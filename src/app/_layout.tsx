@@ -1,3 +1,4 @@
+import "../global.css";
 import { DarkTheme, ThemeProvider, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
