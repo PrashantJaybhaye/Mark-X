@@ -1,4 +1,5 @@
-import React from "react";
+import * as Haptics from "expo-haptics";
+import { StatusBar } from "expo-status-bar";
 import {
   ImageBackground,
   Platform,
@@ -8,9 +9,7 @@ import {
   Vibration,
   View,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Haptics from "expo-haptics";
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -41,31 +40,15 @@ export default function OnboardingScreen() {
           }}
         >
           {/* Header */}
-          <View className="items-center mb-10">
-            {/* 3D Title */}
-            <View className="items-center justify-center">
-              <Text
-                allowFontScaling={false}
-                maxFontSizeMultiplier={1}
-                style={[styles.title, styles.titleShadowDeep]}
-              >
-                MARK X
-              </Text>
-              <Text
-                allowFontScaling={false}
-                maxFontSizeMultiplier={1}
-                style={[styles.title, styles.titleShadowMid]}
-              >
-                MARK X
-              </Text>
-              <Text
-                allowFontScaling={false}
-                maxFontSizeMultiplier={1}
-                style={[styles.title, styles.titleFront]}
-              >
-                MARK X
-              </Text>
-            </View>
+          <View className="items-center mb-20">
+            {/* Title */}
+            <Text
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
+              style={styles.title}
+            >
+              MARK X
+            </Text>
 
             {/* Subtitles */}
             <Text
@@ -110,26 +93,8 @@ const styles = StyleSheet.create({
     fontSize: 54,
     lineHeight: 58,
     letterSpacing: 3,
-    textAlign: "center",
-  },
-  titleShadowDeep: {
-    position: "absolute",
-    top: 4.5,
-    color: "rgba(0, 0, 0, 0.95)",
-    textShadowColor: "rgba(0, 0, 0, 0.8)",
-    textShadowOffset: { width: 0, height: 6 },
-    textShadowRadius: 10,
-  },
-  titleShadowMid: {
-    position: "absolute",
-    top: 2.5,
-    color: "#6E1B00",
-  },
-  titleFront: {
     color: "#FFFFFF",
-    textShadowColor: "rgba(255, 100, 0, 0.85)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textAlign: "center",
   },
   subtitleSmall: {
     fontFamily: "Outfit_400Regular",
