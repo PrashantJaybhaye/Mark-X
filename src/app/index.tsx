@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 import {
   ImageBackground,
   Platform,
@@ -13,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const handleGetStarted = async () => {
     try {
@@ -21,6 +23,7 @@ export default function OnboardingScreen() {
       // Fallback to native vibration for platforms/builds where expo-haptics isn't linked
       Vibration.vibrate(Platform.OS === "android" ? 30 : 15);
     }
+    router.push("/(auth)/login");
   };
 
   return (

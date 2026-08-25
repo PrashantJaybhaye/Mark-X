@@ -12,6 +12,7 @@ import {
   Outfit_800ExtraBold,
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
+import { AuthProvider } from "../context/AuthContext";
 
 // Keep splash screen visible while loading font assets
 SplashScreen.preventAutoHideAsync();
@@ -37,21 +38,24 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={DarkTheme}>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          headerStyle: {
-            backgroundColor: "#121212",
-          },
-          headerTintColor: "#FFFFFF",
-          contentStyle: {
-            backgroundColor: "#121212",
-          },
-        }}
-      />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={DarkTheme}>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            headerStyle: {
+              backgroundColor: "#121212",
+            },
+            headerTintColor: "#FFFFFF",
+            contentStyle: {
+              backgroundColor: "#121212",
+            },
+          }}
+        />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
+
 
