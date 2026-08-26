@@ -14,7 +14,6 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth } from "../services/firebase";
-import { hashPassword } from "../utils/crypto";
 
 interface AuthContextType {
   user: User | null;
@@ -57,8 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (identifier: string, pass: string) => {
     const email = normalizeEmail(identifier);
-    const hashedPassword = await hashPassword(pass, email);
-    await signInWithEmailAndPassword(auth, email, hashedPassword);
+    await signInWithEmailAndPassword(auth, email, pass);
   };
 
   const signUp = async (
@@ -67,11 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     displayName?: string
   ) => {
     const email = normalizeEmail(identifier);
-    const hashedPassword = await hashPassword(pass, email);
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
-      hashedPassword
+      pass
     );
     const name = displayName?.trim() || identifier.trim();
     if (userCredential.user && name) {
