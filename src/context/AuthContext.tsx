@@ -12,6 +12,8 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  sendPasswordResetEmail,
+  sendEmailVerification,
   GoogleAuthProvider,
   signInWithCredential,
   signInWithPopup,
@@ -43,6 +45,9 @@ interface AuthContextType {
     displayName?: string
   ) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  resetPassword: (identifier: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  reloadUser: () => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -90,11 +95,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       pass
     );
     const name = displayName?.trim() || identifier.trim();
-    if (userCredential.user && name) {
-      await updateProfile(userCredential.user, {
-        displayName: name,
+    if (userCredential.user) {
+      if (name) {
+        await updateProfile(userCredential.user, {
+          displayName: name,
+        });
+      }
+      // Send email verification to the newly registered user
+      try {
+        await sendEmailVerification(userCredential.user);
+      } catch (e) {
+        console.warn("Could not send verification email:", e);
+      }
+      setUser({
+        ...userCredential.user,
+        displayName: name || userCredential.user.displayName,
       });
-      setUser({ ...userCredential.user, displayName: name });
     }
   };
 
@@ -147,6 +163,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetPassword = async (identifier: string) => {
+    const trimmed = identifier.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) {
+      throw new Error("Please enter your full registered email address (e.g. yourname@gmail.com).");
+    }
+    await sendPasswordResetEmail(auth, trimmed);
+  };
+
+  const sendVerificationEmail = async () => {
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
+    }
+  };
+
+  const reloadUser = async (): Promise<boolean> => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      const updatedUser = auth.currentUser;
+      setUser({ ...updatedUser });
+      return updatedUser.emailVerified;
+    }
+    return false;
+  };
+
   const signOut = async () => {
     if (Platform.OS !== "web") {
       try {
@@ -164,6 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signInWithGoogle,
+        resetPassword,
+        sendVerificationEmail,
+        reloadUser,
         signOut,
       }}
     >

@@ -18,13 +18,14 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
+import { auth } from "../../services/firebase";
 
 type AuthMode = "signin" | "signup";
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>("signin");
   const [identifier, setIdentifier] = useState("");
@@ -33,13 +34,15 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isResetSuccess, setIsResetSuccess] = useState(false);
 
-  // iOS-style auto-dismiss error message after 3 seconds
+  // iOS-style auto-dismiss error message after 4 seconds
   useEffect(() => {
     if (!errorMessage) return;
     const timer = setTimeout(() => {
       setErrorMessage(null);
-    }, 3000);
+      setIsResetSuccess(false);
+    }, 4000);
     return () => clearTimeout(timer);
   }, [errorMessage]);
 
@@ -58,6 +61,7 @@ export default function LoginScreen() {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setMode(newMode);
     setErrorMessage(null);
+    setIsResetSuccess(false);
   };
 
   const parseFirebaseError = (error: any): string => {
@@ -85,8 +89,34 @@ export default function LoginScreen() {
         return "Popup was blocked by browser. Please allow popups.";
       case "auth/account-exists-with-different-credential":
         return "An account already exists with the same email address.";
+      case "auth/missing-email":
+        return "Please enter an email address.";
       default:
         return error?.message || "An unexpected error occurred. Please try again.";
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!identifier.trim()) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setIsResetSuccess(false);
+      setErrorMessage("Please enter your email above to reset password.");
+      return;
+    }
+
+    try {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      setIsLoading(true);
+      setErrorMessage(null);
+      await resetPassword(identifier);
+      setIsResetSuccess(true);
+      setErrorMessage("Password reset link sent! Check your inbox.");
+    } catch (err: any) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setIsResetSuccess(false);
+      setErrorMessage(parseFirebaseError(err));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -95,6 +125,7 @@ export default function LoginScreen() {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
       setIsLoading(true);
       setErrorMessage(null);
+      setIsResetSuccess(false);
       await signInWithGoogle();
       if (router.canGoBack()) {
         router.back();
@@ -103,6 +134,7 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setIsResetSuccess(false);
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsLoading(false);
@@ -133,8 +165,15 @@ export default function LoginScreen() {
     try {
       if (mode === "signin") {
         await signIn(identifier, password);
+        // If user email is unverified, navigate to verification screen
+        if (auth.currentUser && !auth.currentUser.emailVerified) {
+          router.replace("/(auth)/verify-email");
+          return;
+        }
       } else {
         await signUp(identifier, password, displayName);
+        router.replace("/(auth)/verify-email");
+        return;
       }
       if (router.canGoBack()) {
         router.back();
@@ -198,6 +237,7 @@ export default function LoginScreen() {
               allowFontScaling={false}
               style={[
                 styles.errorText,
+                isResetSuccess && styles.successText,
                 !errorMessage && styles.errorTextHidden,
               ]}
             >
@@ -322,10 +362,8 @@ export default function LoginScreen() {
           {mode === "signin" && (
             <View style={styles.forgotPasswordRow}>
               <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setErrorMessage("Password reset link will be sent to your email.");
-                }}
+                onPress={handleForgotPassword}
+                disabled={isLoading}
                 activeOpacity={0.65}
                 style={styles.forgotPasswordButton}
                 accessibilityRole="button"
@@ -503,6 +541,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: "#FF453A",
     textAlign: "center",
+  },
+  successText: {
+    color: "#30D158",
   },
   errorTextHidden: {
     opacity: 0,
