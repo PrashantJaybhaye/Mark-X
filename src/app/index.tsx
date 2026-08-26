@@ -1,3 +1,4 @@
+import React, { useRef, useState } from "react";
 import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -15,15 +16,28 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const isNavigatingRef = useRef(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const handleGetStarted = async () => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setIsNavigating(true);
+
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {
       // Fallback to native vibration for platforms/builds where expo-haptics isn't linked
       Vibration.vibrate(Platform.OS === "android" ? 30 : 15);
     }
-    router.push("/(auth)/login");
+
+    router.navigate("/(auth)/login");
+
+    // Reset lock after transition completes
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+      setIsNavigating(false);
+    }, 1000);
   };
 
   return (
@@ -73,6 +87,7 @@ export default function OnboardingScreen() {
           {/* Action Button */}
           <TouchableOpacity
             onPress={handleGetStarted}
+            disabled={isNavigating}
             activeOpacity={0.85}
             className="h-14 rounded-full bg-white items-center justify-center mb-2"
           >
