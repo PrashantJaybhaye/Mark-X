@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "project-mark-x",
-    "slug": "project-mark-x",
+    "name": "Mark-X",
+    "slug": "mark-x",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "projectmarkx",
+    "scheme": "markx",
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
-      "package": "com.prashantjaybhaye.projectmarkx",
+      "package": "com.prashantjaybhaye.markx",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,7 +34,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

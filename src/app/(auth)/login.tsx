@@ -24,7 +24,7 @@ type AuthMode = "signin" | "signup";
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>("signin");
   const [identifier, setIdentifier] = useState("");
@@ -78,8 +78,34 @@ export default function LoginScreen() {
         return "Network connection issue. Please check your internet.";
       case "auth/too-many-requests":
         return "Too many failed attempts. Please try again in a few minutes.";
+      case "auth/popup-closed-by-user":
+      case "auth/cancelled-popup-request":
+        return "Google sign-in was cancelled.";
+      case "auth/popup-blocked":
+        return "Popup was blocked by browser. Please allow popups.";
+      case "auth/account-exists-with-different-credential":
+        return "An account already exists with the same email address.";
       default:
         return error?.message || "An unexpected error occurred. Please try again.";
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      setIsLoading(true);
+      setErrorMessage(null);
+      await signInWithGoogle();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/");
+      }
+    } catch (err: any) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setErrorMessage(parseFirebaseError(err));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -322,7 +348,7 @@ export default function LoginScreen() {
             activeOpacity={0.85}
             style={[
               styles.primaryButton,
-              mode === "signup" && { marginTop: 8 },
+              mode === "signup" && { marginTop: 24 },
             ]}
             accessibilityRole="button"
             accessibilityLabel={mode === "signin" ? "Log In" : "Sign Up"}
@@ -354,10 +380,8 @@ export default function LoginScreen() {
           {/* Section 6: Google Authentication */}
           <View style={styles.socialContainer}>
             <TouchableOpacity
-              onPress={() => {
-                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                setErrorMessage("Google Sign-In is ready for production credentials.");
-              }}
+              onPress={handleGoogleSignIn}
+              disabled={isLoading}
               activeOpacity={0.75}
               style={styles.googleButton}
               accessibilityRole="button"
@@ -554,9 +578,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   primaryButtonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 14,
-    letterSpacing: -0.1,
+    fontFamily: "Outfit_700Bold",
+    fontSize: 16,
+    letterSpacing: -0.2,
     color: "#000000",
   },
   dividerRow: {

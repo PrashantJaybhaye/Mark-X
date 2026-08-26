@@ -12,8 +12,26 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithCredential,
+  signInWithPopup,
 } from "firebase/auth";
+import { Platform } from "react-native";
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { auth } from "../services/firebase";
+
+if (Platform.OS !== "web") {
+  GoogleSignin.configure({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    scopes: ["profile", "email"],
+    offlineAccess: false,
+  });
+}
+
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +42,7 @@ interface AuthContextType {
     pass: string,
     displayName?: string
   ) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -79,7 +98,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async () => {
+    // 1. Web environment with window / DOM popup support
+    if (Platform.OS === "web" && typeof signInWithPopup === "function") {
+      const provider = new GoogleAuthProvider();
+      provider.addScope("profile");
+      provider.addScope("email");
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithPopup(auth, provider);
+      return;
+    }
+
+    // 2. Native (iOS / Android) environment using native GoogleSignin
+    try {
+      const webClientId =
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+      GoogleSignin.configure({
+        webClientId,
+        scopes: ["profile", "email"],
+        offlineAccess: false,
+      });
+
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      });
+      const response = await GoogleSignin.signIn();
+      const idToken =
+        response.data?.idToken || (response as any).idToken;
+
+      if (!idToken) {
+        throw new Error("No ID token returned from Google Sign-In.");
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+    } catch (error: any) {
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+          throw new Error("Google Sign-In was cancelled.");
+        } else if (error.code === statusCodes.IN_PROGRESS) {
+          throw new Error("Google Sign-In is already in progress.");
+        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          throw new Error("Google Play Services not available or outdated.");
+        }
+      }
+      throw error;
+    }
+  };
+
   const signOut = async () => {
+    if (Platform.OS !== "web") {
+      try {
+        await GoogleSignin.signOut();
+      } catch {}
+    }
     await firebaseSignOut(auth);
   };
 
@@ -90,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
       }}
     >
