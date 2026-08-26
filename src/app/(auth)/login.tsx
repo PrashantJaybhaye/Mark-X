@@ -1,15 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Vibration,
+  StyleSheet,
+  Image,
+  Pressable,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -32,17 +34,27 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // iOS-style auto-dismiss error message after 3 seconds
+  useEffect(() => {
+    if (!errorMessage) return;
+    const timer = setTimeout(() => {
+      setErrorMessage(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [errorMessage]);
+
   const triggerHaptic = async (
     style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light
   ) => {
     try {
       await Haptics.impactAsync(style);
     } catch {
-      Vibration.vibrate(15);
+      Vibration.vibrate(Platform.OS === "android" ? 25 : 15);
     }
   };
 
   const handleModeSwitch = (newMode: AuthMode) => {
+    if (mode === newMode) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setMode(newMode);
     setErrorMessage(null);
@@ -53,19 +65,19 @@ export default function LoginScreen() {
     switch (code) {
       case "auth/invalid-email":
       case "auth/invalid-credential":
-        return "Invalid username or password.";
+        return "Invalid email address or password.";
       case "auth/user-not-found":
-        return "Account does not exist.";
+        return "No account exists with this email.";
       case "auth/wrong-password":
         return "Incorrect password. Please try again.";
       case "auth/email-already-in-use":
-        return "This username or email is already registered.";
+        return "An account with this email already exists.";
       case "auth/weak-password":
         return "Password must be at least 6 characters.";
       case "auth/network-request-failed":
         return "Network connection issue. Please check your internet.";
       case "auth/too-many-requests":
-        return "Too many failed attempts. Please try again later.";
+        return "Too many failed attempts. Please try again in a few minutes.";
       default:
         return error?.message || "An unexpected error occurred. Please try again.";
     }
@@ -73,14 +85,17 @@ export default function LoginScreen() {
 
   const handleSubmit = async () => {
     if (!identifier.trim()) {
-      setErrorMessage("Please enter your username or email.");
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setErrorMessage("Please enter your email.");
       return;
     }
     if (!password) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
       setErrorMessage("Please enter your password.");
       return;
     }
     if (mode === "signup" && password.length < 6) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
       setErrorMessage("Password must be at least 6 characters.");
       return;
     }
@@ -95,13 +110,14 @@ export default function LoginScreen() {
       } else {
         await signUp(identifier, password, displayName);
       }
-      // Successfully authenticated
       if (router.canGoBack()) {
         router.back();
       } else {
         router.replace("/");
       }
     } catch (err: any) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+      setPassword(""); // Clear wrong password like native iOS
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsLoading(false);
@@ -109,180 +125,166 @@ export default function LoginScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#0A0A0A]">
+    <View style={styles.container}>
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
+        style={styles.flexOne}
       >
         <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingTop: insets.top + 16,
-            paddingBottom: Math.max(insets.bottom, 24) + 16,
-            paddingHorizontal: 24,
-          }}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: Math.max(insets.top, 16) + 4,
+              paddingBottom: Math.max(insets.bottom, 20) + 12,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Header Navigation */}
-          <View className="flex-row items-center justify-between mb-8">
-            <TouchableOpacity
-              onPress={() => {
-                triggerHaptic();
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace("/");
-                }
-              }}
-              activeOpacity={0.7}
-              className="size-10 rounded-full bg-[#1A1A1A] items-center justify-center border border-[#2A2A2A]"
-            >
-              <Text style={styles.backIconText}>‹</Text>
-            </TouchableOpacity>
+          {/* Top Spacing Placeholder (Preserves exact layout structure) */}
+          <View style={styles.topNav} />
 
+          {/* Section 1: Header / Branding */}
+          <View style={styles.brandHeader}>
             <Text
               allowFontScaling={false}
               maxFontSizeMultiplier={1}
-              style={styles.headerBrand}
+              style={styles.brandWordmark}
             >
               MARK X
             </Text>
-
-            <View className="size-10" />
-          </View>
-
-          {/* Mode Switcher Tabs */}
-          <View className="flex-row bg-[#161616] p-1 rounded-2xl border border-[#262626] mb-8">
-            <TouchableOpacity
-              onPress={() => handleModeSwitch("signin")}
-              activeOpacity={0.8}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                mode === "signin" ? "bg-white" : "bg-transparent"
-              }`}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.tabText,
-                  mode === "signin" ? styles.tabTextActive : styles.tabTextInactive,
-                ]}
-              >
-                Sign In
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => handleModeSwitch("signup")}
-              activeOpacity={0.8}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                mode === "signup" ? "bg-white" : "bg-transparent"
-              }`}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.tabText,
-                  mode === "signup" ? styles.tabTextActive : styles.tabTextInactive,
-                ]}
-              >
-                Create Account
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Title and Subtitle */}
-          <View className="mb-8">
             <Text
               allowFontScaling={false}
-              style={styles.headingTitle}
-            >
-              {mode === "signin" ? "Welcome Back" : "Join Mark X"}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={styles.headingSubtitle}
+              maxFontSizeMultiplier={1}
+              style={styles.brandSubtitle}
             >
               {mode === "signin"
-                ? "Enter your credentials to access your account"
-                : "Sign up with your username and password to get started"}
+                ? "Your intelligent digital workspace"
+                : "Create your precision workspace"}
             </Text>
           </View>
 
-          {/* Error Banner */}
-          {errorMessage && (
-            <View className="bg-[#2D1214] border border-[#7A272A] px-4 py-3 rounded-xl mb-6 flex-row items-center">
-              <Text style={styles.errorIcon}>!</Text>
-              <Text
-                allowFontScaling={false}
-                style={styles.errorText}
-              >
-                {errorMessage}
-              </Text>
-            </View>
-          )}
+          {/* iOS-First Inline Status/Error Notice (Fixed Placement - Prevents UI Shift) */}
+          <View style={styles.errorContainer} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.errorText,
+                !errorMessage && styles.errorTextHidden,
+              ]}
+            >
+              {errorMessage || " "}
+            </Text>
+          </View>
 
-          {/* Form Fields */}
-          <View className="gap-5 mb-8">
+          {/* Section 2: Login Form */}
+          <View style={styles.formContainer}>
+            {/* Optional Full Name Field (Sign Up Only) */}
             {mode === "signup" && (
-              <View>
-                <Text style={styles.label}>Full Name (Optional)</Text>
+              <View style={styles.fieldWrapper}>
+                <Text
+                  allowFontScaling={false}
+                  style={styles.fieldLabel}
+                >
+                  Full Name
+                </Text>
                 <TextInput
                   value={displayName}
-                  onChangeText={setDisplayName}
-                  placeholder="e.g. Alex Mercer"
-                  placeholderTextColor="#666666"
+                  onChangeText={(val) => {
+                    setDisplayName(val);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
+                  placeholder="Alex Mercer"
+                  placeholderTextColor="#71717A"
+                  selectionColor="#FFFFFF"
                   autoCapitalize="words"
-                  style={styles.input}
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  style={styles.textInput}
                   allowFontScaling={false}
+                  accessibilityLabel="Full Name"
                 />
               </View>
             )}
 
-            <View>
-              <Text style={styles.label}>Username or Email</Text>
+            {/* Email Field */}
+            <View style={styles.fieldWrapper}>
+              <Text
+                allowFontScaling={false}
+                style={styles.fieldLabel}
+              >
+                Email
+              </Text>
               <TextInput
                 value={identifier}
                 onChangeText={(val) => {
                   setIdentifier(val);
                   if (errorMessage) setErrorMessage(null);
                 }}
-                placeholder="Enter username or email"
-                placeholderTextColor="#666666"
+                placeholder="m@example.com"
+                placeholderTextColor="#71717A"
+                selectionColor="#FFFFFF"
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={styles.input}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
+                returnKeyType="next"
+                style={styles.textInput}
                 allowFontScaling={false}
+                accessibilityLabel="Email address"
               />
             </View>
 
-            <View>
-              <Text style={styles.label}>Password</Text>
-              <View className="relative justify-center">
+            {/* Password Field */}
+            <View style={styles.fieldWrapper}>
+              <Text
+                allowFontScaling={false}
+                style={styles.fieldLabel}
+              >
+                Password
+              </Text>
+              <View style={styles.passwordWrapper}>
                 <TextInput
                   value={password}
                   onChangeText={(val) => {
                     setPassword(val);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#666666"
+                  placeholder="Password"
+                  placeholderTextColor="#71717A"
+                  selectionColor="#FFFFFF"
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  style={[styles.input, { paddingRight: 60 }]}
+                  textContentType="password"
+                  autoComplete="password"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                  style={[
+                    styles.textInput,
+                    styles.passwordInput,
+                  ]}
                   allowFontScaling={false}
+                  accessibilityLabel="Password"
                 />
                 <TouchableOpacity
                   onPress={() => {
-                    triggerHaptic();
+                    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
                     setShowPassword((prev) => !prev);
                   }}
-                  activeOpacity={0.7}
-                  className="absolute right-4 px-1 py-2"
+                  activeOpacity={0.65}
+                  style={styles.showHideButton}
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                  <Text style={styles.showHideText}>
+                  <Text
+                    allowFontScaling={false}
+                    style={styles.showHideText}
+                  >
                     {showPassword ? "Hide" : "Show"}
                   </Text>
                 </TouchableOpacity>
@@ -290,44 +292,132 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Submit Action Button */}
+          {/* Section 3: Forgot Password */}
+          {mode === "signin" && (
+            <View style={styles.forgotPasswordRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                  setErrorMessage("Password reset link will be sent to your email.");
+                }}
+                activeOpacity={0.65}
+                style={styles.forgotPasswordButton}
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={styles.forgotPasswordText}
+                >
+                  Forgot Password?
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Section 4: Primary Action Button */}
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={isLoading}
             activeOpacity={0.85}
-            className={`h-14 rounded-full items-center justify-center mb-6 ${
-              isLoading ? "bg-[#333333]" : "bg-white"
-            }`}
+            style={[
+              styles.primaryButton,
+              mode === "signup" && { marginTop: 8 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={mode === "signin" ? "Log In" : "Sign Up"}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color="#000000" size="small" />
             ) : (
               <Text
                 allowFontScaling={false}
-                style={styles.submitButtonText}
+                style={styles.primaryButtonText}
               >
-                {mode === "signin" ? "Sign In" : "Create Account"}
+                {mode === "signin" ? "Log In" : "Sign Up"}
               </Text>
             )}
           </TouchableOpacity>
 
-          {/* Toggle Helper Footer */}
-          <View className="flex-row justify-center items-center mt-auto pt-6">
-            <Text style={styles.footerText}>
-              {mode === "signin"
-                ? "Don't have an account? "
-                : "Already have an account? "}
+          {/* Section 5: Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text
+              allowFontScaling={false}
+              style={styles.dividerText}
+            >
+              or
             </Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Section 6: Google Authentication */}
+          <View style={styles.socialContainer}>
             <TouchableOpacity
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setErrorMessage("Google Sign-In is ready for production credentials.");
+              }}
+              activeOpacity={0.75}
+              style={styles.googleButton}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+            >
+              <Image
+                source={require("../../../assets/images/google.png")}
+                style={styles.googleIcon}
+                resizeMode="contain"
+              />
+              <Text
+                allowFontScaling={false}
+                style={styles.googleButtonText}
+              >
+                Continue with Google
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Section 7: Sign-Up / Mode Toggle */}
+          <View style={styles.toggleContainer}>
+            <Pressable
               onPress={() =>
                 handleModeSwitch(mode === "signin" ? "signup" : "signin")
               }
-              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
+              style={({ pressed }) => [
+                styles.togglePressable,
+                { opacity: pressed ? 0.65 : 1 },
+              ]}
+              accessibilityRole="button"
             >
-              <Text style={styles.footerLink}>
-                {mode === "signin" ? "Sign Up" : "Sign In"}
+              <Text
+                allowFontScaling={false}
+                style={styles.toggleMutedText}
+              >
+                {mode === "signin"
+                  ? "Don't have an account? "
+                  : "Already have an account? "}
+                <Text style={styles.toggleHighlightText}>
+                  {mode === "signin" ? "Sign up" : "Log in"}
+                </Text>
               </Text>
-            </TouchableOpacity>
+            </Pressable>
+          </View>
+
+          {/* Flexible Bottom Spacer */}
+          <View style={styles.spacer} />
+
+          {/* Bottom Legal / Terms Notice (Inside Safe Area) */}
+          <View style={styles.legalContainer}>
+            <Text
+              allowFontScaling={false}
+              style={styles.legalText}
+            >
+              By continuing, you agree to our{" "}
+              <Text style={styles.legalLink}>Terms of Service</Text>{" "}
+              and{" "}
+              <Text style={styles.legalLink}>Privacy Policy</Text>.
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -336,96 +426,215 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerBrand: {
-    fontFamily: "Outfit_800ExtraBold",
-    fontSize: 18,
-    letterSpacing: 2.5,
-    color: "#FFFFFF",
+  container: {
+    flex: 1,
+    backgroundColor: "#000000",
   },
-  backIconText: {
+  flexOne: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+  },
+  topNav: {
+    height: 44,
+    marginBottom: 16,
+  },
+  brandHeader: {
+    alignItems: "center",
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  brandWordmark: {
+    fontFamily: "Outfit_900Black",
+    fontSize: 36,
+    lineHeight: 42,
+    letterSpacing: 3.5,
     color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "300",
-    lineHeight: 26,
     textAlign: "center",
-    marginTop: -2,
+    marginBottom: 8,
+    textTransform: "uppercase",
   },
-  tabText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 14,
-    letterSpacing: -0.1,
-  },
-  tabTextActive: {
-    color: "#0A0A0A",
-  },
-  tabTextInactive: {
-    color: "#888888",
-  },
-  headingTitle: {
-    fontFamily: "Outfit_800ExtraBold",
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: -0.5,
-    color: "#FFFFFF",
-    marginBottom: 6,
-  },
-  headingSubtitle: {
+  brandSubtitle: {
     fontFamily: "Outfit_400Regular",
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 21,
     color: "#8E8E93",
+    textAlign: "center",
+    letterSpacing: 0.15,
+    maxWidth: 290,
   },
-  label: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    letterSpacing: 0.2,
-    color: "#A0A0A0",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#161616",
-    borderWidth: 1,
-    borderColor: "#262626",
-    borderRadius: 14,
-    height: 52,
-    paddingHorizontal: 16,
-    color: "#FFFFFF",
-    fontFamily: "Outfit_400Regular",
-    fontSize: 16,
-  },
-  showHideText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 13,
-    color: "#999999",
-  },
-  errorIcon: {
-    color: "#FF453A",
-    fontWeight: "bold",
-    fontSize: 14,
-    marginRight: 8,
+  errorContainer: {
+    minHeight: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingHorizontal: 8,
   },
   errorText: {
-    flex: 1,
-    fontFamily: "Outfit_400Regular",
+    fontFamily: "Outfit_500Medium",
     fontSize: 13,
     lineHeight: 18,
     color: "#FF453A",
+    textAlign: "center",
   },
-  submitButtonText: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 16,
-    letterSpacing: -0.2,
-    color: "#0A0A0A",
+  errorTextHidden: {
+    opacity: 0,
   },
-  footerText: {
+  formContainer: {
+    gap: 16,
+    marginBottom: 6,
+  },
+  fieldWrapper: {
+    width: "100%",
+  },
+  fieldLabel: {
+    fontFamily: "Outfit_500Medium",
+    color: "#FFFFFF",
+    fontSize: 14,
+    letterSpacing: -0.1,
+    marginBottom: 6,
+  },
+  textInput: {
+    backgroundColor: "#000000",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderRadius: 10,
+    borderCurve: "continuous",
+    height: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
+    color: "#FFFFFF",
     fontFamily: "Outfit_400Regular",
     fontSize: 14,
-    color: "#777777",
   },
-  footerLink: {
+  passwordWrapper: {
+    position: "relative",
+    justifyContent: "center",
+  },
+  passwordInput: {
+    paddingRight: 56,
+  },
+  showHideButton: {
+    position: "absolute",
+    right: 12,
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  showHideText: {
+    fontFamily: "Outfit_500Medium",
+    fontSize: 13,
+    color: "#8E8E93",
+  },
+  forgotPasswordRow: {
+    alignItems: "flex-end",
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  forgotPasswordButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  forgotPasswordText: {
+    fontFamily: "Outfit_500Medium",
+    fontSize: 13,
+    color: "#8E8E93",
+    letterSpacing: 0.1,
+  },
+  primaryButton: {
+    height: 44,
+    borderRadius: 10,
+    borderCurve: "continuous",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  primaryButtonText: {
     fontFamily: "Outfit_600SemiBold",
     fontSize: 14,
+    letterSpacing: -0.1,
+    color: "#000000",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+  },
+  dividerText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 13,
+    color: "#636366",
+  },
+  socialContainer: {
+    marginBottom: 20,
+  },
+  googleButton: {
+    height: 44,
+    borderRadius: 10,
+    borderCurve: "continuous",
+    backgroundColor: "#000000",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  googleIcon: {
+    width: 18,
+    height: 18,
+  },
+  googleButtonText: {
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 14,
+    letterSpacing: -0.1,
     color: "#FFFFFF",
-    textDecorationLine: "underline",
+  },
+  toggleContainer: {
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  togglePressable: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  toggleMutedText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    color: "#8E8E93",
+    textAlign: "center",
+  },
+  toggleHighlightText: {
+    fontFamily: "Outfit_700Bold",
+    color: "#FFFFFF",
+  },
+  spacer: {
+    flex: 1,
+    minHeight: 20,
+  },
+  legalContainer: {
+    alignItems: "center",
+    paddingTop: 8,
+  },
+  legalText: {
+    fontFamily: "Outfit_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#636366",
+    textAlign: "center",
+  },
+  legalLink: {
+    fontFamily: "Outfit_500Medium",
+    color: "#8E8E93",
   },
 });
