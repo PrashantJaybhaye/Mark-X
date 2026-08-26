@@ -1,6 +1,6 @@
 import "../global.css";
-import { useEffect } from "react";
-import { DarkTheme, ThemeProvider, Stack } from "expo-router";
+import React, { useEffect } from "react";
+import { DarkTheme, ThemeProvider, Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import {
@@ -12,10 +12,52 @@ import {
   Outfit_800ExtraBold,
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
-import { AuthProvider } from "../context/AuthContext";
+import { Anton_400Regular } from "@expo-google-fonts/anton";
+import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 
 // Keep splash screen visible while loading font assets
 SplashScreen.preventAutoHideAsync();
+
+function NavigationGuard() {
+  const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+    const inMainGroup = segments[0] === "(main)";
+    const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
+    const isOnboarding = !segments[0];
+
+    // 1. Not Authenticated: redirect if trying to access protected areas
+    if (!user) {
+      if (inMainGroup || isVerifyScreen) {
+        router.replace("/(auth)/login");
+      }
+      return;
+    }
+
+    // 2. Authenticated but Unverified: route to verify email screen
+    if (!user.emailVerified) {
+      if (!isVerifyScreen) {
+        router.replace("/(auth)/verify-email");
+      }
+      return;
+    }
+
+    // 3. Authenticated and Verified: route to main home dashboard
+    if (user.emailVerified) {
+      if (inAuthGroup || isOnboarding) {
+        router.replace("/(main)/home");
+      }
+    }
+  }, [user, loading, segments]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -25,6 +67,8 @@ export default function RootLayout() {
     Outfit_700Bold,
     Outfit_800ExtraBold,
     Outfit_900Black,
+    Anton_400Regular,
+    BebasNeue_400Regular,
   });
 
   useEffect(() => {
@@ -41,21 +85,24 @@ export default function RootLayout() {
     <AuthProvider>
       <ThemeProvider value={DarkTheme}>
         <StatusBar style="light" />
+        <NavigationGuard />
         <Stack
           screenOptions={{
             headerShown: false,
             headerStyle: {
-              backgroundColor: "#121212",
+              backgroundColor: "#090A0F",
             },
             headerTintColor: "#FFFFFF",
             contentStyle: {
-              backgroundColor: "#121212",
+              backgroundColor: "#090A0F",
             },
           }}
-        />
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(main)" />
+        </Stack>
       </ThemeProvider>
     </AuthProvider>
   );
 }
-
-
