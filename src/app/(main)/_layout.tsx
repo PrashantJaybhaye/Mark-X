@@ -6,7 +6,7 @@ export default function MainLayout() {
       screenOptions={{
         headerShown: false,
         contentStyle: {
-          backgroundColor: "#090A0F",
+          backgroundColor: "#FFFFFF",
         },
       }}
     >

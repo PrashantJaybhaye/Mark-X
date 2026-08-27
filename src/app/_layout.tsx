@@ -1,6 +1,6 @@
 import "../global.css";
 import React, { useEffect } from "react";
-import { DarkTheme, ThemeProvider, Stack, useRouter, useSegments } from "expo-router";
+import { DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import {
@@ -83,18 +83,18 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={DarkTheme}>
-        <StatusBar style="light" />
+      <ThemeProvider value={DefaultTheme}>
+        <StatusBar style="dark" />
         <NavigationGuard />
         <Stack
           screenOptions={{
             headerShown: false,
             headerStyle: {
-              backgroundColor: "#090A0F",
+              backgroundColor: "#FFFFFF",
             },
-            headerTintColor: "#FFFFFF",
+            headerTintColor: "#000000",
             contentStyle: {
-              backgroundColor: "#090A0F",
+              backgroundColor: "#FFFFFF",
             },
           }}
         >
