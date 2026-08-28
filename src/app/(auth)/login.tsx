@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Vibration,
-  StyleSheet,
-  Image,
-  Pressable,
+  View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -19,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../services/firebase";
+import { triggerHaptic } from "../../utils/haptics";
 
 type AuthMode = "signin" | "signup";
 
@@ -36,7 +35,7 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isResetSuccess, setIsResetSuccess] = useState(false);
 
-  // iOS-style auto-dismiss error message after 4 seconds
+  // Auto-dismiss feedback message after 4 seconds
   useEffect(() => {
     if (!errorMessage) return;
     const timer = setTimeout(() => {
@@ -45,16 +44,6 @@ export default function LoginScreen() {
     }, 4000);
     return () => clearTimeout(timer);
   }, [errorMessage]);
-
-  const triggerHaptic = async (
-    style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light
-  ) => {
-    try {
-      await Haptics.impactAsync(style);
-    } catch {
-      Vibration.vibrate(Platform.OS === "android" ? 25 : 15);
-    }
-  };
 
   const handleModeSwitch = (newMode: AuthMode) => {
     if (mode === newMode) return;
@@ -85,12 +74,6 @@ export default function LoginScreen() {
       case "auth/popup-closed-by-user":
       case "auth/cancelled-popup-request":
         return "Google sign-in was cancelled.";
-      case "auth/popup-blocked":
-        return "Popup was blocked by browser. Please allow popups.";
-      case "auth/account-exists-with-different-credential":
-        return "An account already exists with the same email address.";
-      case "auth/missing-email":
-        return "Please enter an email address.";
       default:
         return error?.message || "An unexpected error occurred. Please try again.";
     }
@@ -165,7 +148,6 @@ export default function LoginScreen() {
     try {
       if (mode === "signin") {
         await signIn(identifier, password);
-        // If user email is unverified, navigate to verification screen
         if (auth.currentUser && !auth.currentUser.emailVerified) {
           router.replace("/(auth)/verify-email");
           return;
@@ -182,7 +164,7 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-      setPassword(""); // Clear wrong password like native iOS
+      setPassword("");
       setErrorMessage(parseFirebaseError(err));
     } finally {
       setIsLoading(false);
@@ -190,40 +172,39 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-black">
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.flexOne}
+        className="flex-1"
       >
         <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingTop: Math.max(insets.top, 16) + 4,
-              paddingBottom: Math.max(insets.bottom, 20) + 12,
-            },
-          ]}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 24,
+            paddingTop: Math.max(insets.top, 16) + 4,
+            paddingBottom: Math.max(insets.bottom, 20) + 12,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Spacing Placeholder (Preserves exact layout structure) */}
-          <View style={styles.topNav} />
+          {/* Top Nav Spacing */}
+          <View className="h-11 mb-4" />
 
-          {/* Section 1: Header / Branding */}
-          <View style={styles.brandHeader}>
+          {/* Header Branding */}
+          <View className="items-center mb-8 px-2">
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.brandWordmark}
+              className="text-[36px] text-white tracking-[3.5px] text-center leading-[42px] mb-2 uppercase"
+              style={{ fontFamily: "Outfit_900Black" }}
             >
               MARK X
             </Text>
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.brandSubtitle}
+              className="text-[15px] text-[#8E8E93] text-center leading-[21px] max-w-[290px]"
+              style={{ fontFamily: "Outfit_400Regular" }}
             >
               {mode === "signin"
                 ? "Your intelligent digital workspace"
@@ -231,28 +212,28 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {/* iOS-First Inline Status/Error Notice (Fixed Placement - Prevents UI Shift) */}
-          <View style={styles.errorContainer} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {/* Status / Error Notice */}
+          <View className="h-5 min-h-[20px] justify-center items-center mb-4 px-2">
             <Text
               allowFontScaling={false}
-              style={[
-                styles.errorText,
-                isResetSuccess && styles.successText,
-                !errorMessage && styles.errorTextHidden,
-              ]}
+              className={`text-[13px] text-center leading-[18px] ${
+                isResetSuccess ? "text-[#30D158]" : "text-[#FF453A]"
+              } ${!errorMessage ? "opacity-0" : "opacity-100"}`}
+              style={{ fontFamily: "Outfit_500Medium" }}
             >
               {errorMessage || " "}
             </Text>
           </View>
 
-          {/* Section 2: Login Form */}
-          <View style={styles.formContainer}>
-            {/* Optional Full Name Field (Sign Up Only) */}
+          {/* Form Fields */}
+          <View className="gap-3 mb-2">
+            {/* Optional Full Name (Sign Up Only) */}
             {mode === "signup" && (
-              <View style={styles.fieldWrapper}>
+              <View className="gap-1.5">
                 <Text
                   allowFontScaling={false}
-                  style={styles.fieldLabel}
+                  className="text-[13px] text-[#8E8E93]"
+                  style={{ fontFamily: "Outfit_500Medium" }}
                 >
                   Full Name
                 </Text>
@@ -268,18 +249,19 @@ export default function LoginScreen() {
                   autoCapitalize="words"
                   autoCorrect={false}
                   returnKeyType="next"
-                  style={styles.textInput}
+                  className="h-11 rounded-[10px] bg-[#141416] border border-white/[0.12] px-3.5 text-white text-[15px]"
+                  style={{ fontFamily: "Outfit_400Regular" }}
                   allowFontScaling={false}
-                  accessibilityLabel="Full Name"
                 />
               </View>
             )}
 
             {/* Email Field */}
-            <View style={styles.fieldWrapper}>
+            <View className="gap-1.5">
               <Text
                 allowFontScaling={false}
-                style={styles.fieldLabel}
+                className="text-[13px] text-[#8E8E93]"
+                style={{ fontFamily: "Outfit_500Medium" }}
               >
                 Email
               </Text>
@@ -298,21 +280,22 @@ export default function LoginScreen() {
                 textContentType="emailAddress"
                 autoComplete="email"
                 returnKeyType="next"
-                style={styles.textInput}
+                className="h-11 rounded-[10px] bg-[#141416] border border-white/[0.12] px-3.5 text-white text-[15px]"
+                style={{ fontFamily: "Outfit_400Regular" }}
                 allowFontScaling={false}
-                accessibilityLabel="Email address"
               />
             </View>
 
             {/* Password Field */}
-            <View style={styles.fieldWrapper}>
+            <View className="gap-1.5">
               <Text
                 allowFontScaling={false}
-                style={styles.fieldLabel}
+                className="text-[13px] text-[#8E8E93]"
+                style={{ fontFamily: "Outfit_500Medium" }}
               >
                 Password
               </Text>
-              <View style={styles.passwordWrapper}>
+              <View className="relative justify-center">
                 <TextInput
                   value={password}
                   onChangeText={(val) => {
@@ -329,12 +312,9 @@ export default function LoginScreen() {
                   autoComplete="password"
                   returnKeyType="done"
                   onSubmitEditing={handleSubmit}
-                  style={[
-                    styles.textInput,
-                    styles.passwordInput,
-                  ]}
+                  className="h-11 rounded-[10px] bg-[#141416] border border-white/[0.12] pl-3.5 pr-14 text-white text-[15px]"
+                  style={{ fontFamily: "Outfit_400Regular" }}
                   allowFontScaling={false}
-                  accessibilityLabel="Password"
                 />
                 <TouchableOpacity
                   onPress={() => {
@@ -342,14 +322,13 @@ export default function LoginScreen() {
                     setShowPassword((prev) => !prev);
                   }}
                   activeOpacity={0.65}
-                  style={styles.showHideButton}
-                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  accessibilityRole="button"
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  className="absolute right-3.5 py-1 px-1"
                 >
                   <Text
                     allowFontScaling={false}
-                    style={styles.showHideText}
+                    className="text-[13px] text-[#8E8E93]"
+                    style={{ fontFamily: "Outfit_500Medium" }}
                   >
                     {showPassword ? "Hide" : "Show"}
                   </Text>
@@ -358,20 +337,20 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Section 3: Forgot Password */}
+          {/* Forgot Password Link */}
           {mode === "signin" && (
-            <View style={styles.forgotPasswordRow}>
+            <View className="items-end mb-5">
               <TouchableOpacity
                 onPress={handleForgotPassword}
                 disabled={isLoading}
                 activeOpacity={0.65}
-                style={styles.forgotPasswordButton}
-                accessibilityRole="button"
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="py-1 px-0.5"
               >
                 <Text
                   allowFontScaling={false}
-                  style={styles.forgotPasswordText}
+                  className="text-[13px] text-[#8E8E93]"
+                  style={{ fontFamily: "Outfit_500Medium" }}
                 >
                   Forgot Password?
                 </Text>
@@ -379,106 +358,116 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* Section 4: Primary Action Button */}
+          {/* Submit Button */}
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={isLoading}
             activeOpacity={0.85}
-            style={[
-              styles.primaryButton,
-              mode === "signup" && { marginTop: 24 },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={mode === "signin" ? "Log In" : "Sign Up"}
+            className={`h-11 rounded-[10px] bg-white items-center justify-center mb-4 active:bg-white/90 ${
+              mode === "signup" ? "mt-6" : ""
+            }`}
           >
             {isLoading ? (
               <ActivityIndicator color="#000000" size="small" />
             ) : (
               <Text
                 allowFontScaling={false}
-                style={styles.primaryButtonText}
+                className="text-[16px] text-black tracking-tight"
+                style={{ fontFamily: "Outfit_700Bold" }}
               >
                 {mode === "signin" ? "Log In" : "Sign Up"}
               </Text>
             )}
           </TouchableOpacity>
 
-          {/* Section 5: Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
+          {/* Divider */}
+          <View className="flex-row items-center gap-3.5 mb-4">
+            <View className="flex-1 h-[1px] bg-white/[0.12]" />
             <Text
               allowFontScaling={false}
-              style={styles.dividerText}
+              className="text-[13px] text-[#636366]"
+              style={{ fontFamily: "Outfit_400Regular" }}
             >
               or
             </Text>
-            <View style={styles.dividerLine} />
+            <View className="flex-1 h-[1px] bg-white/[0.12]" />
           </View>
 
-          {/* Section 6: Google Authentication */}
-          <View style={styles.socialContainer}>
+          {/* Google Sign In */}
+          <View className="mb-5">
             <TouchableOpacity
               onPress={handleGoogleSignIn}
               disabled={isLoading}
               activeOpacity={0.75}
-              style={styles.googleButton}
-              accessibilityRole="button"
-              accessibilityLabel="Continue with Google"
+              className="h-11 rounded-[10px] bg-black border border-white/[0.14] flex-row items-center justify-center gap-2.5 active:bg-white/5"
             >
               <Image
                 source={require("../../../assets/images/google.png")}
-                style={styles.googleIcon}
+                className="w-[18px] h-[18px]"
                 resizeMode="contain"
               />
               <Text
                 allowFontScaling={false}
-                style={styles.googleButtonText}
+                className="text-[14px] text-white tracking-tight"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
               >
                 Continue with Google
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Section 7: Sign-Up / Mode Toggle */}
-          <View style={styles.toggleContainer}>
+          {/* Mode Switch Toggle */}
+          <View className="items-center py-1.5">
             <Pressable
               onPress={() =>
                 handleModeSwitch(mode === "signin" ? "signup" : "signin")
               }
               hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }}
-              style={({ pressed }) => [
-                styles.togglePressable,
-                { opacity: pressed ? 0.65 : 1 },
-              ]}
-              accessibilityRole="button"
+              className="py-1.5 px-3"
             >
               <Text
                 allowFontScaling={false}
-                style={styles.toggleMutedText}
+                className="text-[14px] text-[#8E8E93] text-center"
+                style={{ fontFamily: "Outfit_400Regular" }}
               >
                 {mode === "signin"
                   ? "Don't have an account? "
                   : "Already have an account? "}
-                <Text style={styles.toggleHighlightText}>
+                <Text
+                  className="text-white"
+                  style={{ fontFamily: "Outfit_700Bold" }}
+                >
                   {mode === "signin" ? "Sign up" : "Log in"}
                 </Text>
               </Text>
             </Pressable>
           </View>
 
-          {/* Flexible Bottom Spacer */}
-          <View style={styles.spacer} />
+          {/* Spacer */}
+          <View className="flex-1 min-h-[20px]" />
 
-          {/* Bottom Legal / Terms Notice (Inside Safe Area) */}
-          <View style={styles.legalContainer}>
+          {/* Legal / Terms */}
+          <View className="items-center pt-2">
             <Text
               allowFontScaling={false}
-              style={styles.legalText}
+              className="text-[12px] text-[#636366] text-center leading-[18px]"
+              style={{ fontFamily: "Outfit_400Regular" }}
             >
               By continuing, you agree to our{" "}
-              <Text style={styles.legalLink}>Terms of Service</Text>{" "}
+              <Text
+                className="text-[#8E8E93]"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Terms of Service
+              </Text>{" "}
               and{" "}
-              <Text style={styles.legalLink}>Privacy Policy</Text>.
+              <Text
+                className="text-[#8E8E93]"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Privacy Policy
+              </Text>
+              .
             </Text>
           </View>
         </ScrollView>
@@ -486,220 +475,3 @@ export default function LoginScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
-  flexOne: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-  },
-  topNav: {
-    height: 44,
-    marginBottom: 16,
-  },
-  brandHeader: {
-    alignItems: "center",
-    marginBottom: 32,
-    paddingHorizontal: 8,
-  },
-  brandWordmark: {
-    fontFamily: "Outfit_900Black",
-    fontSize: 36,
-    lineHeight: 42,
-    letterSpacing: 3.5,
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 8,
-    textTransform: "uppercase",
-  },
-  brandSubtitle: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 15,
-    lineHeight: 21,
-    color: "#8E8E93",
-    textAlign: "center",
-    letterSpacing: 0.15,
-    maxWidth: 290,
-  },
-  errorContainer: {
-    minHeight: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  errorText: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#FF453A",
-    textAlign: "center",
-  },
-  successText: {
-    color: "#30D158",
-  },
-  errorTextHidden: {
-    opacity: 0,
-  },
-  formContainer: {
-    gap: 16,
-    marginBottom: 6,
-  },
-  fieldWrapper: {
-    width: "100%",
-  },
-  fieldLabel: {
-    fontFamily: "Outfit_500Medium",
-    color: "#FFFFFF",
-    fontSize: 14,
-    letterSpacing: -0.1,
-    marginBottom: 6,
-  },
-  textInput: {
-    backgroundColor: "#000000",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
-    borderRadius: 10,
-    borderCurve: "continuous",
-    height: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 0,
-    color: "#FFFFFF",
-    fontFamily: "Outfit_400Regular",
-    fontSize: 14,
-  },
-  passwordWrapper: {
-    position: "relative",
-    justifyContent: "center",
-  },
-  passwordInput: {
-    paddingRight: 56,
-  },
-  showHideButton: {
-    position: "absolute",
-    right: 12,
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  showHideText: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    color: "#8E8E93",
-  },
-  forgotPasswordRow: {
-    alignItems: "flex-end",
-    marginTop: 6,
-    marginBottom: 20,
-  },
-  forgotPasswordButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  forgotPasswordText: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    color: "#8E8E93",
-    letterSpacing: 0.1,
-  },
-  primaryButton: {
-    height: 44,
-    borderRadius: 10,
-    borderCurve: "continuous",
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  primaryButtonText: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 16,
-    letterSpacing: -0.2,
-    color: "#000000",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginBottom: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-  },
-  dividerText: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 13,
-    color: "#636366",
-  },
-  socialContainer: {
-    marginBottom: 20,
-  },
-  googleButton: {
-    height: 44,
-    borderRadius: 10,
-    borderCurve: "continuous",
-    backgroundColor: "#000000",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  googleIcon: {
-    width: 18,
-    height: 18,
-  },
-  googleButtonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 14,
-    letterSpacing: -0.1,
-    color: "#FFFFFF",
-  },
-  toggleContainer: {
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  togglePressable: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  toggleMutedText: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 14,
-    color: "#8E8E93",
-    textAlign: "center",
-  },
-  toggleHighlightText: {
-    fontFamily: "Outfit_700Bold",
-    color: "#FFFFFF",
-  },
-  spacer: {
-    flex: 1,
-    minHeight: 20,
-  },
-  legalContainer: {
-    alignItems: "center",
-    paddingTop: 8,
-  },
-  legalText: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#636366",
-    textAlign: "center",
-  },
-  legalLink: {
-    fontFamily: "Outfit_500Medium",
-    color: "#8E8E93",
-  },
-});

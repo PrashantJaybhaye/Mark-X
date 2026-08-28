@@ -1,19 +1,17 @@
-import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  ImageBackground,
-  Platform,
-  StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from "react-native";
+import { Image } from "expo-image";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
+import { triggerHaptic } from "../../utils/haptics";
 
 export default function VerifyEmailScreen() {
   const insets = useSafeAreaInsets();
@@ -44,16 +42,6 @@ export default function VerifyEmailScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
-
-  const triggerHaptic = async (
-    style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light
-  ) => {
-    try {
-      await Haptics.impactAsync(style);
-    } catch {
-      Vibration.vibrate(Platform.OS === "android" ? 25 : 15);
-    }
-  };
 
   const handleCheckVerification = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -113,14 +101,17 @@ export default function VerifyEmailScreen() {
     <View className="flex-1 bg-[#1A1A24]">
       <StatusBar style="light" />
 
-      {/* Background image mimicking the underlying screen */}
-      <ImageBackground
-        source={require("../../../assets/images/VerifyBG.png")}
-        className="absolute inset-0"
-        resizeMode="cover"
-      >
+      {/* High-Performance Instant Background Image */}
+      <View className="absolute inset-0">
+        <Image
+          source={require("../../../assets/images/VerifyBG.webp")}
+          style={{ width: "100%", height: "100%", position: "absolute" }}
+          contentFit="cover"
+          priority="high"
+          cachePolicy="memory-disk"
+        />
         <View className="absolute inset-0 bg-black/40" />
-      </ImageBackground>
+      </View>
 
       {/* Bottom Sheet Modal */}
       <View className="flex-1 justify-end">
@@ -132,30 +123,51 @@ export default function VerifyEmailScreen() {
           <View className="items-end w-full mb-4">
             <TouchableOpacity
               onPress={handleClose}
-              className="w-8 h-8 rounded-full bg-[#2C2C2E] items-center justify-center"
+              className="w-8 h-8 rounded-full bg-[#2C2C2E] items-center justify-center active:bg-[#3A3A3C]"
               activeOpacity={0.7}
             >
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Text
+                allowFontScaling={false}
+                className="text-[16px] text-[#8E8E93]"
+                style={{ fontFamily: "Outfit_700Bold" }}
+              >
+                ✕
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Typography Header */}
-          <Text allowFontScaling={false} style={styles.title}>
+          <Text
+            allowFontScaling={false}
+            className="text-[34px] text-white tracking-[0.6px] leading-[38px] mb-2.5"
+            style={{ fontFamily: "Anton_400Regular" }}
+          >
             VERIFY YOUR EMAIL
           </Text>
 
-          <Text allowFontScaling={false} style={styles.subtitle}>
+          <Text
+            allowFontScaling={false}
+            className="text-[15px] text-[#8E8E93] leading-[22px] mb-7"
+            style={{ fontFamily: "Outfit_500Medium" }}
+          >
             We sent you a verification link to your email address.
           </Text>
 
-          {/* Email Display (Input Style) */}
+          {/* Email Display */}
           <View className="w-full mb-3">
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text
+              allowFontScaling={false}
+              className="text-[13px] text-[#8E8E93] mb-2"
+              style={{ fontFamily: "Outfit_500Medium" }}
+            >
+              Email
+            </Text>
             <View className="border-b border-[#38383A] pb-3">
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
-                style={styles.inputText}
+                className="text-[17px] text-white"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
               >
                 {user?.email || "your email address"}
               </Text>
@@ -163,7 +175,11 @@ export default function VerifyEmailScreen() {
           </View>
 
           {/* Spam / Junk Notice */}
-          <Text allowFontScaling={false} style={styles.spamNotice}>
+          <Text
+            allowFontScaling={false}
+            className="text-[13px] text-[#8E8E93] leading-[18px] mt-1 mb-2"
+            style={{ fontFamily: "Outfit_400Regular" }}
+          >
             Didn't receive the email? Please check your Spam folder.
           </Text>
 
@@ -171,27 +187,30 @@ export default function VerifyEmailScreen() {
           <View className="min-h-[24px] justify-center items-center mb-4">
             <Text
               allowFontScaling={false}
-              style={[
-                styles.statusText,
-                isSuccess ? styles.statusSuccess : styles.statusError,
-                !statusMessage && styles.statusHidden,
-              ]}
+              className={`text-[14px] text-center ${
+                isSuccess ? "text-[#32D74B]" : "text-[#FF3B30]"
+              } ${!statusMessage ? "opacity-0" : "opacity-100"}`}
+              style={{ fontFamily: "Outfit_500Medium" }}
             >
               {statusMessage || " "}
             </Text>
           </View>
 
-          {/* Actions */}
+          {/* Action Buttons */}
           <TouchableOpacity
             onPress={handleCheckVerification}
             disabled={isChecking}
             activeOpacity={0.85}
-            className="h-14 bg-white rounded-[18px] justify-center items-center mb-3"
+            className="h-14 bg-white rounded-[18px] justify-center items-center mb-3 active:bg-white/90"
           >
             {isChecking ? (
               <ActivityIndicator color="#000000" size="small" />
             ) : (
-              <Text allowFontScaling={false} style={styles.primaryButtonText}>
+              <Text
+                allowFontScaling={false}
+                className="text-[17px] text-black"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
                 Continue
               </Text>
             )}
@@ -208,10 +227,10 @@ export default function VerifyEmailScreen() {
             ) : (
               <Text
                 allowFontScaling={false}
-                style={[
-                  styles.secondaryButtonText,
-                  resendCooldown > 0 && styles.secondaryDisabledText,
-                ]}
+                className={`text-[15px] ${
+                  resendCooldown > 0 ? "text-[#48484A]" : "text-[#8E8E93]"
+                }`}
+                style={{ fontFamily: "Outfit_600SemiBold" }}
               >
                 {resendCooldown > 0
                   ? `Resend Email in ${resendCooldown}s`
@@ -224,72 +243,3 @@ export default function VerifyEmailScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  closeButtonText: {
-    fontFamily: "Outfit_700Bold",
-    fontSize: 16,
-    color: "#8E8E93",
-  },
-  title: {
-    fontFamily: "Anton_400Regular",
-    fontSize: 34,
-    lineHeight: 38,
-    color: "#FFFFFF",
-    letterSpacing: 0.6,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#8E8E93",
-    marginBottom: 30,
-  },
-  inputLabel: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 13,
-    color: "#8E8E93",
-    marginBottom: 8,
-  },
-  inputText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 17,
-    color: "#FFFFFF",
-  },
-  spamNotice: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#8E8E93",
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  statusText: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 14,
-    textAlign: "center",
-  },
-  statusSuccess: {
-    color: "#32D74B",
-  },
-  statusError: {
-    color: "#FF3B30",
-  },
-  statusHidden: {
-    opacity: 0,
-  },
-  primaryButtonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 17,
-    color: "#000000",
-  },
-  secondaryButtonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 15,
-    color: "#8E8E93",
-  },
-  secondaryDisabledText: {
-    color: "#48484A",
-  },
-});

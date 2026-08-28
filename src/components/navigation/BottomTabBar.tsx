@@ -1,12 +1,14 @@
+import React from "react";
+import { TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { Platform, TouchableOpacity, Vibration, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
+import { triggerHaptic } from "../../utils/haptics";
 
 export type TabKey = "home" | "drive" | "upload" | "notes" | "profile";
 
-interface Props {
+interface BottomTabBarProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onCenterActionPress?: () => void;
@@ -18,19 +20,11 @@ export function BottomTabBar({
   onTabChange,
   onCenterActionPress,
   bottomInset,
-}: Props) {
+}: BottomTabBarProps) {
   const { user } = useAuth();
 
-  const hapticFeedback = async () => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch {
-      Vibration.vibrate(Platform.OS === "android" ? 15 : 10);
-    }
-  };
-
-  const onTabPress = (tab: TabKey) => {
-    hapticFeedback();
+  const handleTabPress = (tab: TabKey) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     if (tab === "upload") {
       onCenterActionPress?.();
     } else {
@@ -39,6 +33,8 @@ export function BottomTabBar({
   };
 
   const isHome = activeTab === "home";
+  const isDrive = activeTab === "drive";
+  const isNotes = activeTab === "notes";
   const isProfile = activeTab === "profile";
 
   return (
@@ -47,9 +43,9 @@ export function BottomTabBar({
       style={{ paddingBottom: Math.max(bottomInset, 10) }}
     >
       <View className="flex-row items-center justify-around h-[54px] px-3">
-        {/* Home */}
+        {/* 1. Home Tab */}
         <TouchableOpacity
-          onPress={() => onTabPress("home")}
+          onPress={() => handleTabPress("home")}
           activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
@@ -65,57 +61,58 @@ export function BottomTabBar({
           />
         </TouchableOpacity>
 
-        {/* Drive */}
+        {/* 2. Drive Tab */}
         <TouchableOpacity
-          onPress={() => onTabPress("drive")}
+          onPress={() => handleTabPress("drive")}
           activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
           <Ionicons
-            name={activeTab === "drive" ? "layers" : "layers-outline"}
+            name={isDrive ? "layers" : "layers-outline"}
             size={28}
-            color={activeTab === "drive" ? "#111111" : "#8E8E93"}
+            color={isDrive ? "#111111" : "#8E8E93"}
           />
         </TouchableOpacity>
 
-        {/* Upload (+) */}
+        {/* 3. Center Upload Action */}
         <TouchableOpacity
-          onPress={() => onTabPress("upload")}
+          onPress={() => handleTabPress("upload")}
           activeOpacity={0.75}
           className="flex-1 h-full items-center justify-center"
         >
-          <View className="w-[42px] h-[42px] rounded-full bg-[#F0F2F4] items-center justify-center border border-black/5">
+          <View className="w-[42px] h-[42px] rounded-full bg-[#F0F2F4] items-center justify-center border border-black/5 active:bg-[#E5E7EB]">
             <Ionicons name="add" size={26} color="#111111" />
           </View>
         </TouchableOpacity>
 
-        {/* Notes */}
+        {/* 4. Notes Tab */}
         <TouchableOpacity
-          onPress={() => onTabPress("notes")}
+          onPress={() => handleTabPress("notes")}
           activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
           <Image
             source={
-              activeTab === "notes"
+              isNotes
                 ? require("../../../assets/images/svg/active-note.png")
                 : require("../../../assets/images/svg/note.png")
             }
             style={{ width: 28, height: 28 }}
-            tintColor={activeTab === "notes" ? "#111111" : "#8E8E93"}
+            tintColor={isNotes ? "#111111" : "#8E8E93"}
             contentFit="contain"
           />
         </TouchableOpacity>
 
-        {/* Profile */}
+        {/* 5. Profile Tab */}
         <TouchableOpacity
-          onPress={() => onTabPress("profile")}
+          onPress={() => handleTabPress("profile")}
           activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
           <View
-            className={`w-[30px] h-[30px] rounded-full overflow-hidden items-center justify-center bg-[#E5E7EB] ${isProfile ? "border-2 border-[#111111]" : "border border-black/10"
-              }`}
+            className={`w-[30px] h-[30px] rounded-full overflow-hidden items-center justify-center bg-[#E5E7EB] ${
+              isProfile ? "border-2 border-[#111111]" : "border border-black/10"
+            }`}
           >
             {user?.photoURL ? (
               <Image

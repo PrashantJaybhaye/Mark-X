@@ -1,17 +1,15 @@
 import React, { useRef, useState } from "react";
-import * as Haptics from "expo-haptics";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import {
-  ImageBackground,
-  Platform,
-  StyleSheet,
   Text,
   TouchableOpacity,
-  Vibration,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import { triggerHaptic } from "../utils/haptics";
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -24,16 +22,9 @@ export default function OnboardingScreen() {
     isNavigatingRef.current = true;
     setIsNavigating(true);
 
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {
-      // Fallback to native vibration for platforms/builds where expo-haptics isn't linked
-      Vibration.vibrate(Platform.OS === "android" ? 30 : 15);
-    }
-
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     router.navigate("/(auth)/login");
 
-    // Reset lock after transition completes
     setTimeout(() => {
       isNavigatingRef.current = false;
       setIsNavigating(false);
@@ -44,11 +35,13 @@ export default function OnboardingScreen() {
     <View className="flex-1 bg-black">
       <StatusBar style="light" />
 
-      <ImageBackground
-        source={require("../../assets/images/OnboardingBG.png")}
-        className="flex-1"
-        resizeMode="cover"
-      >
+      <Image
+        source={require("../../assets/images/OnboardingBG.webp")}
+        style={{ width: "100%", height: "100%", position: "absolute" }}
+        contentFit="cover"
+        priority="high"
+        cachePolicy="memory-disk"
+      />
         <View
           className="flex-1 justify-end px-6"
           style={{
@@ -58,27 +51,26 @@ export default function OnboardingScreen() {
         >
           {/* Header */}
           <View className="items-center mb-20">
-            {/* Title */}
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.title}
+              className="text-[54px] text-white tracking-[3px] text-center leading-[58px]"
+              style={{ fontFamily: "Outfit_900Black" }}
             >
               MARK X
             </Text>
 
-            {/* Subtitles */}
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.subtitleSmall}
+              className="text-[20px] text-white tracking-[4.5px] text-center leading-[26px] mt-6"
+              style={{ fontFamily: "Outfit_400Regular" }}
             >
               REDEFINING
             </Text>
+
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.subtitleLarge}
+              className="text-[28px] text-white tracking-[2px] text-center leading-[34px] mt-1"
+              style={{ fontFamily: "Outfit_900Black" }}
             >
               WHAT'S POSSIBLE
             </Text>
@@ -89,53 +81,17 @@ export default function OnboardingScreen() {
             onPress={handleGetStarted}
             disabled={isNavigating}
             activeOpacity={0.85}
-            className="h-14 rounded-full bg-white items-center justify-center mb-2"
+            className="h-14 rounded-full bg-white items-center justify-center mb-2 active:bg-white/90"
           >
             <Text
               allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-              style={styles.buttonText}
+              className="text-[17px] text-[#171717] tracking-tight"
+              style={{ fontFamily: "Outfit_600SemiBold" }}
             >
               Get Started
             </Text>
           </TouchableOpacity>
         </View>
-      </ImageBackground>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  title: {
-    fontFamily: "Outfit_900Black",
-    fontSize: 54,
-    lineHeight: 58,
-    letterSpacing: 3,
-    color: "#FFFFFF",
-    textAlign: "center",
-  },
-  subtitleSmall: {
-    fontFamily: "Outfit_400Regular",
-    fontSize: 20,
-    lineHeight: 26,
-    letterSpacing: 4.5,
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginTop: 24,
-  },
-  subtitleLarge: {
-    fontFamily: "Outfit_900Black",
-    fontSize: 28,
-    lineHeight: 34,
-    letterSpacing: 2,
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginTop: 4,
-  },
-  buttonText: {
-    fontFamily: "Outfit_600SemiBold",
-    fontSize: 17,
-    letterSpacing: -0.2,
-    color: "#171717",
-  },
-});

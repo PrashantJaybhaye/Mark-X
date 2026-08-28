@@ -36,7 +36,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const isCompact = screenHeight < 720;
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("home");
 
   // Storage and file counter states
@@ -44,6 +44,15 @@ export default function HomeScreen() {
   const [galleryCount, setGalleryCount] = useState(0);
   const [remindersCount, setRemindersCount] = useState(0);
   const [docsCount, setDocsCount] = useState(2);
+
+  const handleLogout = async () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await signOut();
+    } catch (e) {
+      console.warn("Logout error:", e);
+    }
+  };
 
   const handleUploadFile = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -97,16 +106,8 @@ export default function HomeScreen() {
             <MarkXLogo width={110} height={15} color="#111111" />
           </View>
 
-          {/* Right Actions: Frosted Pill (Gift, Search, Add) */}
-          <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => triggerHaptic()}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-            >
-              <Ionicons name="gift" size={19} color="#3E140A" />
-            </TouchableOpacity>
-
+          {/* Right Actions: Frosted Pill (Search, Add, Logout) */}
+          <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-3.5 py-1.5 gap-3.5">
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => triggerHaptic()}
@@ -121,6 +122,14 @@ export default function HomeScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
               <Ionicons name="add" size={23} color="#3E140A" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleLogout}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#3E140A" />
             </TouchableOpacity>
           </View>
         </View>
@@ -207,7 +216,13 @@ export default function HomeScreen() {
         {/* --- Bottom Navigation Bar --- */}
         <BottomTabBar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => {
+            if (tab === "profile") {
+              handleLogout();
+            } else {
+              setActiveTab(tab);
+            }
+          }}
           onCenterActionPress={handleUploadFile}
           bottomInset={insets.bottom}
         />
