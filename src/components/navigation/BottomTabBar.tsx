@@ -76,10 +76,15 @@ export function BottomTabBar({
           activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
-          <Ionicons
-            name={isGallery ? "images" : "images-outline"}
-            size={27}
-            color={isGallery ? "#111111" : "#8E8E93"}
+          <Image
+            source={
+              isGallery
+                ? require("../../../assets/images/svg/active-gallery.png")
+                : require("../../../assets/images/svg/gallery.png")
+            }
+            style={{ width: 26, height: 26 }}
+            tintColor={isGallery ? "#111111" : "#8E8E93"}
+            contentFit="contain"
           />
         </TouchableOpacity>
 
