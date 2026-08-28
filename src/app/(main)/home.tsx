@@ -160,7 +160,7 @@ export default function HomeScreen() {
                 subtitle="Photos & Videos"
                 onPress={() => {
                   triggerHaptic();
-                  router.replace("/(main)/drive");
+                  router.replace("/(main)/gallery");
                 }}
               >
                 <GalleryCardArt />

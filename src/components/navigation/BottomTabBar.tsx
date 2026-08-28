@@ -6,7 +6,7 @@ import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
 import { triggerHaptic } from "../../utils/haptics";
 
-export type TabKey = "home" | "drive" | "upload" | "notes" | "profile";
+export type TabKey = "home" | "drive" | "gallery" | "notes" | "profile";
 
 interface BottomTabBarProps {
   activeTab: TabKey;
@@ -18,22 +18,18 @@ interface BottomTabBarProps {
 export function BottomTabBar({
   activeTab,
   onTabChange,
-  onCenterActionPress,
   bottomInset,
 }: BottomTabBarProps) {
   const { user } = useAuth();
 
   const handleTabPress = (tab: TabKey) => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    if (tab === "upload") {
-      onCenterActionPress?.();
-    } else {
-      onTabChange(tab);
-    }
+    onTabChange(tab);
   };
 
   const isHome = activeTab === "home";
   const isDrive = activeTab === "drive";
+  const isGallery = activeTab === "gallery";
   const isNotes = activeTab === "notes";
   const isProfile = activeTab === "profile";
 
@@ -74,15 +70,17 @@ export function BottomTabBar({
           />
         </TouchableOpacity>
 
-        {/* 3. Center Upload Action */}
+        {/* 3. Center Gallery / Inspiration Tab */}
         <TouchableOpacity
-          onPress={() => handleTabPress("upload")}
-          activeOpacity={0.75}
+          onPress={() => handleTabPress("gallery")}
+          activeOpacity={0.7}
           className="flex-1 h-full items-center justify-center"
         >
-          <View className="w-[42px] h-[42px] rounded-full bg-[#F0F2F4] items-center justify-center border border-black/5 active:bg-[#E5E7EB]">
-            <Ionicons name="add" size={26} color="#111111" />
-          </View>
+          <Ionicons
+            name={isGallery ? "images" : "images-outline"}
+            size={27}
+            color={isGallery ? "#111111" : "#8E8E93"}
+          />
         </TouchableOpacity>
 
         {/* 4. Notes Tab */}
