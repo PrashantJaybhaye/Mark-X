@@ -1,11 +1,25 @@
-import React, { useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import {
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, {
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Rect,
+  Stop,
+} from "react-native-svg";
 
 import { FeatureCard } from "../../components/home/FeatureCard";
+import { MarkXLogo } from "../../components/common/MarkXLogo";
 import {
   DriveCardArt,
   GalleryCardArt,
@@ -20,6 +34,8 @@ import { triggerHaptic } from "../../utils/haptics";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
+  const isCompact = screenHeight < 720;
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("home");
 
@@ -28,12 +44,6 @@ export default function HomeScreen() {
   const [galleryCount, setGalleryCount] = useState(0);
   const [remindersCount, setRemindersCount] = useState(0);
   const [docsCount, setDocsCount] = useState(2);
-
-  const displayName = user?.displayName
-    ? user.displayName.split(" ")[0]
-    : user?.email
-      ? user.email.split("@")[0]
-      : "You";
 
   const handleUploadFile = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -57,55 +67,85 @@ export default function HomeScreen() {
     <View className="flex-1 bg-[#F4F5F7]">
       <StatusBar style="dark" />
 
-      <SafeAreaView edges={["top"]} className="flex-1 bg-[#F4F5F7]">
-        {/* Top Bar */}
-        <View className="flex-row items-center justify-between px-5 pt-8 pb-3.5">
-          <Text
-            allowFontScaling={false}
-            className="text-[20px] text-[#111111] tracking-tight leading-tight pl-0.5"
-            style={{ fontFamily: "Outfit_700Bold" }}
-          >
-            For {displayName}
-          </Text>
+      {/* Top Ambient Peach/Orange Glow (Monzo Style) */}
+      <Svg
+        width="100%"
+        height={screenHeight > 800 ? 540 : 480}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        <Defs>
+          <LinearGradient id="monzoTopGlow" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFA685" stopOpacity="0.95" />
+            <Stop offset="30%" stopColor="#FFB89E" stopOpacity="0.75" />
+            <Stop offset="65%" stopColor="#FFDFC8" stopOpacity="0.4" />
+            <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
+          </LinearGradient>
+          <RadialGradient id="monzoRadialGlow" cx="60%" cy="8%" rx="70%" ry="60%">
+            <Stop offset="0%" stopColor="#FF7A50" stopOpacity="0.65" />
+            <Stop offset="55%" stopColor="#FFAA8A" stopOpacity="0.3" />
+            <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#monzoTopGlow)" />
+        <Rect width="100%" height="100%" fill="url(#monzoRadialGlow)" />
+      </Svg>
 
-          <View className="flex-row items-center gap-5 pr-1">
+      <SafeAreaView edges={["top"]} className="flex-1">
+        {/* Top Header Bar with breathable padding */}
+        <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
+          <View className="justify-center">
+            <MarkXLogo width={110} height={15} color="#111111" />
+          </View>
+
+          {/* Right Actions: Frosted Pill (Gift, Search, Add) */}
+          <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
-              activeOpacity={0.6}
+              activeOpacity={0.7}
               onPress={() => triggerHaptic()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
-              <Ionicons name="download-outline" size={24} color="#111111" />
+              <Ionicons name="gift" size={19} color="#3E140A" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              activeOpacity={0.6}
+              activeOpacity={0.7}
               onPress={() => triggerHaptic()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
-              <Ionicons name="search" size={23} color="#111111" />
+              <Ionicons name="search" size={19} color="#3E140A" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleUploadFile}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <Ionicons name="add" size={23} color="#3E140A" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Scrollable Content */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-          overScrollMode="always"
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: 6,
-            paddingBottom: Math.max(insets.bottom, 12) + 70,
-          }}
-        >
-          {/* Storage Balance Hero Card */}
+        {/* Fixed Hero Card (Outside ScrollView) */}
+        <View className="px-4 pt-3 pb-1">
           <StorageHeroCard
             usedStorage={usedStorage}
             onManageStorage={() => triggerHaptic()}
             onUploadFile={handleUploadFile}
             onAddPhoto={handleAddPhoto}
           />
+        </View>
 
+        {/* Scrollable Content Below Hero Card */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          overScrollMode="always"
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 4,
+            paddingBottom: Math.max(insets.bottom, 12) + 75,
+          }}
+        >
           {/* 2x2 Feature Grid */}
           <View className="w-full gap-3.5">
             {/* Row 1: Gallery & Reminders */}

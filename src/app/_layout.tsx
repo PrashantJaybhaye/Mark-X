@@ -36,12 +36,16 @@ function NavigationGuard() {
     // Ensure auth is loaded and the root navigation tree is fully mounted before routing
     if (loading || !rootNavigationState?.key) return;
 
+    let isMounted = true;
     const inAuthGroup = segments[0] === "(auth)";
     const inMainGroup = segments[0] === "(main)";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
     const isOnboarding = !segments[0];
 
-    const timer = setTimeout(() => {
+    // Use requestAnimationFrame to ensure the navigation tree has completed mounting
+    const frameId = requestAnimationFrame(() => {
+      if (!isMounted) return;
+
       // 1. Not Authenticated: redirect if trying to access protected areas
       if (!user) {
         if (inMainGroup || isVerifyScreen) {
@@ -64,9 +68,12 @@ function NavigationGuard() {
           router.replace("/(main)/home");
         }
       }
-    }, 0);
+    });
 
-    return () => clearTimeout(timer);
+    return () => {
+      isMounted = false;
+      cancelAnimationFrame(frameId);
+    };
   }, [user, loading, segments, rootNavigationState?.key]);
 
   return null;
