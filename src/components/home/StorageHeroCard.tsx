@@ -1,5 +1,6 @@
+import React, { useEffect, useRef } from "react";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 
 interface StorageHeroCardProps {
@@ -7,21 +8,116 @@ interface StorageHeroCardProps {
   totalStorage?: string;
   userName?: string;
   tagline?: string;
+  isLoading?: boolean;
   onManageStorage?: () => void;
   onUploadFile?: () => void;
   onAddPhoto?: () => void;
 }
 
+export function StorageHeroCardSkeleton() {
+  const pulseAnim = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.85,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.35,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View className="w-full mb-4 relative">
+      {/* --- 1. Back Peeking Card Skeleton --- */}
+      <View className="w-full bg-[#FFFFFF] rounded-[24px] pt-4 pb-16 px-5 flex-row justify-between items-start border border-black/[0.04]">
+        <View className="flex-1 mr-3">
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-28 h-5 bg-black/10 rounded-md mb-2"
+          />
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-20 h-2.5 bg-black/10 rounded-md"
+          />
+        </View>
+
+        <View className="shrink-0 items-end justify-center pt-0.5">
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-24 h-3.5 bg-black/10 rounded-md mb-1.5"
+          />
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-28 h-2.5 bg-black/10 rounded-md"
+          />
+        </View>
+      </View>
+
+      {/* --- 2. Front Overlapping Card Skeleton --- */}
+      <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
+        <View className="flex-row justify-between items-start mb-1">
+          <View>
+            <Animated.View
+              style={{ opacity: pulseAnim }}
+              className="w-20 h-2.5 bg-white/30 rounded-md mb-2"
+            />
+            <Animated.View
+              style={{ opacity: pulseAnim }}
+              className="w-36 h-9 bg-white/35 rounded-lg"
+            />
+          </View>
+
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-28 h-7 bg-black/15 rounded-full border border-white/20 mt-1 mb-10"
+          />
+        </View>
+
+        {/* Action Button Pills Skeletons */}
+        <View className="flex-row items-center pt-1">
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="flex-1 h-[36px] rounded-full bg-[#2B140F]/40 mr-2"
+          />
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="flex-1 h-[36px] rounded-full bg-[#2B140F]/40 mr-2"
+          />
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-[36px] h-[36px] rounded-full bg-[#2B140F]/40 ml-auto"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function StorageHeroCard({
   usedStorage = "0.00",
-  totalStorage = "Unlimited",
   userName,
   tagline = "Beyond All Limits",
+  isLoading,
   onManageStorage,
   onUploadFile,
   onAddPhoto,
 }: StorageHeroCardProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (isLoading || (loading && !userName)) {
+    return <StorageHeroCardSkeleton />;
+  }
+
   const rawName =
     userName ||
     user?.displayName ||
@@ -77,61 +173,54 @@ export function StorageHeroCard({
 
       {/* --- 2. Front Overlapping Card (Signature Coral Card) --- */}
       <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
-        {/* Brand & Dynamic Used Storage Balance */}
-        <View className="flex-row justify-between items-baseline mb-2">
-          <Text
-            allowFontScaling={false}
-            className="text-[26px] text-white tracking-tight leading-none"
-            style={{ fontFamily: "Outfit_700Bold" }}
-          >
-            Mark X
-          </Text>
-
-          <View className="flex-row items-baseline">
+        {/* Top Metric Header Row */}
+        <View className="flex-row justify-between items-start mb-1">
+          {/* Large Storage Balance */}
+          <View>
             <Text
               allowFontScaling={false}
-              className="text-[32px] text-white tracking-tight leading-none"
-              style={{ fontFamily: "Outfit_700Bold" }}
-            >
-              {whole}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              className="text-[20px] text-white/95 leading-none"
-              style={{ fontFamily: "Outfit_700Bold" }}
-            >
-              .{decimal}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              className="text-[13px] text-white/85 ml-1.5 leading-none"
+              className="text-[11px] text-white/75 uppercase tracking-wider mb-0.5"
               style={{ fontFamily: "Outfit_600SemiBold" }}
             >
-              GB
+              Used Storage
             </Text>
-          </View>
-        </View>
 
-        {/* Subtitle Info Row */}
-        <View className="flex-row justify-between items-center mb-4 pt-0.5">
-          <View className="flex-row items-center">
-            <Ionicons name="cloud-done-outline" size={13} color="rgba(255,255,255,0.8)" />
+            <View className="flex-row items-baseline">
+              <Text
+                allowFontScaling={false}
+                className="text-[36px] text-white tracking-tight leading-none"
+                style={{ fontFamily: "Outfit_700Bold" }}
+              >
+                {whole}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                className="text-[22px] text-white/95 leading-none"
+                style={{ fontFamily: "Outfit_700Bold" }}
+              >
+                .{decimal}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                className="text-[14px] text-white/85 ml-1.5 leading-none"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                GB
+              </Text>
+            </View>
+          </View>
+
+          {/* Right Status Capsule */}
+          <View className="flex-row items-center bg-black/15 px-2.5 py-1 rounded-full border border-white/20 mt-1 mb-10">
+            <Ionicons name="cloud-done-outline" size={13} color="rgba(255,255,255,0.9)" style={{ marginRight: 4 }} />
             <Text
               allowFontScaling={false}
-              className="text-[12px] text-white/80 ml-1.5"
-              style={{ fontFamily: "Outfit_500Medium" }}
+              className="text-[11px] text-white tracking-wide"
+              style={{ fontFamily: "Outfit_600SemiBold" }}
             >
-              Personal Vault • Active
+              Personal Vault
             </Text>
           </View>
-
-          <Text
-            allowFontScaling={false}
-            className="text-[12px] text-white/80"
-            style={{ fontFamily: "Outfit_500Medium" }}
-          >
-            Used Storage
-          </Text>
         </View>
 
         {/* Action Button Pills */}
