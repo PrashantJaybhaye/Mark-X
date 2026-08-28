@@ -1,15 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   ScrollView,
-  Text,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import Svg, {
   Defs,
   LinearGradient,
@@ -35,8 +33,7 @@ import { triggerHaptic } from "../../utils/haptics";
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
-  const isCompact = screenHeight < 720;
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("home");
 
   // Storage and file counter states
@@ -46,7 +43,7 @@ export default function HomeScreen() {
   const [docsCount, setDocsCount] = useState(2);
 
   const handleLogout = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    triggerHaptic();
     try {
       await signOut();
     } catch (e) {
@@ -55,7 +52,7 @@ export default function HomeScreen() {
   };
 
   const handleUploadFile = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    triggerHaptic();
     const file = await safePickDocument();
     if (file) {
       setDocsCount((prev) => prev + 1);
@@ -64,7 +61,7 @@ export default function HomeScreen() {
   };
 
   const handleAddPhoto = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    triggerHaptic();
     const img = await safePickImage();
     if (img) {
       setGalleryCount((prev) => prev + 1);
@@ -76,37 +73,54 @@ export default function HomeScreen() {
     <View className="flex-1 bg-[#F4F5F7]">
       <StatusBar style="dark" />
 
-      {/* Top Ambient Peach/Orange Glow (Monzo Style) */}
+      {/* Top Ambient Atmospheric Glow (Monzo Style) */}
       <Svg
         width="100%"
-        height={screenHeight > 800 ? 540 : 480}
+        height={screenHeight > 800 ? 560 : 490}
         style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+        pointerEvents="none"
       >
         <Defs>
-          <LinearGradient id="monzoTopGlow" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#FFA685" stopOpacity="0.95" />
-            <Stop offset="30%" stopColor="#FFB89E" stopOpacity="0.75" />
-            <Stop offset="65%" stopColor="#FFDFC8" stopOpacity="0.4" />
+          {/* Main vertical atmospheric gradient */}
+          <LinearGradient id="topGlow" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FF8A5B" stopOpacity="0.92" />
+            <Stop offset="20%" stopColor="#FF9B73" stopOpacity="0.75" />
+            <Stop offset="45%" stopColor="#FFB69A" stopOpacity="0.5" />
+            <Stop offset="70%" stopColor="#FFD8C7" stopOpacity="0.22" />
+            <Stop offset="90%" stopColor="#F6F7F9" stopOpacity="0.05" />
             <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
           </LinearGradient>
-          <RadialGradient id="monzoRadialGlow" cx="60%" cy="8%" rx="70%" ry="60%">
-            <Stop offset="0%" stopColor="#FF7A50" stopOpacity="0.65" />
-            <Stop offset="55%" stopColor="#FFAA8A" stopOpacity="0.3" />
-            <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
+
+          {/* Concentrated top-right warm amber light */}
+          <RadialGradient id="coreAmberGlow" cx="80%" cy="2%" rx="75%" ry="50%">
+            <Stop offset="0%" stopColor="#FF7043" stopOpacity="0.75" />
+            <Stop offset="25%" stopColor="#FF825A" stopOpacity="0.55" />
+            <Stop offset="50%" stopColor="#FFA17F" stopOpacity="0.3" />
+            <Stop offset="75%" stopColor="#FFC8B5" stopOpacity="0.1" />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </RadialGradient>
+
+          {/* Soft ambient balance from top-left */}
+          <RadialGradient id="softCoralGlow" cx="15%" cy="8%" rx="60%" ry="40%">
+            <Stop offset="0%" stopColor="#FFD0BC" stopOpacity="0.28" />
+            <Stop offset="50%" stopColor="#FFE5D9" stopOpacity="0.1" />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </RadialGradient>
         </Defs>
-        <Rect width="100%" height="100%" fill="url(#monzoTopGlow)" />
-        <Rect width="100%" height="100%" fill="url(#monzoRadialGlow)" />
+
+        <Rect width="100%" height="100%" fill="url(#topGlow)" />
+        <Rect width="100%" height="100%" fill="url(#coreAmberGlow)" />
+        <Rect width="100%" height="100%" fill="url(#softCoralGlow)" />
       </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        {/* Top Header Bar with breathable padding */}
+        {/* Top Header Bar */}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
           <View className="justify-center">
             <MarkXLogo width={110} height={15} color="#111111" />
           </View>
 
-          {/* Right Actions: Frosted Pill (Gift, Search, Add) */}
+          {/* Right Actions: Frosted Pill (Search & Add) */}
           <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
               activeOpacity={0.7}
@@ -205,7 +219,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        {/* --- Bottom Navigation Bar --- */}
+        {/* Bottom Navigation Bar */}
         <BottomTabBar
           activeTab={activeTab}
           onTabChange={(tab) => {
