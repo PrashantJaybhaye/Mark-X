@@ -8,6 +8,7 @@ interface UploadStatusToastProps {
   fileName: string;
   category: DriveFileCategory;
   onClose: () => void;
+  bottomInset?: number;
 }
 
 export function UploadStatusToast({
@@ -15,6 +16,7 @@ export function UploadStatusToast({
   fileName,
   category,
   onClose,
+  bottomInset = 20,
 }: UploadStatusToastProps) {
   const icon = getCategoryIcon(category);
 
@@ -27,7 +29,7 @@ export function UploadStatusToast({
         position: "absolute",
         left: 16,
         right: 16,
-        bottom: 20,
+        bottom: bottomInset + 16,
         elevation: 6,
         zIndex: 50,
       }}
@@ -56,3 +58,4 @@ export function UploadStatusToast({
     </View>
   );
 }
+

@@ -24,11 +24,14 @@ function DriveFileListComponent({
   const query = searchQuery.trim().toLowerCase();
 
   /**
-   * Filter only when the actual files or query changes.
+   * Filter and sort files based on search query and active tab
    */
   const filteredFiles = useMemo(() => {
-    if (!query) return files;
-    return files.filter((file) => file.name.toLowerCase().includes(query));
+    let result = files;
+    if (query) {
+      result = files.filter((file) => file.name.toLowerCase().includes(query));
+    }
+    return result;
   }, [files, query]);
 
   /**
@@ -69,7 +72,7 @@ function DriveFileListComponent({
 
   const keyExtractor = useCallback((item: DriveItem) => item.id, []);
 
-  const headerTitle = activeTab === "suggested" ? "Suggested Files" : "Recent Activity";
+  const headerTitle = activeTab === "suggested" ? "Suggested Files" : "Recent Activity Feed";
 
   /**
    * Keep the header lightweight and memoized.
@@ -79,16 +82,21 @@ function DriveFileListComponent({
 
     return (
       <View className="flex-row items-center justify-between mb-2.5 px-1">
-        <Text className="text-[13px] font-outfit-semibold text-[#70757A] uppercase tracking-wider">
-          {headerTitle}
-        </Text>
+        <View className="flex-row items-center">
+          {activeTab === "activity" && (
+            <Ionicons name="time-outline" size={14} color="#70757A" style={{ marginRight: 5 }} />
+          )}
+          <Text className="text-[13px] font-outfit-semibold text-[#70757A] uppercase tracking-wider">
+            {headerTitle}
+          </Text>
+        </View>
 
         <Text className="text-[12px] font-outfit text-[#9AA0A6]">
           {filteredFiles.length} {filteredFiles.length === 1 ? "item" : "items"}
         </Text>
       </View>
     );
-  }, [filteredFiles.length, headerTitle]);
+  }, [activeTab, filteredFiles.length, headerTitle]);
 
   /**
    * Search empty state.
