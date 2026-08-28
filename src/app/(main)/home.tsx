@@ -5,9 +5,10 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Svg, {
   Defs,
   LinearGradient,
@@ -25,31 +26,18 @@ import {
   RemindersCardArt,
 } from "../../components/home/HomeVisuals";
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
-import { BottomTabBar, TabKey } from "../../components/navigation/BottomTabBar";
-import { useAuth } from "../../context/AuthContext";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
-  const { signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabKey>("home");
 
   // Storage and file counter states
   const [usedStorage, setUsedStorage] = useState("0.00");
   const [galleryCount, setGalleryCount] = useState(0);
   const [remindersCount, setRemindersCount] = useState(0);
   const [docsCount, setDocsCount] = useState(2);
-
-  const handleLogout = async () => {
-    triggerHaptic();
-    try {
-      await signOut();
-    } catch (e) {
-      console.warn("Logout error:", e);
-    }
-  };
 
   const handleUploadFile = async () => {
     triggerHaptic();
@@ -154,11 +142,12 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           bounces={true}
+          alwaysBounceVertical={true}
           overScrollMode="always"
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 4,
-            paddingBottom: Math.max(insets.bottom, 12) + 75,
+            paddingBottom: 40,
           }}
         >
           {/* 2x2 Feature Grid */}
@@ -171,7 +160,7 @@ export default function HomeScreen() {
                 subtitle="Photos & Videos"
                 onPress={() => {
                   triggerHaptic();
-                  setActiveTab("drive");
+                  router.replace("/(main)/drive");
                 }}
               >
                 <GalleryCardArt />
@@ -183,7 +172,7 @@ export default function HomeScreen() {
                 subtitle="Tasks & Due Alerts"
                 onPress={() => {
                   triggerHaptic();
-                  setActiveTab("notes");
+                  router.replace("/(main)/notes");
                 }}
               >
                 <RemindersCardArt />
@@ -198,7 +187,7 @@ export default function HomeScreen() {
                 subtitle="Continuous Autosave"
                 onPress={() => {
                   triggerHaptic();
-                  setActiveTab("notes");
+                  router.replace("/(main)/notes");
                 }}
               >
                 <NotesCardArt />
@@ -210,7 +199,7 @@ export default function HomeScreen() {
                 subtitle="Fast Secure Sync"
                 onPress={() => {
                   triggerHaptic();
-                  setActiveTab("drive");
+                  router.replace("/(main)/drive");
                 }}
               >
                 <DriveCardArt />
@@ -218,20 +207,6 @@ export default function HomeScreen() {
             </View>
           </View>
         </ScrollView>
-
-        {/* Bottom Navigation Bar */}
-        <BottomTabBar
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            if (tab === "profile") {
-              handleLogout();
-            } else {
-              setActiveTab(tab);
-            }
-          }}
-          onCenterActionPress={handleUploadFile}
-          bottomInset={insets.bottom}
-        />
       </SafeAreaView>
     </View>
   );
