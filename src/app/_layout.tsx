@@ -1,6 +1,13 @@
 import "../global.css";
 import React, { useEffect } from "react";
-import { DefaultTheme, ThemeProvider, Stack, useRouter, useSegments } from "expo-router";
+import {
+  DefaultTheme,
+  ThemeProvider,
+  Stack,
+  useRouter,
+  useSegments,
+  useRootNavigationState,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import {
@@ -23,38 +30,44 @@ function NavigationGuard() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    if (loading) return;
+    // Ensure auth is loaded and the root navigation tree is fully mounted before routing
+    if (loading || !rootNavigationState?.key) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inMainGroup = segments[0] === "(main)";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
     const isOnboarding = !segments[0];
 
-    // 1. Not Authenticated: redirect if trying to access protected areas
-    if (!user) {
-      if (inMainGroup || isVerifyScreen) {
-        router.replace("/(auth)/login");
+    const timer = setTimeout(() => {
+      // 1. Not Authenticated: redirect if trying to access protected areas
+      if (!user) {
+        if (inMainGroup || isVerifyScreen) {
+          router.replace("/(auth)/login");
+        }
+        return;
       }
-      return;
-    }
 
-    // 2. Authenticated but Unverified: route to verify email screen
-    if (!user.emailVerified) {
-      if (!isVerifyScreen) {
-        router.replace("/(auth)/verify-email");
+      // 2. Authenticated but Unverified: route to verify email screen
+      if (!user.emailVerified) {
+        if (!isVerifyScreen) {
+          router.replace("/(auth)/verify-email");
+        }
+        return;
       }
-      return;
-    }
 
-    // 3. Authenticated and Verified: route to main home dashboard
-    if (user.emailVerified) {
-      if (inAuthGroup || isOnboarding) {
-        router.replace("/(main)/home");
+      // 3. Authenticated and Verified: route to main home dashboard
+      if (user.emailVerified) {
+        if (inAuthGroup || isOnboarding) {
+          router.replace("/(main)/home");
+        }
       }
-    }
-  }, [user, loading, segments]);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [user, loading, segments, rootNavigationState?.key]);
 
   return null;
 }
