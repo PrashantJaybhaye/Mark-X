@@ -60,3 +60,16 @@ export function getCategoryIcon(category: DriveFileCategory): {
       return { name: "document-outline", color: "#5F6368" };
   }
 }
+
+export interface DriveItem {
+  id: string;
+  name: string;
+  category: DriveFileCategory;
+  size?: string;
+  updatedAt: string;
+  uri?: string;
+  mimeType?: string;
+  sharedBy?: string;
+  isFolder?: boolean;
+}
+

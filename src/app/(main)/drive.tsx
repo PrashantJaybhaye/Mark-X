@@ -8,16 +8,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { DriveHeader } from "../../components/drive/DriveHeader";
 import { DriveTabs } from "../../components/drive/DriveTabs";
 import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
+import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
 import { UploadStatusToast } from "../../components/drive/UploadStatusToast";
 
 // Services & Helpers
-import { DriveFileCategory, getFileCategory } from "../../utils/driveFileTypes";
+import { DriveItem, DriveFileCategory, getFileCategory } from "../../utils/driveFileTypes";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 
 export default function DriveScreen() {
   const insets = useSafeAreaInsets();
+
+  // Files state initialized empty
+  const [files, setFiles] = useState<DriveItem[]>([]);
 
   // Screen state
   const [activeTab, setActiveTab] = useState<"suggested" | "activity">("suggested");
@@ -45,26 +49,80 @@ export default function DriveScreen() {
     };
   }, []);
 
-  // Action handlers
+  // Action handlers - add picked/created files directly into state
   const handleUploadFile = async () => {
     const file = await safePickDocument();
     if (file) {
-      triggerToast(file.name || "Selected Document", getFileCategory(file.name, file.mimeType));
+      const category = getFileCategory(file.name, file.mimeType);
+      const newItem: DriveItem = {
+        id: Date.now().toString(),
+        name: file.name || "Uploaded Document",
+        category,
+        size: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB",
+        updatedAt: "Just now",
+        uri: file.uri,
+        mimeType: file.mimeType,
+      };
+      setFiles((prev) => [newItem, ...prev]);
+      triggerToast(newItem.name, category);
     }
   };
 
   const handleScanDocument = async () => {
     const img = await safePickImage();
-    if (img) triggerToast("Scanned Document", "pdf");
+    if (img) {
+      const newItem: DriveItem = {
+        id: Date.now().toString(),
+        name: `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.pdf`,
+        category: "pdf",
+        size: "1.8 MB",
+        updatedAt: "Just now",
+        uri: img.uri,
+      };
+      setFiles((prev) => [newItem, ...prev]);
+      triggerToast(newItem.name, "pdf");
+    }
   };
 
   const handleImportPhoto = async () => {
     const img = await safePickImage();
-    if (img) triggerToast("Imported Image", "image");
+    if (img) {
+      const newItem: DriveItem = {
+        id: Date.now().toString(),
+        name: `IMG_${Date.now().toString().slice(-4)}.jpg`,
+        category: "image",
+        size: "3.2 MB",
+        updatedAt: "Just now",
+        uri: img.uri,
+      };
+      setFiles((prev) => [newItem, ...prev]);
+      triggerToast(newItem.name, "image");
+    }
   };
 
-  const handleCreateFolder = () => triggerToast("New Folder", "folder");
-  const handleCreateNote = () => triggerToast("New Note", "document");
+  const handleCreateFolder = () => {
+    const newFolder: DriveItem = {
+      id: Date.now().toString(),
+      name: `New Folder ${files.filter((f) => f.isFolder).length + 1}`,
+      category: "folder",
+      updatedAt: "Just now",
+      isFolder: true,
+    };
+    setFiles((prev) => [newFolder, ...prev]);
+    triggerToast(newFolder.name, "folder");
+  };
+
+  const handleCreateNote = () => {
+    const newNote: DriveItem = {
+      id: Date.now().toString(),
+      name: `Encrypted Note ${new Date().toLocaleDateString()}.md`,
+      category: "document",
+      size: "12 KB",
+      updatedAt: "Just now",
+    };
+    setFiles((prev) => [newNote, ...prev]);
+    triggerToast(newNote.name, "document");
+  };
 
   return (
     <View className="flex-1 bg-white">
@@ -83,14 +141,25 @@ export default function DriveScreen() {
         onTabChange={setActiveTab}
       />
 
-      {/* 3. Empty State Scroll Content */}
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-      >
-        <DriveEmptyState />
-      </ScrollView>
+      {/* 3. Content Area - Virtualized File List or Empty State */}
+      {files.length > 0 ? (
+        <DriveFileList
+          files={files}
+          searchQuery={search}
+          activeTab={activeTab}
+          contentPaddingBottom={insets.bottom + 80}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
+        >
+          <DriveEmptyState />
+        </ScrollView>
+      )}
 
       {/* 4. Mark X Squircle Action FAB */}
       <View
@@ -135,3 +204,4 @@ export default function DriveScreen() {
     </View>
   );
 }
+
