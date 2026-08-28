@@ -13,10 +13,12 @@ export interface PickedFileResult {
 }
 
 export interface PickedImageResult {
+  fileName?: string;
   uri: string;
   width: number;
   height: number;
   fileSize?: number;
+  mimeType?: string;
 }
 
 export async function safePickDocument(): Promise<PickedFileResult | null> {
@@ -69,10 +71,12 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         return {
+          fileName: asset.fileName || undefined,
           uri: asset.uri,
           width: asset.width || 800,
           height: asset.height || 1000,
           fileSize: asset.fileSize,
+          mimeType: asset.mimeType || undefined,
         };
       }
       return null;
@@ -83,10 +87,11 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
 
   // Simulated fallback when testing on a pre-compiled development build without rebuild
   return {
+    fileName: "Sample_Photo.jpg",
     uri: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
     width: 800,
     height: 1200,
     fileSize: 1850000,
+    mimeType: "image/jpeg",
   };
 }
-

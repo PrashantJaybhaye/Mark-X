@@ -7,7 +7,6 @@ import { DriveFileItem } from "./DriveFileItem";
 interface DriveFileListProps {
   files: DriveItem[];
   searchQuery: string;
-  activeTab: "suggested" | "activity";
   contentPaddingBottom?: number;
   onItemPress?: (item: DriveItem) => void;
   onOptionsPress?: (item: DriveItem) => void;
@@ -16,7 +15,6 @@ interface DriveFileListProps {
 function DriveFileListComponent({
   files,
   searchQuery,
-  activeTab,
   contentPaddingBottom = 80,
   onItemPress,
   onOptionsPress,
@@ -24,7 +22,7 @@ function DriveFileListComponent({
   const query = searchQuery.trim().toLowerCase();
 
   /**
-   * Filter and sort files based on search query and active tab
+   * Filter files based on search query.
    */
   const filteredFiles = useMemo(() => {
     let result = files;
@@ -72,8 +70,6 @@ function DriveFileListComponent({
 
   const keyExtractor = useCallback((item: DriveItem) => item.id, []);
 
-  const headerTitle = activeTab === "suggested" ? "Suggested Files" : "Recent Activity Feed";
-
   /**
    * Keep the header lightweight and memoized.
    */
@@ -83,11 +79,8 @@ function DriveFileListComponent({
     return (
       <View className="flex-row items-center justify-between mb-2.5 px-1">
         <View className="flex-row items-center">
-          {activeTab === "activity" && (
-            <Ionicons name="time-outline" size={14} color="#70757A" style={{ marginRight: 5 }} />
-          )}
           <Text className="text-[13px] font-outfit-semibold text-[#70757A] uppercase tracking-wider">
-            {headerTitle}
+            Suggested Files
           </Text>
         </View>
 
@@ -96,7 +89,7 @@ function DriveFileListComponent({
         </Text>
       </View>
     );
-  }, [activeTab, filteredFiles.length, headerTitle]);
+  }, [filteredFiles.length]);
 
   /**
    * Search empty state.
@@ -115,7 +108,7 @@ function DriveFileListComponent({
         </Text>
 
         <Text className="text-[13px] font-outfit text-[#70757A] text-center">
-          No results match "{searchQuery}". Try another filename or type.
+          No results match “{searchQuery}”. Try another filename or type.
         </Text>
       </View>
     );
@@ -160,7 +153,6 @@ export const DriveFileList = memo(
     return (
       previous.files === next.files &&
       previous.searchQuery === next.searchQuery &&
-      previous.activeTab === next.activeTab &&
       previous.contentPaddingBottom === next.contentPaddingBottom &&
       previous.onItemPress === next.onItemPress &&
       previous.onOptionsPress === next.onOptionsPress

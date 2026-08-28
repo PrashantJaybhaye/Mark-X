@@ -26,6 +26,12 @@ export function DriveFileOptionsSheet({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState("");
 
+  const handleClose = () => {
+    setIsRenaming(false);
+    setNewName("");
+    onClose();
+  };
+
   if (!item) return null;
 
   const iconConfig = getCategoryIcon(item.category);
@@ -39,8 +45,7 @@ export function DriveFileOptionsSheet({
     if (newName.trim() && newName.trim() !== item.name) {
       onRename(item.id, newName.trim());
     }
-    setIsRenaming(false);
-    onClose();
+    handleClose();
   };
 
   const handleDelete = () => {
@@ -55,7 +60,7 @@ export function DriveFileOptionsSheet({
           onPress: () => {
             triggerHaptic();
             onDelete(item.id);
-            onClose();
+            handleClose();
           },
         },
       ]
@@ -63,8 +68,8 @@ export function DriveFileOptionsSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      <TouchableWithoutFeedback onPress={handleClose}>
         <View className="flex-1 bg-black/45 justify-end">
           <TouchableWithoutFeedback>
             <View
@@ -143,7 +148,7 @@ export function DriveFileOptionsSheet({
                     activeOpacity={0.7}
                     onPress={() => {
                       triggerHaptic();
-                      onClose();
+                      handleClose();
                       onShare?.(item);
                     }}
                     className="flex-row items-center p-3 rounded-2xl active:bg-[#F5F7FA]"

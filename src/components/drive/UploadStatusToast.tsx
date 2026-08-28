@@ -7,6 +7,7 @@ interface UploadStatusToastProps {
   visible: boolean;
   fileName: string;
   category: DriveFileCategory;
+  detail: string;
   onClose: () => void;
   bottomInset?: number;
 }
@@ -15,6 +16,7 @@ export function UploadStatusToast({
   visible,
   fileName,
   category,
+  detail,
   onClose,
   bottomInset = 20,
 }: UploadStatusToastProps) {
@@ -43,7 +45,7 @@ export function UploadStatusToast({
             {fileName || "File selected"}
           </Text>
           <Text className="text-[11px] font-outfit text-[#B4B8BF] mt-0.5">
-            Ready to upload • Saved locally
+            {detail}
           </Text>
         </View>
       </View>
@@ -58,4 +60,3 @@ export function UploadStatusToast({
     </View>
   );
 }
-

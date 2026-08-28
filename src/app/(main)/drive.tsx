@@ -6,7 +6,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 // Drive Components
 import { DriveHeader } from "../../components/drive/DriveHeader";
-import { DriveTabs } from "../../components/drive/DriveTabs";
 import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
 import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
@@ -26,7 +25,6 @@ export default function DriveScreen() {
   const [files, setFiles] = useState<DriveItem[]>([]);
 
   // Screen state
-  const [activeTab, setActiveTab] = useState<"suggested" | "activity">("suggested");
   const [search, setSearch] = useState("");
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
 
@@ -38,11 +36,13 @@ export default function DriveScreen() {
   const [isToastOpen, setIsToastOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileCategory, setFileCategory] = useState<DriveFileCategory>("document");
+  const [toastDetail, setToastDetail] = useState("");
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const triggerToast = (name: string, category: DriveFileCategory) => {
+  const triggerToast = (name: string, category: DriveFileCategory, detail: string) => {
     setFileName(name);
     setFileCategory(category);
+    setToastDetail(detail);
     setIsToastOpen(true);
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -72,23 +72,26 @@ export default function DriveScreen() {
         mimeType: file.mimeType,
       };
       setFiles((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category);
+      triggerToast(newItem.name, category, "Ready to upload • Saved locally");
     }
   };
 
   const handleScanDocument = async () => {
     const img = await safePickImage();
     if (img) {
+      const name = img.fileName || `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.jpg`;
+      const category = getFileCategory(name, img.mimeType);
       const newItem: DriveItem = {
         id: generateUniqueId(),
-        name: `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.pdf`,
-        category: "pdf",
-        size: "1.8 MB",
+        name,
+        category,
+        size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.8 MB",
         updatedAt: "Just now",
         uri: img.uri,
+        mimeType: img.mimeType,
       };
       setFiles((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, "pdf");
+      triggerToast(newItem.name, category, "Image imported • Saved locally");
     }
   };
 
@@ -104,7 +107,7 @@ export default function DriveScreen() {
         uri: img.uri,
       };
       setFiles((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, "image");
+      triggerToast(newItem.name, "image", "Photo imported • Saved locally");
     }
   };
 
@@ -117,7 +120,7 @@ export default function DriveScreen() {
       isFolder: true,
     };
     setFiles((prev) => [newFolder, ...prev]);
-    triggerToast(newFolder.name, "folder");
+    triggerToast(newFolder.name, "folder", "Folder created • Saved locally");
   };
 
   const handleCreateNote = () => {
@@ -129,7 +132,7 @@ export default function DriveScreen() {
       updatedAt: "Just now",
     };
     setFiles((prev) => [newNote, ...prev]);
-    triggerToast(newNote.name, "document");
+    triggerToast(newNote.name, "document", "Note created • Saved locally");
   };
 
   // Item Options Handlers
@@ -137,19 +140,19 @@ export default function DriveScreen() {
     setFiles((prev) =>
       prev.map((f) => (f.id === id ? { ...f, name: newName, updatedAt: "Edited just now" } : f))
     );
-    triggerToast(`Renamed to "${newName}"`, "document");
+    triggerToast(`Renamed to "${newName}"`, "document", "Name updated • Saved locally");
   };
 
   const handleDeleteFile = (id: string) => {
     const fileToDelete = files.find((f) => f.id === id);
     setFiles((prev) => prev.filter((f) => f.id !== id));
     if (fileToDelete) {
-      triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category);
+      triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive");
     }
   };
 
   const handleShareFile = (item: DriveItem) => {
-    triggerToast(`Shared "${item.name}"`, item.category);
+    triggerToast(`Shared "${item.name}"`, item.category, "Ready to share");
   };
 
   return (
@@ -163,18 +166,11 @@ export default function DriveScreen() {
         topInset={insets.top}
       />
 
-      {/* 2. Sub-tabs Switcher */}
-      <DriveTabs
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
-
-      {/* 3. Content Area - Virtualized File List or Empty State */}
+      {/* 2. Content Area - Virtualized File List or Empty State */}
       {files.length > 0 ? (
         <DriveFileList
           files={files}
           searchQuery={search}
-          activeTab={activeTab}
           contentPaddingBottom={insets.bottom + 80}
           onItemPress={(item) => setSelectedFileForPreview(item)}
           onOptionsPress={(item) => setSelectedFileForOptions(item)}
@@ -191,7 +187,7 @@ export default function DriveScreen() {
         </ScrollView>
       )}
 
-      {/* 4. Mark X Squircle Action FAB */}
+      {/* 3. Mark X Squircle Action FAB */}
       <View
         style={{
           position: "absolute",
@@ -213,16 +209,17 @@ export default function DriveScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 5. Status Notification Toast */}
+      {/* 4. Status Notification Toast */}
       <UploadStatusToast
         visible={isToastOpen}
         fileName={fileName}
         category={fileCategory}
+        detail={toastDetail}
         onClose={() => setIsToastOpen(false)}
         bottomInset={insets.bottom + 68}
       />
 
-      {/* 6. Add Action Sheet */}
+      {/* 5. Add Action Sheet */}
       <DriveActionSheet
         visible={isActionSheetOpen}
         onClose={() => setIsActionSheetOpen(false)}
@@ -233,7 +230,7 @@ export default function DriveScreen() {
         onCreateNote={handleCreateNote}
       />
 
-      {/* 7. File 3-Dots Options Action Sheet */}
+      {/* 6. File 3-Dots Options Action Sheet */}
       <DriveFileOptionsSheet
         visible={!!selectedFileForOptions}
         item={selectedFileForOptions}
@@ -243,7 +240,7 @@ export default function DriveScreen() {
         onShare={handleShareFile}
       />
 
-      {/* 8. File Details & Image Preview Modal */}
+      {/* 7. File Details & Image Preview Modal */}
       <DriveFilePreviewModal
         visible={!!selectedFileForPreview}
         item={selectedFileForPreview}
@@ -255,5 +252,4 @@ export default function DriveScreen() {
     </View>
   );
 }
-
 
