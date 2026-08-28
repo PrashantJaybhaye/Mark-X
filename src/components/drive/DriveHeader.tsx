@@ -12,32 +12,42 @@ export function DriveHeader({ search, onSearchChange, topInset }: DriveHeaderPro
   return (
     <View
       className="bg-white px-4 pb-3"
-      style={{ paddingTop: Math.max(topInset, 16) + (Platform.OS === "android" ? 10 : 4) }}
+      style={{
+        paddingTop: Math.max(topInset, 16) + (Platform.OS === "android" ? 16 : 10),
+      }}
     >
-      <View className="flex-row items-center bg-[#F8F9FA] border border-[#E8EAED] rounded-2xl px-3.5 h-11">
-        <Ionicons name="search" size={18} color="#5F6368" style={{ marginRight: 8 }} />
+      {/* Google Drive Style Floating Search Bar */}
+      <View className="flex-row items-center bg-[#EDF2FA] rounded-full px-3.5 h-[52px]">
+        {/* Left: Search Icon */}
+        <View className="w-8 h-8 items-center justify-center -ml-1 mr-1.5">
+          <Ionicons name="search" size={20} color="#444746" />
+        </View>
 
+        {/* Center: Search Input */}
         <TextInput
-          placeholder="Search files and folders"
-          placeholderTextColor="#80868B"
+          placeholder="Search in Drive"
+          placeholderTextColor="#444746"
           value={search}
           onChangeText={onSearchChange}
-          className="flex-1 text-[14px] text-[#1F1F1F] font-outfit py-0"
+          className="flex-1 text-[15px] text-[#1F1F1F] font-outfit py-0"
           returnKeyType="search"
           clearButtonMode="while-editing"
         />
 
-        {search.length > 0 && Platform.OS === "android" && (
+        {/* Right: Clear button when search query exists */}
+        {search.length > 0 && (
           <TouchableOpacity
             onPress={() => onSearchChange("")}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            className="p-1"
+            className="p-1.5 -mr-1"
           >
-            <Ionicons name="close-circle" size={18} color="#80868B" />
+            <Ionicons name="close-circle" size={20} color="#444746" />
           </TouchableOpacity>
         )}
       </View>
     </View>
   );
 }
+
+
 

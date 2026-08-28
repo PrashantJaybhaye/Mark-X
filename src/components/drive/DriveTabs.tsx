@@ -9,56 +9,69 @@ interface DriveTabsProps {
 
 export function DriveTabs({ activeTab, onTabChange }: DriveTabsProps) {
   return (
-    <View className="flex-row px-5 border-b border-[#E6E8EC] bg-white" style={{ columnGap: 24 }}>
+    <View className="flex-row w-full bg-white border-b border-[#E0E2E6]">
+      {/* Suggested Tab */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
           triggerHaptic();
           onTabChange("suggested");
         }}
-        className="pb-2.5 pt-1.5 relative items-center"
+        className="flex-1 items-center justify-center pt-2 pb-3 relative"
       >
         <Text
           className={`text-[14px] ${
             activeTab === "suggested"
-              ? "text-[#0B57D0] font-outfit-semibold"
-              : "text-[#6B7078] font-outfit-medium"
+              ? "text-[#000000] font-outfit-bold"
+              : "text-[#444746] font-outfit-medium"
           }`}
         >
           Suggested
         </Text>
         {activeTab === "suggested" && (
           <View
-            className="bg-[#0B57D0] rounded-full"
-            style={{ position: "absolute", bottom: -1, left: 0, right: 0, height: 2.5 }}
+            className="bg-[#000000] rounded-t-full"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              width: 72,
+              height: 3,
+            }}
           />
         )}
       </TouchableOpacity>
 
+      {/* Activity Tab */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
           triggerHaptic();
           onTabChange("activity");
         }}
-        className="pb-2.5 pt-1.5 relative items-center"
+        className="flex-1 items-center justify-center pt-2 pb-3 relative"
       >
         <Text
           className={`text-[14px] ${
             activeTab === "activity"
-              ? "text-[#0B57D0] font-outfit-semibold"
-              : "text-[#6B7078] font-outfit-medium"
+              ? "text-[#000000] font-outfit-bold"
+              : "text-[#444746] font-outfit-medium"
           }`}
         >
           Activity
         </Text>
         {activeTab === "activity" && (
           <View
-            className="bg-[#0B57D0] rounded-full"
-            style={{ position: "absolute", bottom: -1, left: 0, right: 0, height: 2.5 }}
+            className="bg-[#000000] rounded-t-full"
+            style={{
+              position: "absolute",
+              bottom: 0,
+              width: 72,
+              height: 3,
+            }}
           />
         )}
       </TouchableOpacity>
     </View>
   );
 }
+
