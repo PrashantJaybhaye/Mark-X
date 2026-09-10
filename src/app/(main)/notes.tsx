@@ -14,6 +14,7 @@ import Svg, {
 import { NotesHeader, NoteViewMode } from "../../components/notes/NotesHeader";
 import { NotesStackedBanner } from "../../components/notes/NotesStackedBanner";
 import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
+import { NotesEmptyState } from "../../components/notes/NotesEmptyState";
 import { triggerHaptic } from "../../utils/haptics";
 
 export default function NotesScreen() {
@@ -113,40 +114,13 @@ export default function NotesScreen() {
           {/* 2. Bottom Notes Area (Grid & List View Modes) */}
           <View className="px-5 pt-1">
             {filteredNotes.length === 0 ? (
-              /* --- Clean Empty State when no notes exist --- */
-              <View className="w-full items-center justify-center pt-8 pb-12 px-6">
-                <View className="w-16 h-16 rounded-3xl bg-white items-center justify-center border border-black/[0.05] shadow-xs mb-3.5">
-                  <Ionicons name="document-text-outline" size={28} color="#3E140A" />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  className="text-[18px] text-[#111111] mb-1 text-center"
-                  style={{ fontFamily: "Outfit_600SemiBold" }}
-                >
-                  No notes yet
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  className="text-[13px] text-[#6B7280] text-center max-w-[240px] mb-5 leading-snug"
-                  style={{ fontFamily: "Outfit_400Regular" }}
-                >
-                  Capture your daily ideas, quick thoughts & checklists.
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={handleAddNote}
-                  className="flex-row items-center bg-[#111111] px-5 py-2.5 rounded-full shadow-sm"
-                >
-                  <Ionicons name="add" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text
-                    allowFontScaling={false}
-                    className="text-[13px] text-white"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    Create First Note
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <NotesEmptyState
+                searchQuery={searchQuery}
+                viewMode={viewMode}
+                columnWidth={columnWidth}
+                onClearSearch={() => setSearchQuery("")}
+                onCreateNote={handleAddNote}
+              />
             ) : viewMode === "grid" ? (
               /* --- Grid Mode (2-Column Masonry Layout) --- */
               <View className="flex-row justify-between w-full">

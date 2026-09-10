@@ -18,6 +18,7 @@ import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
 import { GalleryDetailModal } from "../../components/gallery/GalleryDetailModal";
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
 import { GalleryMasonrySkeleton } from "../../components/gallery/GallerySkeleton";
+import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import { safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -191,6 +192,7 @@ export default function GalleryScreen() {
           showsVerticalScrollIndicator={false}
           bounces={true}
           contentContainerStyle={{
+            flexGrow: 1,
             paddingHorizontal: 12,
             paddingTop: 12,
             paddingBottom: 30,
@@ -199,20 +201,10 @@ export default function GalleryScreen() {
           {isRefreshing ? (
             <GalleryMasonrySkeleton cardWidth={columnWidth} />
           ) : pins.length === 0 ? (
-            <View className="items-center justify-center py-24">
-              <Ionicons name="images-outline" size={36} color="#B4B8BF" />
-              <Text className="text-[15px] font-outfit-semibold text-[#111111] mt-3">
-                No pins in gallery
-              </Text>
-              <TouchableOpacity
-                onPress={handleAddPhoto}
-                className="mt-3 px-5 py-2.5 bg-[#111111] rounded-full"
-              >
-                <Text className="text-[13px] font-outfit-semibold text-white">
-                  Add Your First Pin
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <GalleryEmptyState
+              cardWidth={columnWidth}
+              onAddPhoto={handleAddPhoto}
+            />
           ) : (
             <View className="flex-row w-full justify-between">
               {/* Left Column */}
