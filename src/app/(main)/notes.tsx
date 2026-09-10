@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, useWindowDimensions } from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, ScrollView, useWindowDimensions, Text, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,29 +12,48 @@ import Svg, {
 } from "react-native-svg";
 
 import { NotesHeader, NoteViewMode } from "../../components/notes/NotesHeader";
+import { NotesStackedBanner } from "../../components/notes/NotesStackedBanner";
+import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
+import { triggerHaptic } from "../../utils/haptics";
 
 export default function NotesScreen() {
-  const { height: screenHeight } = useWindowDimensions();
+  const { height: screenHeight, width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
+  const [notes, setNotes] = useState<NoteItem[]>([]);
+
+  // 2-Column spacing (20px outer margin on each side, 12px gutter between columns)
+  const columnWidth = (windowWidth - 40 - 12) / 2;
 
   const handleToggleViewMode = () => {
     setViewMode((prev) => (prev === "grid" ? "list" : "grid"));
   };
 
   const handleAddNote = () => {
-    // Step 2: note creation / editor
+    triggerHaptic();
+    // Step 2: Note creation / editor modal
   };
 
-  const handleOptionsPress = () => {
-    // Note options
-  };
+  // Filter notes by search query if user searches
+  const filteredNotes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter(
+      (n) =>
+        n.title.toLowerCase().includes(q) ||
+        (n.body && n.body.toLowerCase().includes(q))
+    );
+  }, [notes, searchQuery]);
+
+  // Distribute notes into two columns for grid masonry
+  const leftColumnNotes = filteredNotes.filter((_, i) => i % 2 === 0);
+  const rightColumnNotes = filteredNotes.filter((_, i) => i % 2 !== 0);
 
   return (
     <View className="flex-1 bg-[#F4F5F7]">
       <StatusBar style="dark" />
 
-      {/* Top Ambient Atmospheric Glow (Monzo Style - Matching Home Page) */}
+      {/* Top Ambient Atmospheric Glow (Mark-X Signature Glow) */}
       <Svg
         width="100%"
         height={screenHeight > 800 ? 560 : 490}
@@ -42,7 +61,6 @@ export default function NotesScreen() {
         pointerEvents="none"
       >
         <Defs>
-          {/* Main vertical atmospheric gradient */}
           <LinearGradient id="topGlow" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor="#FF8A5B" stopOpacity="0.92" />
             <Stop offset="20%" stopColor="#FF9B73" stopOpacity="0.75" />
@@ -52,7 +70,6 @@ export default function NotesScreen() {
             <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
           </LinearGradient>
 
-          {/* Concentrated top-right warm amber light */}
           <RadialGradient id="coreAmberGlow" cx="80%" cy="2%" rx="75%" ry="50%">
             <Stop offset="0%" stopColor="#FF7043" stopOpacity="0.75" />
             <Stop offset="25%" stopColor="#FF825A" stopOpacity="0.55" />
@@ -61,7 +78,6 @@ export default function NotesScreen() {
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </RadialGradient>
 
-          {/* Soft ambient balance from top-left */}
           <RadialGradient id="softCoralGlow" cx="15%" cy="8%" rx="60%" ry="40%">
             <Stop offset="0%" stopColor="#FFD0BC" stopOpacity="0.28" />
             <Stop offset="50%" stopColor="#FFE5D9" stopOpacity="0.1" />
@@ -75,44 +91,103 @@ export default function NotesScreen() {
       </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        {/* Step 1: Premium Home-Style Header */}
+        {/* Top Header Bar */}
         <NotesHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           viewMode={viewMode}
           onToggleViewMode={handleToggleViewMode}
           onAddNote={handleAddNote}
-          onOptionsPress={handleOptionsPress}
         />
 
-        {/* Content Area for subsequent steps */}
+        {/* Scrollable Content Body */}
         <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingBottom: 80,
-            paddingHorizontal: 24,
-          }}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: 100,
+          }}
         >
-          <View className="w-16 h-16 rounded-3xl bg-white/70 items-center justify-center border border-white/80 shadow-sm mb-4">
-            <Ionicons name="document-text-outline" size={30} color="#3E140A" />
+          {/* 1. Stacked Cards Banner */}
+          <NotesStackedBanner />
+
+          {/* 2. Bottom Notes Area (Grid & List View Modes) */}
+          <View className="px-5 pt-1">
+            {filteredNotes.length === 0 ? (
+              /* --- Clean Empty State when no notes exist --- */
+              <View className="w-full items-center justify-center pt-8 pb-12 px-6">
+                <View className="w-16 h-16 rounded-3xl bg-white items-center justify-center border border-black/[0.05] shadow-xs mb-3.5">
+                  <Ionicons name="document-text-outline" size={28} color="#3E140A" />
+                </View>
+                <Text
+                  allowFontScaling={false}
+                  className="text-[18px] text-[#111111] mb-1 text-center"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                >
+                  No notes yet
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  className="text-[13px] text-[#6B7280] text-center max-w-[240px] mb-5 leading-snug"
+                  style={{ fontFamily: "Outfit_400Regular" }}
+                >
+                  Capture your daily ideas, quick thoughts & checklists.
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleAddNote}
+                  className="flex-row items-center bg-[#111111] px-5 py-2.5 rounded-full shadow-sm"
+                >
+                  <Ionicons name="add" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text
+                    allowFontScaling={false}
+                    className="text-[13px] text-white"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Create First Note
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : viewMode === "grid" ? (
+              /* --- Grid Mode (2-Column Masonry Layout) --- */
+              <View className="flex-row justify-between w-full">
+                {/* Left Column */}
+                <View style={{ width: columnWidth }}>
+                  {leftColumnNotes.map((note) => (
+                    <NoteItemCard
+                      key={note.id}
+                      note={note}
+                      viewMode="grid"
+                      onPress={(n) => {}}
+                    />
+                  ))}
+                </View>
+
+                {/* Right Column */}
+                <View style={{ width: columnWidth }}>
+                  {rightColumnNotes.map((note) => (
+                    <NoteItemCard
+                      key={note.id}
+                      note={note}
+                      viewMode="grid"
+                      onPress={(n) => {}}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              /* --- Row / Card List Mode --- */
+              <View className="w-full">
+                {filteredNotes.map((note) => (
+                  <NoteItemCard
+                    key={note.id}
+                    note={note}
+                    viewMode="list"
+                    onPress={(n) => {}}
+                  />
+                ))}
+              </View>
+            )}
           </View>
-          <Text
-            allowFontScaling={false}
-            className="text-[18px] text-[#111111] mb-1"
-            style={{ fontFamily: "Outfit_600SemiBold" }}
-          >
-            Premium Header Ready
-          </Text>
-          <Text
-            allowFontScaling={false}
-            className="text-[14px] text-[#6B7280] text-center max-w-[260px]"
-            style={{ fontFamily: "Outfit_400Regular" }}
-          >
-            Matching Mark-X atmospheric glow and frosted glass action controls.
-          </Text>
         </ScrollView>
       </SafeAreaView>
     </View>
