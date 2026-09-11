@@ -26,7 +26,7 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
 
   if (hasNativeDocPicker) {
     try {
-      const DocumentPicker = require("expo-document-picker");
+      const DocumentPicker = await import("expo-document-picker");
       const result = await DocumentPicker.getDocumentAsync({
         type: ["*/*"],
         copyToCacheDirectory: true,
@@ -44,16 +44,12 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
       return null;
     } catch (err) {
       console.warn("[SafePicker] Error during document picking:", err);
+      return null;
     }
   }
 
-  // Simulated fallback when testing on a pre-compiled development build without rebuild
-  return {
-    name: `Document_${Date.now().toString().slice(-4)}.pdf`,
-    uri: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-    size: 1420000,
-    mimeType: "application/pdf",
-  };
+  console.warn("[SafePicker] ExpoDocumentPicker native module is not available in this environment.");
+  return null;
 }
 
 export async function safePickImage(): Promise<PickedImageResult | null> {
@@ -61,7 +57,7 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
 
   if (hasNativeImagePicker) {
     try {
-      const ImagePicker = require("expo-image-picker");
+      const ImagePicker = await import("expo-image-picker");
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
@@ -82,16 +78,10 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
       return null;
     } catch (err) {
       console.warn("[SafePicker] Error during image picking:", err);
+      return null;
     }
   }
 
-  // Simulated fallback when testing on a pre-compiled development build without rebuild
-  return {
-    fileName: "Sample_Photo.jpg",
-    uri: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80",
-    width: 800,
-    height: 1200,
-    fileSize: 1850000,
-    mimeType: "image/jpeg",
-  };
+  console.warn("[SafePicker] ExponentImagePicker native module is not available in this environment.");
+  return null;
 }

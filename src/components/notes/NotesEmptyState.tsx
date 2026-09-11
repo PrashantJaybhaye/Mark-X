@@ -49,7 +49,7 @@ export function NotesEmptyState({
           className="text-[12px] text-[#9B9A97] text-center max-w-[240px] mb-3"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
-          No notes matched "{searchQuery}"
+          No notes matched &ldquo;{searchQuery}&rdquo;
         </Text>
         <TouchableOpacity
           activeOpacity={0.7}

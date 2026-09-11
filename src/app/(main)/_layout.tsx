@@ -1,11 +1,10 @@
 import React from "react";
-import { Tabs, useRouter } from "expo-router";
+import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomTabBar, TabKey } from "../../components/navigation/BottomTabBar";
 
 export default function MainLayout() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   return (
     <Tabs
@@ -16,7 +15,7 @@ export default function MainLayout() {
             activeTab={currentRoute}
             onTabChange={(tab) => {
               if (tab !== currentRoute) {
-                router.replace(`/(main)/${tab}` as any);
+                props.navigation.navigate(tab);
               }
             }}
             bottomInset={insets.bottom}

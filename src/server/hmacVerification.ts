@@ -15,15 +15,24 @@ const SERVER_HMAC_SECRET = process.env.HMAC_SECRET_KEY || "server_secret_placeho
 // Maximum acceptable request age (5 minutes)
 const MAX_REQUEST_AGE_MS = 5 * 60 * 1000;
 
-// In-memory or Redis-backed cache to store processed nonces and prevent replay attacks
-const processedNonces = new Set<string>();
+// In-memory or Redis-backed cache to store processed nonces and their arrival timestamp
+const processedNonces = new Map<string, number>();
 
 /**
- * Periodically cleans up expired nonces to prevent memory leaks
+ * Periodically cleans up only nonces older than MAX_REQUEST_AGE_MS
  */
-setInterval(() => {
-  processedNonces.clear();
-}, MAX_REQUEST_AGE_MS * 2);
+const cleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [n, ts] of processedNonces.entries()) {
+    if (now - ts > MAX_REQUEST_AGE_MS) {
+      processedNonces.delete(n);
+    }
+  }
+}, 60 * 1000);
+
+if (typeof cleanupTimer === "object" && "unref" in cleanupTimer) {
+  cleanupTimer.unref();
+}
 
 export interface IncomingPackage<T = any> {
   payload: T;
@@ -86,7 +95,7 @@ export function verifyIncomingApiPackage(
       error: "Replay attack detected: Nonce has already been processed.",
     };
   }
-  processedNonces.add(nonce);
+  processedNonces.set(nonce, now);
 
   // 4. If HMAC signature was provided, verify with timingSafeEqual
   if (receivedHmacSignature) {

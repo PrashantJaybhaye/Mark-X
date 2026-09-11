@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { DriveItem, getCategoryIcon } from "../../utils/driveFileTypes";
@@ -19,8 +18,6 @@ export function DriveFilePreviewModal({
   onClose,
   onOptionsPress,
 }: DriveFilePreviewModalProps) {
-  const insets = useSafeAreaInsets();
-
   if (!item) return null;
 
   const iconConfig = getCategoryIcon(item.category);

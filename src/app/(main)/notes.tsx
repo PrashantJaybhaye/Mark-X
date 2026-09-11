@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { View, ScrollView, useWindowDimensions, Text, TouchableOpacity } from "react-native";
+import { View, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
 import Svg, {
   Defs,
   LinearGradient,
@@ -15,13 +14,38 @@ import { NotesHeader, NoteViewMode } from "../../components/notes/NotesHeader";
 import { NotesStackedBanner } from "../../components/notes/NotesStackedBanner";
 import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
 import { NotesEmptyState } from "../../components/notes/NotesEmptyState";
+import { NoteEditModal } from "../../components/notes/NoteEditModal";
 import { triggerHaptic } from "../../utils/haptics";
+import { loadNotes, saveNotes } from "../../services/storageService";
 
 export default function NotesScreen() {
   const { height: screenHeight, width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
   const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<NoteItem | null>(null);
+
+  // Hydrate notes on mount
+  React.useEffect(() => {
+    let isMounted = true;
+    loadNotes().then((stored) => {
+      if (isMounted && stored.length > 0) {
+        setNotes(stored);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updateNotesAndPersist = (updater: (prev: NoteItem[]) => NoteItem[]) => {
+    setNotes((prev) => {
+      const updated = updater(prev);
+      saveNotes(updated);
+      return updated;
+    });
+  };
 
   // 2-Column spacing (20px outer margin on each side, 12px gutter between columns)
   const columnWidth = (windowWidth - 40 - 12) / 2;
@@ -32,7 +56,54 @@ export default function NotesScreen() {
 
   const handleAddNote = () => {
     triggerHaptic();
-    // Step 2: Note creation / editor modal
+    setSelectedNote(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditNote = (note: NoteItem) => {
+    triggerHaptic();
+    setSelectedNote(note);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveNote = (data: { id?: string; title: string; body: string; category: string; isPinned: boolean }) => {
+    const formattedDate = new Date().toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+    if (data.id) {
+      // Update existing
+      updateNotesAndPersist((prev) =>
+        prev.map((n) =>
+          n.id === data.id
+            ? {
+                ...n,
+                title: data.title,
+                body: data.body,
+                category: data.category,
+                isPinned: data.isPinned,
+                createdAt: `Edited ${formattedDate}`,
+              }
+            : n
+        )
+      );
+    } else {
+      // Create new
+      const newNote: NoteItem = {
+        id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        title: data.title,
+        body: data.body,
+        category: data.category,
+        isPinned: data.isPinned,
+        createdAt: formattedDate,
+      };
+      updateNotesAndPersist((prev) => [newNote, ...prev]);
+    }
+  };
+
+  const handleDeleteNote = (id: string) => {
+    updateNotesAndPersist((prev) => prev.filter((n) => n.id !== id));
   };
 
   // Filter notes by search query if user searches
@@ -46,9 +117,17 @@ export default function NotesScreen() {
     );
   }, [notes, searchQuery]);
 
-  // Distribute notes into two columns for grid masonry
-  const leftColumnNotes = filteredNotes.filter((_, i) => i % 2 === 0);
-  const rightColumnNotes = filteredNotes.filter((_, i) => i % 2 !== 0);
+  // Distribute notes into two columns for grid masonry (pinned items first)
+  const sortedNotes = useMemo(() => {
+    return [...filteredNotes].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return 0;
+    });
+  }, [filteredNotes]);
+
+  const leftColumnNotes = sortedNotes.filter((_, i) => i % 2 === 0);
+  const rightColumnNotes = sortedNotes.filter((_, i) => i % 2 !== 0);
 
   return (
     <View className="flex-1 bg-[#F4F5F7]">
@@ -109,7 +188,7 @@ export default function NotesScreen() {
           }}
         >
           {/* 1. Stacked Cards Banner */}
-          <NotesStackedBanner />
+          <NotesStackedBanner onPress={handleAddNote} />
 
           {/* 2. Bottom Notes Area (Grid & List View Modes) */}
           <View className="px-5 pt-1">
@@ -131,7 +210,7 @@ export default function NotesScreen() {
                       key={note.id}
                       note={note}
                       viewMode="grid"
-                      onPress={(n) => {}}
+                      onPress={handleEditNote}
                     />
                   ))}
                 </View>
@@ -143,7 +222,7 @@ export default function NotesScreen() {
                       key={note.id}
                       note={note}
                       viewMode="grid"
-                      onPress={(n) => {}}
+                      onPress={handleEditNote}
                     />
                   ))}
                 </View>
@@ -156,7 +235,7 @@ export default function NotesScreen() {
                     key={note.id}
                     note={note}
                     viewMode="list"
-                    onPress={(n) => {}}
+                    onPress={handleEditNote}
                   />
                 ))}
               </View>
@@ -164,6 +243,15 @@ export default function NotesScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Interactive Note Creation / Edit Modal */}
+      <NoteEditModal
+        visible={isEditModalOpen}
+        note={selectedNote}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveNote}
+        onDelete={handleDeleteNote}
+      />
     </View>
   );
 }

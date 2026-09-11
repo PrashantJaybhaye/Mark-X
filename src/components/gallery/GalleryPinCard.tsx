@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Animated } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +20,7 @@ export function GalleryPinCard({
   onOptionsPress,
 }: GalleryPinCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(0.35)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(0.35));
 
   useEffect(() => {
     if (!isLoaded) {

@@ -242,7 +242,7 @@ export function ProfileOptionsModal({
                     className="text-[13px] text-[#4B5563] leading-5"
                     style={{ fontFamily: "Outfit_400Regular" }}
                   >
-                    Biometric Lock checks your device's fingerprint or Face ID
+                    Biometric Lock checks your device&apos;s fingerprint or Face ID
                     whenever you open Mark-X to keep your vault private.
                   </Text>
                 </View>

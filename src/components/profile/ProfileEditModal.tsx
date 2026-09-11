@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -36,12 +36,7 @@ export function ProfileEditModal({
   const [photoUri, setPhotoUri] = useState<string | null>(currentPhotoUri || null);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setName(currentName);
-      setPhotoUri(currentPhotoUri || null);
-    }
-  }, [visible, currentName, currentPhotoUri]);
+
 
   const handlePickPhoto = async () => {
     triggerHaptic();

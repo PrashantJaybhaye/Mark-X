@@ -58,11 +58,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  */
 export function normalizeEmail(identifier: string): string {
   const trimmed = identifier.trim().toLowerCase();
-  if (trimmed.includes("@")) {
-    return trimmed;
-  }
-  // Standardized domain for username-only accounts
-  return `${trimmed}@markx.app`;
+  return trimmed;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -80,6 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (identifier: string, pass: string) => {
     const email = normalizeEmail(identifier);
+    if (!email.includes("@")) {
+      throw new Error("Please enter a valid email address.");
+    }
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
@@ -89,6 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     displayName?: string
   ) => {
     const email = normalizeEmail(identifier);
+    if (!email.includes("@")) {
+      throw new Error("Please enter a valid email address.");
+    }
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -107,10 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.warn("Could not send verification email:", e);
       }
-      setUser({
-        ...userCredential.user,
-        displayName: name || userCredential.user.displayName,
-      });
+      // Ensure state holds the real class instance with prototypes intact
+      await userCredential.user.reload();
+      setUser(auth.currentUser || userCredential.user);
     }
   };
 
@@ -127,15 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 2. Native (iOS / Android) environment using native GoogleSignin
     try {
-      const webClientId =
-        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-
-      GoogleSignin.configure({
-        webClientId,
-        scopes: ["profile", "email"],
-        offlineAccess: false,
-      });
-
       await GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       });
@@ -181,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (auth.currentUser) {
       await auth.currentUser.reload();
       const updatedUser = auth.currentUser;
-      setUser({ ...updatedUser });
+      setUser(updatedUser);
       return updatedUser.emailVerified;
     }
     return false;

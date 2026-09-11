@@ -26,27 +26,36 @@ import {
   ProfileOptionsModal,
 } from "../../components/profile/ProfileOptionsModal";
 
+import { loadUserPreferences, saveUserPreferences } from "../../services/storageService";
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, signOut, reloadUser, resetPassword } = useAuth();
 
-  const [userName, setUserName] = useState(user?.displayName || "User");
-  const [photoUri, setPhotoUri] = useState<string | null>(user?.photoURL || null);
-  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(true);
+  const [customName, setCustomName] = useState<string | null>(null);
+  const [customPhotoUri, setCustomPhotoUri] = useState<string | null | undefined>(undefined);
+  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
+  const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeOptionModal, setActiveOptionModal] = useState<OptionModalType>(null);
 
+  const userName = customName ?? user?.displayName ?? "User";
+  const photoUri = customPhotoUri !== undefined ? customPhotoUri : (user?.photoURL || null);
+
   useEffect(() => {
-    setUserName(user?.displayName || "User");
-    setPhotoUri(user?.photoURL || null);
-  }, [user?.displayName, user?.photoURL]);
+    loadUserPreferences().then((prefs) => {
+      if (prefs.isBiometricsEnabled !== undefined) {
+        setIsBiometricsEnabled(prefs.isBiometricsEnabled);
+      }
+    });
+  }, []);
 
   const handlePickAvatar = async () => {
     triggerHaptic();
     const result = await safePickImage();
     if (result?.uri) {
-      setPhotoUri(result.uri);
+      setCustomPhotoUri(result.uri);
       if (auth.currentUser) {
         try {
           await updateProfile(auth.currentUser, { photoURL: result.uri });
@@ -60,7 +69,7 @@ export default function ProfileScreen() {
 
   const handleRemoveAvatar = async () => {
     triggerHaptic();
-    setPhotoUri(null);
+    setCustomPhotoUri(null);
     if (auth.currentUser) {
       try {
         await updateProfile(auth.currentUser, { photoURL: "" });
@@ -93,8 +102,8 @@ export default function ProfileScreen() {
   };
 
   const handleSaveProfile = async (newName: string, newPhotoUri?: string | null) => {
-    setUserName(newName);
-    setPhotoUri(newPhotoUri || null);
+    setCustomName(newName);
+    setCustomPhotoUri(newPhotoUri || null);
 
     if (auth.currentUser) {
       await updateProfile(auth.currentUser, {
@@ -122,6 +131,7 @@ export default function ProfileScreen() {
   const handleToggleBiometrics = (val: boolean) => {
     triggerHaptic();
     setIsBiometricsEnabled(val);
+    saveUserPreferences({ isBiometricsEnabled: val });
     if (val) {
       Alert.alert(
         "Biometric Lock Active",
@@ -132,9 +142,14 @@ export default function ProfileScreen() {
 
   const handleShowDevices = () => {
     triggerHaptic();
+    const deviceType = Platform.select({
+      ios: "Apple iPhone",
+      android: "Android Phone",
+      default: "Web Browser",
+    });
     Alert.alert(
       "Active Session",
-      "Current Device: Android Phone\nStatus: Secure & Authenticated\nProvider: Firebase Auth"
+      `Current Device: ${deviceType}\nStatus: Secure & Authenticated\nProvider: Firebase Auth`
     );
   };
 
@@ -148,9 +163,17 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <StatusBar style="light" />
+      <StatusBar style={isScrolledPastBanner ? "dark" : "light"} />
 
-      <ScrollView showsVerticalScrollIndicator={false} bounces={true}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          const y = e.nativeEvent.contentOffset.y;
+          setIsScrolledPastBanner(y > 100);
+        }}
+      >
         {/* City Skyline Banner */}
         <View className="w-full h-[150px] bg-[#222222] relative">
           <Image

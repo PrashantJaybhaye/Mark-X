@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, TouchableOpacity, ScrollView } from "react-native";
+import { View, TouchableOpacity, ScrollView, Share } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,12 +17,33 @@ import { UploadStatusToast } from "../../components/drive/UploadStatusToast";
 import { DriveItem, DriveFileCategory, getFileCategory } from "../../utils/driveFileTypes";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
+import { loadDriveItems, saveDriveItems } from "../../services/storageService";
 
 export default function DriveScreen() {
   const insets = useSafeAreaInsets();
 
-  // Files state initialized empty
+  // Files state initialized from storage
   const [files, setFiles] = useState<DriveItem[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    loadDriveItems().then((stored) => {
+      if (isMounted && stored.length > 0) {
+        setFiles(stored);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updateFilesAndPersist = (updater: (prev: DriveItem[]) => DriveItem[]) => {
+    setFiles((prev) => {
+      const updated = updater(prev);
+      saveDriveItems(updated);
+      return updated;
+    });
+  };
 
   // Screen state
   const [search, setSearch] = useState("");
@@ -57,7 +78,7 @@ export default function DriveScreen() {
 
   const generateUniqueId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  // Action handlers - add picked/created files directly into state
+  // Action handlers - add picked/created files and persist
   const handleUploadFile = async () => {
     const file = await safePickDocument();
     if (file) {
@@ -71,8 +92,8 @@ export default function DriveScreen() {
         uri: file.uri,
         mimeType: file.mimeType,
       };
-      setFiles((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category, "Ready to upload • Saved locally");
+      updateFilesAndPersist((prev) => [newItem, ...prev]);
+      triggerToast(newItem.name, category, "Saved to Drive");
     }
   };
 
@@ -90,8 +111,8 @@ export default function DriveScreen() {
         uri: img.uri,
         mimeType: img.mimeType,
       };
-      setFiles((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category, "Image imported • Saved locally");
+      updateFilesAndPersist((prev) => [newItem, ...prev]);
+      triggerToast(newItem.name, category, "Document scanned • Saved locally");
     }
   };
 
@@ -100,13 +121,13 @@ export default function DriveScreen() {
     if (img) {
       const newItem: DriveItem = {
         id: generateUniqueId(),
-        name: `IMG_${Date.now().toString().slice(-4)}.jpg`,
+        name: img.fileName || `IMG_${Date.now().toString().slice(-4)}.jpg`,
         category: "image",
-        size: "3.2 MB",
+        size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "3.2 MB",
         updatedAt: "Just now",
         uri: img.uri,
       };
-      setFiles((prev) => [newItem, ...prev]);
+      updateFilesAndPersist((prev) => [newItem, ...prev]);
       triggerToast(newItem.name, "image", "Photo imported • Saved locally");
     }
   };
@@ -119,7 +140,7 @@ export default function DriveScreen() {
       updatedAt: "Just now",
       isFolder: true,
     };
-    setFiles((prev) => [newFolder, ...prev]);
+    updateFilesAndPersist((prev) => [newFolder, ...prev]);
     triggerToast(newFolder.name, "folder", "Folder created • Saved locally");
   };
 
@@ -131,28 +152,36 @@ export default function DriveScreen() {
       size: "12 KB",
       updatedAt: "Just now",
     };
-    setFiles((prev) => [newNote, ...prev]);
+    updateFilesAndPersist((prev) => [newNote, ...prev]);
     triggerToast(newNote.name, "document", "Note created • Saved locally");
   };
 
   // Item Options Handlers
   const handleRenameFile = (id: string, newName: string) => {
-    setFiles((prev) =>
+    updateFilesAndPersist((prev) =>
       prev.map((f) => (f.id === id ? { ...f, name: newName, updatedAt: "Edited just now" } : f))
     );
-    triggerToast(`Renamed to "${newName}"`, "document", "Name updated • Saved locally");
+    triggerToast(`Renamed to "${newName}"`, "document", "Name updated");
   };
 
   const handleDeleteFile = (id: string) => {
     const fileToDelete = files.find((f) => f.id === id);
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    updateFilesAndPersist((prev) => prev.filter((f) => f.id !== id));
     if (fileToDelete) {
       triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive");
     }
   };
 
-  const handleShareFile = (item: DriveItem) => {
-    triggerToast(`Shared "${item.name}"`, item.category, "Ready to share");
+  const handleShareFile = async (item: DriveItem) => {
+    try {
+      await Share.share({
+        title: item.name,
+        message: item.uri ? `${item.name}\n${item.uri}` : `Mark-X File: ${item.name}`,
+        url: item.uri,
+      });
+    } catch {
+      triggerToast(`Shared "${item.name}"`, item.category, "Ready to share");
+    }
   };
 
   return (

@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Svg, {
   Defs,
   LinearGradient,
@@ -28,32 +28,96 @@ import {
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
+import {
+  loadDriveItems,
+  saveDriveItems,
+  loadGalleryPins,
+  saveGalleryPins,
+  loadNotes,
+} from "../../services/storageService";
+import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
+import { GalleryPin } from "../../utils/galleryData";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { height: screenHeight } = useWindowDimensions();
 
-  // Storage and file counter states
+  // Storage and file counter states dynamically derived from real storage
   const [usedStorage, setUsedStorage] = useState("0.00");
   const [galleryCount, setGalleryCount] = useState(0);
-  const [remindersCount, setRemindersCount] = useState(0);
-  const [docsCount, setDocsCount] = useState(2);
+  const [notesCount, setNotesCount] = useState(0);
+  const [docsCount, setDocsCount] = useState(0);
+
+  const refreshCounts = React.useCallback(async () => {
+    try {
+      const [driveItems, galleryPins, notes] = await Promise.all([
+        loadDriveItems(),
+        loadGalleryPins(),
+        loadNotes(),
+      ]);
+
+      setDocsCount(driveItems.length);
+      setGalleryCount(galleryPins.length);
+      setNotesCount(notes.length);
+
+      // Approximate storage calculation in GB
+      const driveSizeMB = driveItems.reduce((acc, item) => {
+        if (!item.size) return acc + 1.2;
+        const num = parseFloat(item.size);
+        return isNaN(num) ? acc + 1.0 : acc + num;
+      }, 0);
+      const gallerySizeMB = galleryPins.length * 2.5;
+      const totalGB = ((driveSizeMB + gallerySizeMB) / 1024).toFixed(2);
+      setUsedStorage(totalGB);
+    } catch (err) {
+      console.warn("[HomeScreen] Could not refresh metrics:", err);
+    }
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshCounts();
+    }, [refreshCounts])
+  );
 
   const handleUploadFile = async () => {
     triggerHaptic();
     const file = await safePickDocument();
     if (file) {
-      setDocsCount((prev) => prev + 1);
-      setUsedStorage((prev) => (parseFloat(prev) + 0.05).toFixed(2));
+      const category = getFileCategory(file.name, file.mimeType);
+      const newItem: DriveItem = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: file.name || "Uploaded Document",
+        category,
+        size: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB",
+        updatedAt: "Just now",
+        uri: file.uri,
+        mimeType: file.mimeType,
+      };
+      const existing = await loadDriveItems();
+      await saveDriveItems([newItem, ...existing]);
+      await refreshCounts();
     }
   };
 
   const handleAddPhoto = async () => {
     triggerHaptic();
     const img = await safePickImage();
-    if (img) {
-      setGalleryCount((prev) => prev + 1);
-      setUsedStorage((prev) => (parseFloat(prev) + 0.02).toFixed(2));
+    if (img && img.uri) {
+      const newPin: GalleryPin = {
+        id: `pin-${Date.now()}`,
+        title: img.fileName || "Captured photo",
+        author: "You",
+        imageUrl: img.uri,
+        aspectRatio: img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75,
+        category: "Aesthetic",
+        likes: 1,
+        isLiked: true,
+        saved: true,
+      };
+      const existing = await loadGalleryPins();
+      await saveGalleryPins([newPin, ...existing]);
+      await refreshCounts();
     }
   };
 
@@ -160,7 +224,7 @@ export default function HomeScreen() {
                 subtitle="Photos & Videos"
                 onPress={() => {
                   triggerHaptic();
-                  router.replace("/(main)/gallery");
+                  router.navigate("/(main)/gallery");
                 }}
               >
                 <GalleryCardArt />
@@ -168,11 +232,11 @@ export default function HomeScreen() {
 
               <FeatureCard
                 title="Reminders"
-                count={remindersCount}
+                count={notesCount}
                 subtitle="Tasks & Due Alerts"
                 onPress={() => {
                   triggerHaptic();
-                  router.replace("/(main)/notes");
+                  router.navigate("/(main)/notes");
                 }}
               >
                 <RemindersCardArt />
@@ -183,11 +247,11 @@ export default function HomeScreen() {
             <View className="flex-row gap-3.5">
               <FeatureCard
                 title="Secure Notes"
-                count="Notes"
+                count={notesCount}
                 subtitle="Continuous Autosave"
                 onPress={() => {
                   triggerHaptic();
-                  router.replace("/(main)/notes");
+                  router.navigate("/(main)/notes");
                 }}
               >
                 <NotesCardArt />
@@ -199,7 +263,7 @@ export default function HomeScreen() {
                 subtitle="Fast Secure Sync"
                 onPress={() => {
                   triggerHaptic();
-                  router.replace("/(main)/drive");
+                  router.navigate("/(main)/drive");
                 }}
               >
                 <DriveCardArt />

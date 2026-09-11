@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Animated } from "react-native";
 
 interface GallerySkeletonProps {
@@ -13,7 +13,7 @@ export function GallerySkeletonCard({
   width: number;
   height: number;
 }) {
-  const pulseAnim = useRef(new Animated.Value(0.35)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(0.35));
 
   useEffect(() => {
     const animation = Animated.loop(

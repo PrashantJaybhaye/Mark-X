@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   Animated,
@@ -22,18 +21,40 @@ import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import { safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 
+import { loadGalleryPins, saveGalleryPins } from "../../services/storageService";
+
 export default function GalleryScreen() {
   const { width: windowWidth } = useWindowDimensions();
 
   // 2-column masonry spacing (12px side margin, 10px gutter between columns)
   const columnWidth = (windowWidth - 24 - 10) / 2;
 
-  // Gallery state
+  // Gallery state loaded from persistence
   const [pins, setPins] = useState<GalleryPin[]>(INITIAL_GALLERY_PINS);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+    loadGalleryPins().then((stored) => {
+      if (isMounted && stored.length > 0) {
+        setPins(stored);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updatePinsAndPersist = (updater: (prev: GalleryPin[]) => GalleryPin[]) => {
+    setPins((prev) => {
+      const updated = updater(prev);
+      saveGalleryPins(updated);
+      return updated;
+    });
+  };
+
   // Spin animation for refresh button
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const [spinAnim] = useState(() => new Animated.Value(0));
 
   // Active Pin Modals
   const [selectedPin, setSelectedPin] = useState<GalleryPin | null>(null);
@@ -63,16 +84,16 @@ export default function GalleryScreen() {
 
   // Like Toggle
   const handleLikeToggle = (pinId: string) => {
-    setPins((prev) =>
+    updatePinsAndPersist((prev) =>
       prev.map((pin) =>
-        pin.id === pinId ? { ...pin, isLiked: !pin.isLiked } : pin
+        pin.id === pinId ? { ...pin, isLiked: !pin.isLiked, likes: pin.isLiked ? pin.likes - 1 : pin.likes + 1 } : pin
       )
     );
   };
 
   // Save Toggle
   const handleSaveToggle = (pinId: string) => {
-    setPins((prev) =>
+    updatePinsAndPersist((prev) =>
       prev.map((pin) =>
         pin.id === pinId ? { ...pin, saved: !pin.saved } : pin
       )
@@ -81,7 +102,7 @@ export default function GalleryScreen() {
 
   // Hide Pin
   const handleHidePin = (pinId: string) => {
-    setPins((prev) => prev.filter((p) => p.id !== pinId));
+    updatePinsAndPersist((prev) => prev.filter((p) => p.id !== pinId));
   };
 
   // Manual Refresh Button Press
@@ -140,7 +161,7 @@ export default function GalleryScreen() {
         tags: ["MyUploads", "Inspiration"],
         description: "Added to your inspiration collection.",
       };
-      setPins((prev) => [newPin, ...prev]);
+      updatePinsAndPersist((prev) => [newPin, ...prev]);
     }
   };
 

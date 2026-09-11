@@ -74,7 +74,7 @@ function NavigationGuard() {
       isMounted = false;
       cancelAnimationFrame(frameId);
     };
-  }, [user, loading, segments, rootNavigationState?.key]);
+  }, [user, loading, segments, rootNavigationState?.key, router]);
 
   return null;
 }

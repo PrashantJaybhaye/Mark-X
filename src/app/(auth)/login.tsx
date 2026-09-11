@@ -110,11 +110,7 @@ export default function LoginScreen() {
       setErrorMessage(null);
       setIsResetSuccess(false);
       await signInWithGoogle();
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace("/");
-      }
+      router.replace("/(main)/home");
     } catch (err: any) {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
       setIsResetSuccess(false);
@@ -157,11 +153,7 @@ export default function LoginScreen() {
         router.replace("/(auth)/verify-email");
         return;
       }
-      if (router.canGoBack()) {
-        router.back();
-      } else {
-        router.replace("/");
-      }
+      router.replace("/(main)/home");
     } catch (err: any) {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
       setPassword("");

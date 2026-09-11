@@ -55,7 +55,7 @@ export default function VerifyEmailScreen() {
         setStatusMessage("Email verified successfully!");
         triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
         setTimeout(() => {
-          router.replace("/");
+          router.replace("/(main)/home");
         }, 1200);
       } else {
         setIsSuccess(false);
@@ -180,7 +180,7 @@ export default function VerifyEmailScreen() {
             className="text-[13px] text-[#8E8E93] leading-[18px] mt-1 mb-2"
             style={{ fontFamily: "Outfit_400Regular" }}
           >
-            Didn't receive the email? Please check your Spam folder.
+            Didn&apos;t receive the email? Please check your Spam folder.
           </Text>
 
           {/* Status Message */}

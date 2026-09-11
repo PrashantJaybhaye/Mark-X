@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
@@ -15,7 +15,7 @@ interface StorageHeroCardProps {
 }
 
 export function StorageHeroCardSkeleton() {
-  const pulseAnim = useRef(new Animated.Value(0.35)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(0.35));
 
   useEffect(() => {
     const animation = Animated.loop(
