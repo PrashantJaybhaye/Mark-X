@@ -2,7 +2,6 @@ import React from "react";
 import { TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import * as Haptics from "expo-haptics";
 import { useAuth } from "../../context/AuthContext";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -11,7 +10,6 @@ export type TabKey = "home" | "drive" | "gallery" | "notes" | "profile";
 interface BottomTabBarProps {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
-  onCenterActionPress?: () => void;
   bottomInset: number;
 }
 
@@ -23,7 +21,7 @@ export function BottomTabBar({
   const { user } = useAuth();
 
   const handleTabPress = (tab: TabKey) => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    triggerHaptic();
     onTabChange(tab);
   };
 
@@ -117,19 +115,15 @@ export function BottomTabBar({
               isProfile ? "border-2 border-[#111111]" : "border border-black/10"
             }`}
           >
-            {user?.photoURL ? (
-              <Image
-                source={{ uri: user.photoURL }}
-                style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
-              />
-            ) : (
-              <Ionicons
-                name="person"
-                size={18}
-                color={isProfile ? "#111111" : "#6B7280"}
-              />
-            )}
+            <Image
+              source={
+                user?.photoURL
+                  ? { uri: user.photoURL }
+                  : require("../../../assets/images/default-avatar.jpg")
+              }
+              style={{ width: "100%", height: "100%" }}
+              contentFit="cover"
+            />
           </View>
         </TouchableOpacity>
       </View>
