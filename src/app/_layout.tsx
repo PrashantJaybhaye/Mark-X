@@ -39,6 +39,7 @@ function NavigationGuard() {
     let isMounted = true;
     const inAuthGroup = segments[0] === "(auth)";
     const inMainGroup = segments[0] === "(main)";
+    const isProfileGroup = segments[0] === "profile";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
     const isOnboarding = !segments[0];
 
@@ -48,7 +49,7 @@ function NavigationGuard() {
 
       // 1. Not Authenticated: redirect if trying to access protected areas
       if (!user) {
-        if (inMainGroup || isVerifyScreen) {
+        if (inMainGroup || isProfileGroup || isVerifyScreen) {
           router.replace("/(auth)/login");
         }
         return;
@@ -121,6 +122,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(main)" />
+          <Stack.Screen name="profile" />
         </Stack>
       </ThemeProvider>
     </AuthProvider>

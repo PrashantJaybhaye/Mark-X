@@ -12,36 +12,26 @@ import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { updateProfile } from "firebase/auth";
+import { useRouter } from "expo-router";
 
 import { useAuth } from "../../context/AuthContext";
-import { auth } from "../../services/firebase";
-import { safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
-
 import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
-import { ProfileEditModal } from "../../components/profile/ProfileEditModal";
 import {
-  OptionModalType,
-  ProfileOptionsModal,
-} from "../../components/profile/ProfileOptionsModal";
-
-import { loadUserPreferences, saveUserPreferences } from "../../services/storageService";
+  loadUserPreferences,
+  saveUserPreferences,
+} from "../../services/storageService";
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, signOut, reloadUser, resetPassword } = useAuth();
+  const { user } = useAuth();
 
-  const [customName, setCustomName] = useState<string | null>(null);
-  const [customPhotoUri, setCustomPhotoUri] = useState<string | null | undefined>(undefined);
   const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
   const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
 
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [activeOptionModal, setActiveOptionModal] = useState<OptionModalType>(null);
-
-  const userName = customName ?? user?.displayName ?? "User";
-  const photoUri = customPhotoUri !== undefined ? customPhotoUri : (user?.photoURL || null);
+  const userName = user?.displayName || "User";
+  const photoUri = user?.photoURL || null;
 
   useEffect(() => {
     loadUserPreferences().then((prefs) => {
@@ -51,81 +41,9 @@ export default function ProfileScreen() {
     });
   }, []);
 
-  const handlePickAvatar = async () => {
-    triggerHaptic();
-    const result = await safePickImage();
-    if (result?.uri) {
-      setCustomPhotoUri(result.uri);
-      if (auth.currentUser) {
-        try {
-          await updateProfile(auth.currentUser, { photoURL: result.uri });
-          await reloadUser();
-        } catch (err) {
-          console.warn("Could not update photo in auth:", err);
-        }
-      }
-    }
-  };
-
-  const handleRemoveAvatar = async () => {
-    triggerHaptic();
-    setCustomPhotoUri(null);
-    if (auth.currentUser) {
-      try {
-        await updateProfile(auth.currentUser, { photoURL: "" });
-        await reloadUser();
-      } catch (err) {
-        console.warn("Could not remove photo from auth:", err);
-      }
-    }
-  };
-
   const handleAvatarPress = () => {
     triggerHaptic();
-    if (photoUri) {
-      Alert.alert(
-        "Profile Photo",
-        "Choose an option for your profile picture",
-        [
-          { text: "Change Photo", onPress: handlePickAvatar },
-          {
-            text: "Remove Photo (Use Default)",
-            style: "destructive",
-            onPress: handleRemoveAvatar,
-          },
-          { text: "Cancel", style: "cancel" },
-        ]
-      );
-    } else {
-      handlePickAvatar();
-    }
-  };
-
-  const handleSaveProfile = async (newName: string, newPhotoUri?: string | null) => {
-    setCustomName(newName);
-    setCustomPhotoUri(newPhotoUri || null);
-
-    if (auth.currentUser) {
-      await updateProfile(auth.currentUser, {
-        displayName: newName,
-        photoURL: newPhotoUri || "",
-      });
-      await reloadUser();
-    }
-  };
-
-  const handleSendPasswordReset = async () => {
-    if (user?.email) {
-      await resetPassword(user.email);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (err: any) {
-      Alert.alert("Sign Out Error", err.message || "Failed to sign out.");
-    }
+    router.push("/profile/personal-info");
   };
 
   const handleToggleBiometrics = (val: boolean) => {
@@ -138,19 +56,6 @@ export default function ProfileScreen() {
         "Mark-X Vault and Notes are now secured with device biometrics."
       );
     }
-  };
-
-  const handleShowDevices = () => {
-    triggerHaptic();
-    const deviceType = Platform.select({
-      ios: "Apple iPhone",
-      android: "Android Phone",
-      default: "Web Browser",
-    });
-    Alert.alert(
-      "Active Session",
-      `Current Device: ${deviceType}\nStatus: Secure & Authenticated\nProvider: Firebase Auth`
-    );
   };
 
   const joinedDate = user?.metadata?.creationTime
@@ -260,12 +165,12 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="person-outline"
               title="Personal information"
-              onPress={() => setIsEditModalOpen(true)}
+              onPress={() => router.push("/profile/personal-info")}
             />
             <ProfileCardRow
               icon="lock-closed-outline"
               title="Login & security"
-              onPress={() => setActiveOptionModal("password")}
+              onPress={() => router.push("/profile/security")}
             />
           </View>
 
@@ -281,6 +186,7 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="finger-print-outline"
               title="Biometric Lock"
+              onPress={() => router.push("/profile/biometrics")}
               rightElement={
                 <Switch
                   value={isBiometricsEnabled}
@@ -300,7 +206,7 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="hardware-chip-outline"
               title="Active devices"
-              onPress={handleShowDevices}
+              onPress={() => router.push("/profile/devices")}
             />
           </View>
 
@@ -316,54 +222,25 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="help-circle-outline"
               title="Help & Support"
-              onPress={() => setActiveOptionModal("help")}
+              onPress={() => router.push("/profile/help")}
             />
             <ProfileCardRow
               icon="document-text-outline"
               title="Terms & Conditions"
-              onPress={() => setActiveOptionModal("terms")}
+              onPress={() => router.push("/profile/terms")}
             />
             <ProfileCardRow
               icon="information-circle-outline"
               title="About"
               trailingText="v1.0.0"
-              onPress={() => setActiveOptionModal("about")}
-            />
-            <ProfileCardRow
-              icon="log-out-outline"
-              title="Log out"
-              isDestructive
               showDivider={false}
-              onPress={() => setActiveOptionModal("logout")}
+              onPress={() => router.push("/profile/about")}
             />
           </View>
 
           <View className="h-10" />
         </View>
       </ScrollView>
-
-      {/* Edit Profile Sheet */}
-      {isEditModalOpen && (
-        <ProfileEditModal
-          visible={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          currentName={userName}
-          currentPhotoUri={photoUri}
-          onSave={handleSaveProfile}
-        />
-      )}
-
-      {/* Action and Detail Modals */}
-      {activeOptionModal && (
-        <ProfileOptionsModal
-          type={activeOptionModal}
-          visible={true}
-          onClose={() => setActiveOptionModal(null)}
-          userEmail={user?.email}
-          onSendPasswordReset={handleSendPasswordReset}
-          onSignOut={handleSignOut}
-        />
-      )}
     </View>
   );
 }
