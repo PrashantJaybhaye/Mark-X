@@ -8,8 +8,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
 
+import { copyToClipboard } from "../../services/clipboardService";
 import { triggerHaptic } from "../../utils/haptics";
 import { ProfileHeader } from "../../components/profile/ProfileHeader";
 
@@ -75,10 +75,12 @@ export default function HelpScreen() {
     if (canOpen) {
       await Linking.openURL(mailtoUrl);
     } else {
-      await Clipboard.setStringAsync(supportEmail);
+      const copied = await copyToClipboard(supportEmail);
       Alert.alert(
-        "Support Email Copied",
-        `Mail app is not configured. We copied "${supportEmail}" to your clipboard.`
+        copied ? "Support Email Copied" : "Contact Support",
+        copied
+          ? `Mail app is not configured. We copied "${supportEmail}" to your clipboard.`
+          : `Please email our team directly at: ${supportEmail}`
       );
     }
   };

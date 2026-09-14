@@ -12,11 +12,11 @@ import {
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { updateProfile } from "firebase/auth";
-import * as Clipboard from "expo-clipboard";
 
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../services/firebase";
 import { safePickImage } from "../../services/nativePickerService";
+import { copyToClipboard } from "../../services/clipboardService";
 import { triggerHaptic } from "../../utils/haptics";
 import { ProfileHeader } from "../../components/profile/ProfileHeader";
 
@@ -44,9 +44,13 @@ export default function PersonalInfoScreen() {
   const handleCopyUid = async () => {
     if (user?.uid) {
       triggerHaptic();
-      await Clipboard.setStringAsync(user.uid);
-      setCopiedUid(true);
-      setTimeout(() => setCopiedUid(false), 2000);
+      const copied = await copyToClipboard(user.uid);
+      if (copied) {
+        setCopiedUid(true);
+        setTimeout(() => setCopiedUid(false), 2000);
+      } else {
+        Alert.alert("Account ID", user.uid);
+      }
     }
   };
 
