@@ -59,7 +59,6 @@ export function BiometricLockGate() {
       }
     } else {
       hasAutoPromptedRef.current = false;
-      setErrorMessage(null);
     }
   }, [isLocked, handleUnlock]);
 
