@@ -113,7 +113,7 @@ export default function ProfileScreen() {
         }}
       >
         {/* City Skyline Banner */}
-        <View className="w-full h-[150px] bg-[#222222] relative">
+        <View className="w-full h-[180px] relative">
           <Image
             source={require("../../../assets/images/profile-banner.jpg")}
             style={{ width: "100%", height: "100%" }}
@@ -127,24 +127,23 @@ export default function ProfileScreen() {
               left: 0,
               right: 0,
               height: insets.top + 20,
-              backgroundColor: "rgba(0,0,0,0.25)",
             }}
           />
         </View>
 
         {/* User Identity & Info */}
         <View className="px-5">
-          <View className="-mt-[42px]">
+          <View className="-mt-[52px]">
             <TouchableOpacity
               onPress={handleAvatarPress}
               activeOpacity={0.85}
-              className="w-[84px] h-[84px] rounded-full overflow-hidden border-[4px] border-white bg-[#C6F043]"
+              className="w-[104px] h-[104px] rounded-full overflow-hidden border-[4px] border-white bg-[#C6F043]"
               style={{
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.1,
-                shadowRadius: 6,
-                elevation: 3,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 8,
+                elevation: 4,
               }}
             >
               <Image
