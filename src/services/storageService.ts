@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
 
 export interface UserPreferences {
   isBiometricsEnabled?: boolean;
+  lockTimeoutMinutes?: number; // 0 = immediately upon leaving app, 1, 5, 15 minutes
 }
 
 /**
@@ -73,6 +74,12 @@ export const saveNotes = (notes: NoteItem[]) => saveItem(STORAGE_KEYS.NOTES, not
 
 // User Preferences
 export const loadUserPreferences = () =>
-  loadItem<UserPreferences>(STORAGE_KEYS.USER_PREFERENCES, { isBiometricsEnabled: false });
-export const saveUserPreferences = (prefs: UserPreferences) =>
-  saveItem(STORAGE_KEYS.USER_PREFERENCES, prefs);
+  loadItem<UserPreferences>(STORAGE_KEYS.USER_PREFERENCES, {
+    isBiometricsEnabled: false,
+    lockTimeoutMinutes: 0,
+  });
+
+export const saveUserPreferences = async (prefs: Partial<UserPreferences>) => {
+  const current = await loadUserPreferences();
+  return saveItem(STORAGE_KEYS.USER_PREFERENCES, { ...current, ...prefs });
+};

@@ -22,6 +22,8 @@ import {
 import { Anton_400Regular } from "@expo-google-fonts/anton";
 import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
 import { AuthProvider, useAuth } from "../context/AuthContext";
+import { BiometricsProvider } from "../context/BiometricsContext";
+import { BiometricLockGate } from "../components/security/BiometricLockGate";
 
 // Keep splash screen visible while loading font assets
 SplashScreen.preventAutoHideAsync();
@@ -104,27 +106,30 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={DefaultTheme}>
-        <StatusBar style="dark" />
-        <NavigationGuard />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            headerStyle: {
-              backgroundColor: "#FFFFFF",
-            },
-            headerTintColor: "#000000",
-            contentStyle: {
-              backgroundColor: "#FFFFFF",
-            },
-          }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(main)" />
-          <Stack.Screen name="profile" />
-        </Stack>
-      </ThemeProvider>
+      <BiometricsProvider>
+        <ThemeProvider value={DefaultTheme}>
+          <StatusBar style="dark" />
+          <NavigationGuard />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              headerStyle: {
+                backgroundColor: "#FFFFFF",
+              },
+              headerTintColor: "#000000",
+              contentStyle: {
+                backgroundColor: "#FFFFFF",
+              },
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(main)" />
+            <Stack.Screen name="profile" />
+          </Stack>
+          <BiometricLockGate />
+        </ThemeProvider>
+      </BiometricsProvider>
     </AuthProvider>
   );
 }

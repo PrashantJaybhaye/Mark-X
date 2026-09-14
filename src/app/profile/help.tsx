@@ -333,7 +333,7 @@ export default function HelpScreen() {
             className="text-[15px] text-[#64748B] leading-5"
             style={{ fontFamily: "Outfit_400Regular" }}
           >
-            Send us a message and we'll reply as soon as we can
+            Send us a message and we&apos;ll reply as soon as we can
           </Text>
         </View>
 

@@ -261,7 +261,7 @@ export default function TermsScreen() {
         >
           When you enable Biometric Lock (Face ID, Touch ID, or native
           biometrics) within your Profile, authentication is handled entirely
-          within your device's native hardware Secure Enclave. Mark-X never
+          within your device&apos;s native hardware Secure Enclave. Mark-X never
           transmits, records, or stores your biometric information on external
           servers.
         </Text>

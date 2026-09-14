@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Platform,
@@ -15,46 +15,56 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import { useAuth } from "../../context/AuthContext";
+import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
-import {
-  loadUserPreferences,
-  saveUserPreferences,
-} from "../../services/storageService";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { isBiometricsEnabled, setBiometricsEnabled, capability } = useBiometrics();
 
-  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
+  const [isTogglingBiometrics, setIsTogglingBiometrics] = useState(false);
   const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
 
   const userName = user?.displayName || "User";
   const photoUri = user?.photoURL || user?.providerData?.[0]?.photoURL || null;
-
-  useEffect(() => {
-    loadUserPreferences().then((prefs) => {
-      if (prefs.isBiometricsEnabled !== undefined) {
-        setIsBiometricsEnabled(prefs.isBiometricsEnabled);
-      }
-    });
-  }, []);
 
   const handleAvatarPress = () => {
     triggerHaptic();
     router.push("/profile/personal-info");
   };
 
-  const handleToggleBiometrics = (val: boolean) => {
+  const handleToggleBiometrics = async (val: boolean) => {
+    if (isTogglingBiometrics) return;
     triggerHaptic();
-    setIsBiometricsEnabled(val);
-    saveUserPreferences({ isBiometricsEnabled: val });
-    if (val) {
+
+    if (val && (!capability?.hasHardware || !capability?.isEnrolled)) {
       Alert.alert(
-        "Biometric Lock Active",
-        "Mark-X Vault and Notes are now secured with device biometrics."
+        "Biometrics Unavailable",
+        !capability?.hasHardware
+          ? "Your device does not appear to support biometric hardware."
+          : "No biometric credentials enrolled. Please register your fingerprint or face in device Settings first."
       );
+      return;
+    }
+
+    setIsTogglingBiometrics(true);
+    try {
+      const result = await setBiometricsEnabled(val);
+      if (!result.success) {
+        if (result.error && result.error !== "Authentication cancelled.") {
+          Alert.alert("Verification Failed", result.error);
+        }
+      } else if (val) {
+        Alert.alert(
+          "Biometric Lock Active",
+          `Mark-X is now secured with ${capability?.sensorName || "device biometrics"}.`
+        );
+      }
+    } finally {
+      setIsTogglingBiometrics(false);
     }
   };
 
@@ -186,9 +196,11 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="finger-print-outline"
               title="Biometric Lock"
+              subtitle={capability?.sensorName || "Device sensor protection"}
               onPress={() => router.push("/profile/biometrics")}
               rightElement={
                 <Switch
+                  disabled={isTogglingBiometrics}
                   value={isBiometricsEnabled}
                   onValueChange={handleToggleBiometrics}
                   trackColor={{ false: "#E5E7EB", true: "#222222" }}

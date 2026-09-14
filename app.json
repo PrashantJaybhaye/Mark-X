@@ -37,7 +37,13 @@
       ],
       "@react-native-google-signin/google-signin",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Mark-X to use Face ID to secure your confidential vault, notes, and session."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
