@@ -14,6 +14,7 @@ export interface UserMetadata {
   displayName: string | null;
   photoURL: string | null;
   emailVerified: boolean;
+  username?: string | null;
   providerId: string;
   providers: string[];
   createdAt: FieldValue | string;
