@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { auth } from "./firebase";
 import { DriveItem } from "../utils/driveFileTypes";
 import { GalleryPin } from "../utils/galleryData";
 import { NoteItem } from "../components/notes/NoteItemCard";
@@ -10,106 +11,68 @@ const STORAGE_KEYS = {
   USER_PREFERENCES: "@markx_user_preferences_v1",
 };
 
-/**
- * Loads stored drive files and folders.
- */
-export async function loadDriveItems(): Promise<DriveItem[]> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.DRIVE_ITEMS);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn("[StorageService] Failed to load drive items:", err);
-    return [];
-  }
-}
-
-/**
- * Persists drive files and folders to local storage.
- */
-export async function saveDriveItems(items: DriveItem[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEYS.DRIVE_ITEMS, JSON.stringify(items));
-  } catch (err) {
-    console.warn("[StorageService] Failed to save drive items:", err);
-  }
-}
-
-/**
- * Loads stored gallery inspiration pins.
- */
-export async function loadGalleryPins(): Promise<GalleryPin[]> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.GALLERY_PINS);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn("[StorageService] Failed to load gallery pins:", err);
-    return [];
-  }
-}
-
-/**
- * Persists gallery inspiration pins to local storage.
- */
-export async function saveGalleryPins(pins: GalleryPin[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEYS.GALLERY_PINS, JSON.stringify(pins));
-  } catch (err) {
-    console.warn("[StorageService] Failed to save gallery pins:", err);
-  }
-}
-
-/**
- * Loads stored notes.
- */
-export async function loadNotes(): Promise<NoteItem[]> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.NOTES);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn("[StorageService] Failed to load notes:", err);
-    return [];
-  }
-}
-
-/**
- * Persists notes to local storage.
- */
-export async function saveNotes(notes: NoteItem[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
-  } catch (err) {
-    console.warn("[StorageService] Failed to save notes:", err);
-  }
-}
-
 export interface UserPreferences {
   isBiometricsEnabled?: boolean;
 }
 
 /**
- * Loads stored user preferences (e.g. biometrics setting).
+ * Returns a user-scoped key so multiple users on the same device don't see each other's data.
  */
-export async function loadUserPreferences(): Promise<UserPreferences> {
+function getScopedKey(baseKey: string): string {
+  const uid = auth.currentUser?.uid;
+  return uid ? `${baseKey}_${uid}` : baseKey;
+}
+
+/**
+ * Loads and parses JSON data from AsyncStorage with automatic user scoping and legacy migration.
+ */
+async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_PREFERENCES);
-    if (!raw) return { isBiometricsEnabled: false };
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn("[StorageService] Failed to load user preferences:", err);
-    return { isBiometricsEnabled: false };
+    const scopedKey = getScopedKey(baseKey);
+    let raw = await AsyncStorage.getItem(scopedKey);
+
+    // Migrate legacy un-scoped data to user-scoped key if available
+    if (raw === null && auth.currentUser?.uid) {
+      raw = await AsyncStorage.getItem(baseKey);
+      if (raw !== null) {
+        await AsyncStorage.setItem(scopedKey, raw);
+        await AsyncStorage.removeItem(baseKey);
+      }
+    }
+
+    return raw ? JSON.parse(raw) : defaultValue;
+  } catch (error) {
+    console.warn(`[StorageService] Failed to load ${baseKey}:`, error);
+    return defaultValue;
   }
 }
 
 /**
- * Persists user preferences.
+ * Serializes and saves JSON data to user-scoped AsyncStorage.
  */
-export async function saveUserPreferences(prefs: UserPreferences): Promise<void> {
+async function saveItem<T>(baseKey: string, value: T): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_PREFERENCES, JSON.stringify(prefs));
-  } catch (err) {
-    console.warn("[StorageService] Failed to save user preferences:", err);
+    const key = getScopedKey(baseKey);
+    await AsyncStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`[StorageService] Failed to save ${baseKey}:`, error);
   }
 }
+
+// Drive Items
+export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITEMS, []);
+export const saveDriveItems = (items: DriveItem[]) => saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
+
+// Gallery Pins
+export const loadGalleryPins = () => loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
+export const saveGalleryPins = (pins: GalleryPin[]) => saveItem(STORAGE_KEYS.GALLERY_PINS, pins);
+
+// Notes
+export const loadNotes = () => loadItem<NoteItem[]>(STORAGE_KEYS.NOTES, []);
+export const saveNotes = (notes: NoteItem[]) => saveItem(STORAGE_KEYS.NOTES, notes);
+
+// User Preferences
+export const loadUserPreferences = () =>
+  loadItem<UserPreferences>(STORAGE_KEYS.USER_PREFERENCES, { isBiometricsEnabled: false });
+export const saveUserPreferences = (prefs: UserPreferences) =>
+  saveItem(STORAGE_KEYS.USER_PREFERENCES, prefs);

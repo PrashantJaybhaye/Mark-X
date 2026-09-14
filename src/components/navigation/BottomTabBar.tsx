@@ -117,8 +117,8 @@ export function BottomTabBar({
           >
             <Image
               source={
-                user?.photoURL
-                  ? { uri: user.photoURL }
+                user?.photoURL || user?.providerData?.[0]?.photoURL
+                  ? { uri: user?.photoURL || user?.providerData?.[0]?.photoURL! }
                   : require("../../../assets/images/default-avatar.jpg")
               }
               style={{ width: "100%", height: "100%" }}

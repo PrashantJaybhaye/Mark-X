@@ -31,7 +31,7 @@ export default function ProfileScreen() {
   const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
 
   const userName = user?.displayName || "User";
-  const photoUri = user?.photoURL || null;
+  const photoUri = user?.photoURL || user?.providerData?.[0]?.photoURL || null;
 
   useEffect(() => {
     loadUserPreferences().then((prefs) => {

@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../services/firebase";
 import { safePickImage } from "../../services/nativePickerService";
 import { copyToClipboard } from "../../services/clipboardService";
+import { updateUserMetadata } from "../../services/userService";
 import { triggerHaptic } from "../../utils/haptics";
 import { ProfileHeader } from "../../components/profile/ProfileHeader";
 
@@ -24,7 +25,9 @@ export default function PersonalInfoScreen() {
   const { user, reloadUser } = useAuth();
 
   const [name, setName] = useState(user?.displayName || "");
-  const [photoUri, setPhotoUri] = useState<string | null>(user?.photoURL || null);
+  const [photoUri, setPhotoUri] = useState<string | null>(
+    user?.photoURL || user?.providerData?.[0]?.photoURL || null
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [copiedUid, setCopiedUid] = useState(false);
 
@@ -66,6 +69,10 @@ export default function PersonalInfoScreen() {
     try {
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, {
+          displayName: trimmed,
+          photoURL: photoUri || "",
+        });
+        await updateUserMetadata(auth.currentUser.uid, {
           displayName: trimmed,
           photoURL: photoUri || "",
         });

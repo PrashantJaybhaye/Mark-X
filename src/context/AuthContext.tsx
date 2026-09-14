@@ -25,6 +25,7 @@ import {
   statusCodes,
 } from "@react-native-google-signin/google-signin";
 import { auth } from "../services/firebase";
+import { syncUserMetadata } from "../services/userService";
 
 if (Platform.OS !== "web") {
   GoogleSignin.configure({
@@ -69,6 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      if (currentUser) {
+        syncUserMetadata(currentUser);
+      }
     });
 
     return () => unsubscribe();
@@ -111,7 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Ensure state holds the real class instance with prototypes intact
       await userCredential.user.reload();
-      setUser(auth.currentUser || userCredential.user);
+      const updatedUser = auth.currentUser || userCredential.user;
+      setUser(updatedUser);
+      await syncUserMetadata(updatedUser, true);
     }
   };
 
@@ -174,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await auth.currentUser.reload();
       const updatedUser = auth.currentUser;
       setUser(updatedUser);
+      syncUserMetadata(updatedUser);
       return updatedUser.emailVerified;
     }
     return false;
