@@ -19,7 +19,7 @@ export async function checkOtaUpdate(): Promise<OtaCheckResult> {
     return {
       hasUpdate: false,
       title: "You're Up to Date",
-      message: "Mark-X v1.0.0 is currently running the latest build. Over-The-Air updates will automatically apply in production releases.",
+      message: "Mark-X is currently running the latest build. Over-The-Air updates will automatically apply in production releases.",
     };
   }
 

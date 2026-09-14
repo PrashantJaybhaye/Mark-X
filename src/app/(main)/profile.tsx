@@ -179,7 +179,7 @@ export default function ProfileScreen() {
             />
             <ProfileCardRow
               icon="lock-closed-outline"
-              title="Login & security"
+              title="Security & Privacy"
               onPress={() => router.push("/profile/security")}
             />
           </View>
@@ -197,7 +197,7 @@ export default function ProfileScreen() {
               icon="finger-print-outline"
               title="Biometric Lock"
               subtitle={capability?.sensorName || "Device sensor protection"}
-              onPress={() => router.push("/profile/biometrics")}
+              onPress={() => handleToggleBiometrics(!isBiometricsEnabled)}
               rightElement={
                 <Switch
                   disabled={isTogglingBiometrics}
@@ -244,7 +244,6 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="information-circle-outline"
               title="About"
-              trailingText="v1.0.0"
               showDivider={false}
               onPress={() => router.push("/profile/about")}
             />

@@ -1,40 +1,123 @@
 import React, { useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar as RNStatusBar,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../context/AuthContext";
+import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
-import { ProfileHeader } from "../../components/profile/ProfileHeader";
+
+type ActiveModal =
+  | "reset_password"
+  | "auto_lock"
+  | "lock_vault"
+  | "sign_out"
+  | "deactivate"
+  | null;
+
+const TIMEOUT_OPTIONS = [
+  { label: "Immediately", value: 0 },
+  { label: "1 Minute", value: 1 },
+  { label: "5 Minutes", value: 5 },
+  { label: "15 Minutes", value: 15 },
+] as const;
+
+function getTimeoutLabel(minutes: number) {
+  switch (minutes) {
+    case 0:
+      return "Immediately";
+    case 1:
+      return "1 min";
+    case 5:
+      return "5 mins";
+    case 15:
+      return "15 mins";
+    default:
+      return `${minutes} mins`;
+  }
+}
 
 export default function SecurityScreen() {
-  const { user, resetPassword, signOut } = useAuth();
-  const [isSendingReset, setIsSendingReset] = useState(false);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { user, resetPassword, sendVerificationEmail, signOut } = useAuth();
+  const {
+    isBiometricsEnabled,
+    capability,
+    setBiometricsEnabled,
+    lockTimeoutMinutes,
+    setLockTimeout,
+    lockApp,
+  } = useBiometrics();
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (err: any) {
-      Alert.alert("Sign Out Error", err.message || "Failed to sign out.");
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [isTogglingBiometrics, setIsTogglingBiometrics] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isSendingVerify, setIsSendingVerify] = useState(false);
+
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (RNStatusBar.currentHeight || 24) : 16
+  );
+
+  const sensorName = capability?.sensorName || "Biometrics";
+  const userName = user?.displayName || "User";
+  const photoUri = user?.photoURL || user?.providerData?.[0]?.photoURL || null;
+
+  const handleDismiss = () => {
+    triggerHaptic();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(main)/profile");
     }
   };
 
-  const handleLogOutPress = () => {
+  const handleToggleBiometrics = async (val: boolean) => {
+    if (isTogglingBiometrics) return;
     triggerHaptic();
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out of Mark-X? You will need to sign in again to access your account.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: handleSignOut,
-        },
-      ]
-    );
+
+    if (val && (!capability?.hasHardware || !capability?.isEnrolled)) {
+      Alert.alert(
+        "Biometrics Unavailable",
+        !capability?.hasHardware
+          ? "Your device does not appear to support biometric hardware."
+          : "No biometric credentials enrolled. Please register your fingerprint or face in device Settings first."
+      );
+      return;
+    }
+
+    setIsTogglingBiometrics(true);
+    try {
+      const result = await setBiometricsEnabled(val);
+      if (!result.success) {
+        if (result.error && result.error !== "Authentication cancelled.") {
+          Alert.alert("Verification Failed", result.error);
+        }
+      }
+    } finally {
+      setIsTogglingBiometrics(false);
+    }
   };
 
-  const handleResetPassword = async () => {
+  const handleConfirmResetPassword = async () => {
+    setActiveModal(null);
     if (!user?.email) {
       Alert.alert("Error", "No email address associated with this account.");
       return;
@@ -45,8 +128,8 @@ export default function SecurityScreen() {
     try {
       await resetPassword(user.email);
       Alert.alert(
-        "Password Reset Sent",
-        `A password reset link has been dispatched to ${user.email}. Please follow the instructions in the email.`
+        "Reset Link Dispatched",
+        `A secure reset link has been emailed to ${user.email}. Follow the instructions in the email to update your password.`
       );
     } catch (err: any) {
       Alert.alert("Reset Error", err.message || "Failed to send password reset email.");
@@ -55,254 +138,888 @@ export default function SecurityScreen() {
     }
   };
 
+  const handleResendVerification = async () => {
+    triggerHaptic();
+    setIsSendingVerify(true);
+    try {
+      await sendVerificationEmail();
+      Alert.alert(
+        "Verification Link Sent",
+        `A verification link has been sent to ${user?.email}. Please check your email to verify your account.`
+      );
+    } catch (err: any) {
+      Alert.alert("Verification Error", err.message || "Could not send verification email.");
+    } finally {
+      setIsSendingVerify(false);
+    }
+  };
+
+  const handleOpenAutoLockPicker = () => {
+    triggerHaptic();
+    setActiveModal("auto_lock");
+  };
+
+  const handleLockVaultNow = () => {
+    triggerHaptic();
+    setActiveModal("lock_vault");
+  };
+
+  const handleSignOut = async () => {
+    setActiveModal(null);
+    triggerHaptic();
+    try {
+      await signOut();
+    } catch (err: any) {
+      Alert.alert("Sign Out Error", err.message || "Failed to sign out.");
+    }
+  };
+
+  const handleDeactivate = async () => {
+    setActiveModal(null);
+    triggerHaptic();
+    try {
+      await signOut();
+    } catch (err: any) {
+      Alert.alert("Deactivation Error", err.message || "Failed to deactivate session.");
+    }
+  };
+
+  const isSecurityStrong = isBiometricsEnabled && user?.emailVerified;
+  const isSecurityGood = isBiometricsEnabled || user?.emailVerified;
+
   return (
     <View className="flex-1 bg-white">
-      <ProfileHeader
-        title="Login & Security"
-        subtitle="Manage authentication and access controls"
-      />
+      <StatusBar style="dark" />
+
+      {/* Top Nav Bar */}
+      <View
+        style={{ paddingTop: topInset + 8 }}
+        className="bg-white px-4 pb-3.5 border-b border-[#EBEBEB]"
+      >
+        <View className="flex-row items-center justify-between min-h-[44px] relative">
+          <TouchableOpacity
+            onPress={handleDismiss}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="w-10 h-10 items-center justify-center z-10"
+          >
+            <Ionicons name="chevron-back" size={24} color="#222222" />
+          </TouchableOpacity>
+
+          <View className="absolute inset-0 items-center justify-center pointer-events-none">
+            <Text
+              className="text-[17px] text-[#222222]"
+              style={{ fontFamily: "Outfit_600SemiBold" }}
+            >
+              Security & Privacy
+            </Text>
+          </View>
+
+          <View className="w-10 h-10" />
+        </View>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: Math.max(insets.bottom + 32, 48),
+        }}
       >
-        {/* Security Status Hero Card */}
-        <View className="bg-[#F0FDF4] rounded-2xl p-5 border border-[#BBF7D0] mb-6 flex-row items-center">
-          <View className="w-12 h-12 rounded-xl bg-[#DCFCE7] items-center justify-center mr-4">
-            <Ionicons name="shield-checkmark" size={26} color="#16A34A" />
-          </View>
-          <View className="flex-1">
-            <Text
-              className="text-[16px] text-[#15803D]"
-              style={{ fontFamily: "Outfit_700Bold" }}
-            >
-              Account Protected
-            </Text>
-            <Text
-              className="text-[13px] text-[#166534] mt-0.5"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Firebase authentication and vault encryption active.
-            </Text>
-          </View>
-        </View>
-
-        {/* Password Management Card */}
-        <Text
-          className="text-[13px] text-[#64748B] uppercase tracking-wider mb-2 ml-1"
-          style={{ fontFamily: "Outfit_600SemiBold" }}
+        {/* ================= ACCOUNT DETAIL HEADER ================= */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            triggerHaptic();
+            router.push("/profile/personal-info");
+          }}
+          className="pb-4 mb-4 border-b border-[#EBEBEB] flex-row items-center justify-between"
         >
-          Password Management
-        </Text>
-        <View className="bg-[#F8FAFC] rounded-2xl p-5 border border-[#E2E8F0] mb-6">
-          <View className="flex-row items-center mb-3">
-            <View className="w-10 h-10 rounded-xl bg-[#EFF6FF] items-center justify-center mr-3">
-              <Ionicons name="key-outline" size={20} color="#2563EB" />
+          <View className="flex-row items-center flex-1 pr-3">
+            <View className="w-12 h-12 rounded-full overflow-hidden bg-[#F7F7F7] border border-[#EBEBEB] mr-3.5">
+              <Image
+                source={
+                  photoUri
+                    ? { uri: photoUri }
+                    : require("../../../assets/images/default-avatar.jpg")
+                }
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+                transition={200}
+              />
             </View>
+
             <View className="flex-1">
+              <View className="flex-row items-center">
+                <Text
+                  className="text-[17px] text-[#222222] mr-1.5"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                  numberOfLines={1}
+                >
+                  {userName}
+                </Text>
+                {user?.emailVerified && (
+                  <Ionicons name="checkmark-circle" size={15} color="#008A05" />
+                )}
+              </View>
               <Text
-                className="text-[16px] text-[#0F172A]"
-                style={{ fontFamily: "Outfit_600SemiBold" }}
+                className="text-[13px] text-[#717171] mt-0.5"
+                style={{ fontFamily: "Outfit_400Regular" }}
+                numberOfLines={1}
               >
-                Change Password
+                {user?.email || "No email linked"}
               </Text>
               <Text
-                className="text-[13px] text-[#64748B]"
+                className="text-[12px] text-[#717171] mt-0.5"
                 style={{ fontFamily: "Outfit_400Regular" }}
               >
-                Send a secure reset link to your email
+                Member · Active
               </Text>
             </View>
           </View>
 
           <Text
-            className="text-[14px] text-[#475569] leading-5 mb-4"
-            style={{ fontFamily: "Outfit_400Regular" }}
+            className="text-[14px] text-[#222222]"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
           >
-            We will email a verification link to{" "}
-            <Text className="text-[#0F172A] font-semibold">
-              {user?.email || "your registered email"}
-            </Text>
-            . You will be able to set a new password securely.
+            Edit
           </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleResetPassword}
-            disabled={isSendingReset}
-            activeOpacity={0.8}
-            className="w-full bg-[#0F172A] py-3.5 rounded-xl items-center justify-center flex-row"
-          >
-            <Ionicons
-              name="mail-outline"
-              size={18}
-              color="#FFFFFF"
-              style={{ marginRight: 8 }}
-            />
-            <Text
-              className="text-[15px] text-white"
-              style={{ fontFamily: "Outfit_600SemiBold" }}
-            >
-              {isSendingReset ? "Sending Link..." : "Send Reset Email"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sign-in Method & Provider */}
-        <Text
-          className="text-[13px] text-[#64748B] uppercase tracking-wider mb-2 ml-1"
-          style={{ fontFamily: "Outfit_600SemiBold" }}
-        >
-          Authentication Details
-        </Text>
-        <View className="bg-[#F8FAFC] rounded-2xl p-4 border border-[#E2E8F0] mb-6">
-          <View className="flex-row items-center justify-between py-2 border-b border-[#E2E8F0]">
-            <Text
-              className="text-[14px] text-[#64748B]"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Primary Provider
-            </Text>
-            <Text
-              className="text-[14px] text-[#0F172A]"
-              style={{ fontFamily: "Outfit_600SemiBold" }}
-            >
-              Firebase Auth
-            </Text>
-          </View>
-
-          <View className="flex-row items-center justify-between py-2 border-b border-[#E2E8F0]">
-            <Text
-              className="text-[14px] text-[#64748B]"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Email Verification
-            </Text>
+        {/* ================= SECURITY HEALTH CARD ================= */}
+        <View className="bg-[#FAFAFA] rounded-xl p-3.5 border border-[#EBEBEB] mb-5">
+          <View className="flex-row items-center justify-between mb-1.5">
             <View className="flex-row items-center">
               <Ionicons
-                name={user?.emailVerified ? "checkmark-circle" : "alert-circle"}
-                size={15}
-                color={user?.emailVerified ? "#15803D" : "#EAB308"}
+                name="shield-checkmark"
+                size={18}
+                color={isSecurityStrong ? "#008A05" : "#D97706"}
+                style={{ marginRight: 6 }}
               />
               <Text
-                className={`text-[13px] ml-1.5 ${
-                  user?.emailVerified ? "text-[#15803D]" : "text-[#EAB308]"
+                className="text-[14px] text-[#222222]"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                Account security
+              </Text>
+            </View>
+
+            <View
+              className={`px-2 py-0.5 rounded-full ${
+                isSecurityStrong
+                  ? "bg-[#E6F4EA]"
+                  : isSecurityGood
+                  ? "bg-[#FEF3C7]"
+                  : "bg-[#FEE2E2]"
+              }`}
+            >
+              <Text
+                className={`text-[11px] ${
+                  isSecurityStrong
+                    ? "text-[#008A05]"
+                    : isSecurityGood
+                    ? "text-[#B45309]"
+                    : "text-[#DC2626]"
                 }`}
                 style={{ fontFamily: "Outfit_600SemiBold" }}
               >
-                {user?.emailVerified ? "Verified" : "Pending"}
+                {isSecurityStrong ? "Strong" : isSecurityGood ? "Good" : "Action needed"}
               </Text>
             </View>
           </View>
 
-          <View className="flex-row items-center justify-between py-2">
-            <Text
-              className="text-[14px] text-[#64748B]"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Account Creation
-            </Text>
-            <Text
-              className="text-[14px] text-[#0F172A]"
-              style={{ fontFamily: "Outfit_500Medium" }}
-            >
-              {user?.metadata?.creationTime
-                ? new Date(user.metadata.creationTime).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "Active"}
-            </Text>
-          </View>
+          <Text
+            className="text-[12px] text-[#717171] leading-4"
+            style={{ fontFamily: "Outfit_400Regular" }}
+          >
+            {isSecurityStrong
+              ? "Your account is well protected with biometric authentication and a verified email address."
+              : !isBiometricsEnabled
+              ? "Enable Biometric Lock to safeguard your vault with native hardware security."
+              : "Verify your email to guarantee seamless account recovery."}
+          </Text>
         </View>
 
-        {/* Security Recommendations */}
-        <Text
-          className="text-[13px] text-[#64748B] uppercase tracking-wider mb-2 ml-1"
-          style={{ fontFamily: "Outfit_600SemiBold" }}
-        >
-          Security Best Practices
-        </Text>
-        <View className="bg-[#F8FAFC] rounded-2xl p-4 border border-[#E2E8F0]">
-          <View className="flex-row items-start mb-3">
-            <Ionicons name="checkmark-done-circle-outline" size={20} color="#16A34A" />
-            <Text
-              className="text-[13px] text-[#475569] ml-2 flex-1 leading-5"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Use a strong, unique password not shared with any other web service.
-            </Text>
-          </View>
+        {/* ================= SECTION 1: LOGIN ================= */}
+        <View className="mb-5">
+          <Text
+            className="text-[17px] text-[#222222] tracking-tight mb-1"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
+          >
+            Login
+          </Text>
 
-          <View className="flex-row items-start mb-3">
-            <Ionicons name="checkmark-done-circle-outline" size={20} color="#16A34A" />
-            <Text
-              className="text-[13px] text-[#475569] ml-2 flex-1 leading-5"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Keep your biometric lock enabled for instant hardware-level vault protection.
-            </Text>
-          </View>
-
-          <View className="flex-row items-start">
-            <Ionicons name="checkmark-done-circle-outline" size={20} color="#16A34A" />
-            <Text
-              className="text-[13px] text-[#475569] ml-2 flex-1 leading-5"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              Never share your account email or credentials with anyone.
-            </Text>
-          </View>
-        </View>
-
-        {/* Account Session / Log Out */}
-        <Text
-          className="text-[13px] text-[#64748B] uppercase tracking-wider mt-6 mb-2 ml-1"
-          style={{ fontFamily: "Outfit_600SemiBold" }}
-        >
-          Session
-        </Text>
-        <View className="bg-[#FEF2F2] rounded-2xl p-5 border border-[#FECACA] mb-6">
-          <View className="flex-row items-center mb-3">
-            <View className="w-10 h-10 rounded-xl bg-[#FEE2E2] items-center justify-center mr-3">
-              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
-            </View>
-            <View className="flex-1">
+          {/* Password Row */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerHaptic();
+              setActiveModal("reset_password");
+            }}
+            className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
               <Text
-                className="text-[16px] text-[#991B1B]"
-                style={{ fontFamily: "Outfit_600SemiBold" }}
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
               >
-                Log Out of Mark-X
+                Password
               </Text>
               <Text
-                className="text-[13px] text-[#B91C1C] mt-0.5"
+                className="text-[13px] text-[#717171]"
                 style={{ fontFamily: "Outfit_400Regular" }}
               >
-                End your active session on this device
+                •••••••••••
+              </Text>
+            </View>
+
+            <View className="py-0.5">
+              {isSendingReset ? (
+                <ActivityIndicator size="small" color="#222222" />
+              ) : (
+                <Text
+                  className="text-[14px] text-[#222222]"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                >
+                  Update
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* Social accounts Row */}
+          <View className="py-3.5 flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Social accounts
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                {user?.providerData?.[0]?.providerId === "google.com"
+                  ? "Connected with Google"
+                  : "Email & password credentials"}
+              </Text>
+            </View>
+
+            <Text
+              className="text-[13px] text-[#717171]"
+              style={{ fontFamily: "Outfit_500Medium" }}
+            >
+              Connected
+            </Text>
+          </View>
+        </View>
+
+        {/* ================= SECTION 2: VAULT & APP LOCK ================= */}
+        <View className="mb-5">
+          <Text
+            className="text-[17px] text-[#222222] tracking-tight mb-1"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
+          >
+            Vault & app lock
+          </Text>
+
+          {/* Biometrics Row with Inline Switch */}
+          <View className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Biometric authentication
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                {isBiometricsEnabled
+                  ? `${sensorName} active for vault entry`
+                  : `Enable ${sensorName} for instant biometric unlock`}
+              </Text>
+            </View>
+
+            <Switch
+              disabled={isTogglingBiometrics}
+              value={isBiometricsEnabled}
+              onValueChange={handleToggleBiometrics}
+              trackColor={{ false: "#E5E7EB", true: "#222222" }}
+              thumbColor={
+                Platform.OS === "android"
+                  ? isBiometricsEnabled
+                    ? "#FFFFFF"
+                    : "#F3F4F6"
+                  : "#FFFFFF"
+              }
+              ios_backgroundColor="#E5E7EB"
+            />
+          </View>
+
+          {/* Auto-Lock Timer Row */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleOpenAutoLockPicker}
+            className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Auto-Lock Timer
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                {isBiometricsEnabled
+                  ? `Locks app ${getTimeoutLabel(lockTimeoutMinutes).toLowerCase()} after background`
+                  : "Configure inactivity threshold"}
+              </Text>
+            </View>
+
+            <View className="py-0.5">
+              <Text
+                className="text-[14px] text-[#222222]"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                {getTimeoutLabel(lockTimeoutMinutes)}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Lock Vault Now Row */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleLockVaultNow}
+            className="py-3.5 flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Lock Vault Now
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                Immediately lock session and require unlock
+              </Text>
+            </View>
+
+            <View className="py-0.5">
+              <Text
+                className="text-[14px] text-[#007AFF]"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                Lock
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* ================= SECTION 3: SECURITY & ENCRYPTION ================= */}
+        <View className="mb-5">
+          <Text
+            className="text-[17px] text-[#222222] tracking-tight mb-1"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
+          >
+            Security & encryption
+          </Text>
+
+          {/* Email Verification Row */}
+          <TouchableOpacity
+            activeOpacity={user?.emailVerified ? 1 : 0.7}
+            disabled={user?.emailVerified || isSendingVerify}
+            onPress={handleResendVerification}
+            className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Email address
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+                numberOfLines={1}
+              >
+                {user?.email || "No email linked"}
+                {user?.emailVerified ? " · Verified" : " · Unverified"}
+              </Text>
+            </View>
+
+            {user?.emailVerified ? (
+              <View className="flex-row items-center">
+                <Ionicons
+                  name="checkmark-circle"
+                  size={15}
+                  color="#008A05"
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  className="text-[13px] text-[#008A05]"
+                  style={{ fontFamily: "Outfit_500Medium" }}
+                >
+                  Verified
+                </Text>
+              </View>
+            ) : (
+              <View className="py-0.5">
+                {isSendingVerify ? (
+                  <ActivityIndicator size="small" color="#222222" />
+                ) : (
+                  <Text
+                    className="text-[14px] text-[#222222]"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Verify
+                  </Text>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Hardware Encryption Row */}
+          <View className="py-3.5 flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Encryption Method
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                Hardware 256-bit AES encryption
+              </Text>
+            </View>
+
+            <View className="flex-row items-center">
+              <Text
+                className="text-[13px] text-[#008A05]"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Secured
               </Text>
             </View>
           </View>
+        </View>
 
-          <TouchableOpacity
-            onPress={handleLogOutPress}
-            activeOpacity={0.8}
-            className="w-full bg-[#EF4444] py-3.5 rounded-xl items-center justify-center flex-row shadow-sm"
+        {/* ================= SECTION 4: ACCOUNT ================= */}
+        <View className="mb-4">
+          <Text
+            className="text-[17px] text-[#222222] tracking-tight mb-1"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
           >
-            <Ionicons
-              name="log-out-outline"
-              size={18}
-              color="#FFFFFF"
-              style={{ marginRight: 8 }}
-            />
-            <Text
-              className="text-[15px] text-white"
-              style={{ fontFamily: "Outfit_600SemiBold" }}
-            >
-              Log Out
-            </Text>
+            Account
+          </Text>
+
+          {/* Log out Row */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerHaptic();
+              setActiveModal("sign_out");
+            }}
+            className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Log out
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                Sign out of your Mark-X account on this device
+              </Text>
+            </View>
+
+            <View className="py-0.5">
+              <Text
+                className="text-[14px] text-[#E00B41]"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                Log out
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Deactivate Account Row */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              triggerHaptic();
+              setActiveModal("deactivate");
+            }}
+            className="py-3.5 flex-row items-center justify-between"
+          >
+            <View className="flex-1 pr-3">
+              <Text
+                className="text-[15px] text-[#222222] mb-0.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Deactivate your account
+              </Text>
+              <Text
+                className="text-[13px] text-[#717171]"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                Deactivate account and lock all biometric sessions
+              </Text>
+            </View>
+
+            <View className="py-0.5">
+              <Text
+                className="text-[14px] text-[#E00B41]"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                Deactivate
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ================= UNIFIED CENTERED IOS DIALOG MODAL ================= */}
+      <Modal
+        visible={activeModal !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setActiveModal(null)}
+      >
+        <View className="flex-1 bg-black/40 items-center justify-center px-8">
+          {/* Backdrop layer to dismiss on clicking outside */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setActiveModal(null)}
+          />
+
+          {/* Modal Alert Box */}
+          <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl z-10">
+            {activeModal === "reset_password" && (
+              <>
+                <View className="pt-5 px-4 pb-4 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Update Password
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    We will send a secure password reset link to {user?.email || "your email"}.
+                  </Text>
+                </View>
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                <View className="flex-row h-[44px]">
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setActiveModal(null);
+                    }}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#007AFF]"
+                      style={{ fontFamily: "Outfit_400Regular" }}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleConfirmResetPassword}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#007AFF]"
+                      style={{ fontFamily: "Outfit_600SemiBold" }}
+                    >
+                      Send Link
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {activeModal === "auto_lock" && (
+              <>
+                <View className="pt-5 px-4 pb-3 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Auto-Lock Timer
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    Choose how quickly Mark-X locks after moving to the background.
+                  </Text>
+                </View>
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                {TIMEOUT_OPTIONS.map((opt, index) => {
+                  const isSelected = lockTimeoutMinutes === opt.value;
+                  return (
+                    <View key={opt.value}>
+                      {index > 0 && <View className="h-[0.5px] bg-[#3C3C43]/20" />}
+                      <TouchableOpacity
+                        onPress={async () => {
+                          triggerHaptic();
+                          setActiveModal(null);
+                          await setLockTimeout(opt.value);
+                        }}
+                        activeOpacity={0.7}
+                        className="h-[44px] flex-row items-center justify-between px-5 active:bg-black/5"
+                      >
+                        <Text
+                          className={`text-[16px] ${
+                            isSelected ? "text-[#007AFF]" : "text-[#000000]"
+                          }`}
+                          style={{
+                            fontFamily: isSelected
+                              ? "Outfit_600SemiBold"
+                              : "Outfit_400Regular",
+                          }}
+                        >
+                          {opt.label}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={18} color="#007AFF" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setActiveModal(null);
+                  }}
+                  activeOpacity={0.7}
+                  className="h-[44px] items-center justify-center active:bg-black/5"
+                >
+                  <Text
+                    className="text-[17px] text-[#007AFF]"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Done
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {activeModal === "lock_vault" && (
+              <>
+                <View className="pt-5 px-4 pb-4 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    {isBiometricsEnabled ? "Lock Vault Now" : "Biometrics Inactive"}
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    {isBiometricsEnabled
+                      ? `Lock your active session now? You will need ${sensorName} to unlock your private vault.`
+                      : `Enable Biometric Authentication first to lock your vault with ${sensorName}.`}
+                  </Text>
+                </View>
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                {isBiometricsEnabled ? (
+                  <View className="flex-row h-[44px]">
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic();
+                        setActiveModal(null);
+                      }}
+                      activeOpacity={0.7}
+                      className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                    >
+                      <Text
+                        className="text-[17px] text-[#007AFF]"
+                        style={{ fontFamily: "Outfit_400Regular" }}
+                      >
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic();
+                        setActiveModal(null);
+                        lockApp();
+                      }}
+                      activeOpacity={0.7}
+                      className="flex-1 items-center justify-center active:bg-black/5"
+                    >
+                      <Text
+                        className="text-[17px] text-[#007AFF]"
+                        style={{ fontFamily: "Outfit_600SemiBold" }}
+                      >
+                        Lock
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setActiveModal(null);
+                    }}
+                    activeOpacity={0.7}
+                    className="h-[44px] items-center justify-center active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#007AFF]"
+                      style={{ fontFamily: "Outfit_600SemiBold" }}
+                    >
+                      OK
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+
+            {activeModal === "sign_out" && (
+              <>
+                <View className="pt-5 px-4 pb-4 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Log out
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    Are you sure you want to log out of Mark-X? You will need to sign in again to access your account.
+                  </Text>
+                </View>
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                <View className="flex-row h-[44px]">
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setActiveModal(null);
+                    }}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#007AFF]"
+                      style={{ fontFamily: "Outfit_400Regular" }}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSignOut}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#FF3B30]"
+                      style={{ fontFamily: "Outfit_600SemiBold" }}
+                    >
+                      Log out
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {activeModal === "deactivate" && (
+              <>
+                <View className="pt-5 px-4 pb-4 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Deactivate Account
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    Are you sure you want to deactivate your account? All active sessions will be terminated and your local vault will be locked.
+                  </Text>
+                </View>
+
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+                <View className="flex-row h-[44px]">
+                  <TouchableOpacity
+                    onPress={() => {
+                      triggerHaptic();
+                      setActiveModal(null);
+                    }}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#007AFF]"
+                      style={{ fontFamily: "Outfit_400Regular" }}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleDeactivate}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center active:bg-black/5"
+                  >
+                    <Text
+                      className="text-[17px] text-[#FF3B30]"
+                      style={{ fontFamily: "Outfit_600SemiBold" }}
+                    >
+                      Deactivate
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

@@ -15,7 +15,6 @@ export default function ProfileLayout() {
     >
       <Stack.Screen name="personal-info" />
       <Stack.Screen name="security" />
-      <Stack.Screen name="biometrics" />
       <Stack.Screen name="devices" />
       <Stack.Screen name="help" />
       <Stack.Screen name="terms" />
