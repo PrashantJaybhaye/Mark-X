@@ -32,33 +32,77 @@ import {
   syncCurrentDevice,
 } from "../../services/deviceSyncService";
 
-function getDeviceIcon(type: string): keyof typeof Ionicons.glyphMap {
-  switch (type) {
-    case "tablet":
-      return "tablet-portrait-outline";
-    case "desktop":
-      return "laptop-outline";
-    case "browser":
-      return "globe-outline";
-    default:
-      return "phone-portrait-outline";
-  }
+
+type LogoutAction =
+  | { type: "remote"; device: FirestoreDevice }
+  | { type: "all_others" }
+  | null;
+
+
+/**
+ * Renders an active device row (icon badge, name, platform, and right action/status).
+ */
+interface DeviceRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  rightElement: React.ReactNode;
+  showDivider?: boolean;
 }
 
-// Clean Mark-X Profile Row Item
-interface DeviceInfoRowProps {
-  label: string;
-  description: string;
-  value: string;
-  isLast?: boolean;
+function DeviceRow({
+  icon,
+  title,
+  subtitle,
+  rightElement,
+  showDivider = true,
+}: DeviceRowProps) {
+  return (
+    <View
+      className={`py-3.5 ${showDivider ? "border-b border-[#EBEBEB]" : ""} flex-row items-center justify-between`}
+    >
+      <View className="flex-row items-center flex-1 pr-3">
+        <View className="w-12 h-12 rounded-full bg-[#F7F7F7] border border-[#EBEBEB] items-center justify-center mr-3.5">
+          <Ionicons name={icon} size={22} color="#222222" />
+        </View>
+
+        <View className="flex-1">
+          <Text
+            className="text-[17px] text-[#222222]"
+            style={{ fontFamily: "Outfit_600SemiBold" }}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          <Text
+            className="text-[13px] text-[#717171] mt-0.5"
+            style={{ fontFamily: "Outfit_400Regular" }}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+        </View>
+      </View>
+
+      {rightElement}
+    </View>
+  );
 }
 
-function DeviceInfoRow({
+/**
+ * Standard Mark-X profile key-value specification row.
+ */
+function SpecRow({
   label,
   description,
   value,
   isLast = false,
-}: DeviceInfoRowProps) {
+}: {
+  label: string;
+  description: string;
+  value: string;
+  isLast?: boolean;
+}) {
   return (
     <View
       className={`py-3.5 ${isLast ? "" : "border-b border-[#EBEBEB]"} flex-row items-center justify-between`}
@@ -90,10 +134,110 @@ function DeviceInfoRow({
   );
 }
 
-type ActiveLogoutTarget =
-  | { type: "remote"; device: FirestoreDevice }
-  | { type: "all_others" }
-  | null;
+/**
+ * Centered iOS confirmation dialog modal matching Mark-X design language.
+ */
+function ConfirmationDialog({
+  visible,
+  title,
+  message,
+  isLoading,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  title: string;
+  message: string;
+  isLoading: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View className="flex-1 bg-black/40 items-center justify-center px-8">
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
+              <View className="pt-5 px-4 pb-4 items-center">
+                <Text
+                  className="text-[17px] text-[#000000] text-center mb-1.5"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                >
+                  {title}
+                </Text>
+                <Text
+                  className="text-[13px] text-[#3C3C43] text-center leading-5"
+                  style={{ fontFamily: "Outfit_400Regular" }}
+                >
+                  {message}
+                </Text>
+              </View>
+
+              <View className="h-[0.5px] bg-[#3C3C43]/20" />
+
+              <View className="flex-row h-[44px]">
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    onClose();
+                  }}
+                  activeOpacity={0.7}
+                  disabled={isLoading}
+                  className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                >
+                  <Text
+                    className="text-[17px] text-[#007AFF]"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={onConfirm}
+                  activeOpacity={0.7}
+                  disabled={isLoading}
+                  className="flex-1 items-center justify-center active:bg-black/5"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#E00B41" />
+                  ) : (
+                    <Text
+                      className="text-[17px] text-[#E00B41]"
+                      style={{ fontFamily: "Outfit_600SemiBold" }}
+                    >
+                      Log Out
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+}
+
+
+function getDeviceIcon(type: string): keyof typeof Ionicons.glyphMap {
+  switch (type) {
+    case "tablet":
+      return "tablet-portrait-outline";
+    case "desktop":
+      return "laptop-outline";
+    case "browser":
+      return "globe-outline";
+    default:
+      return "phone-portrait-outline";
+  }
+}
+
 
 export default function DevicesScreen() {
   const router = useRouter();
@@ -103,8 +247,8 @@ export default function DevicesScreen() {
 
   const [currentDeviceId, setCurrentDeviceId] = useState<string>("");
   const [allDevices, setAllDevices] = useState<FirestoreDevice[]>([]);
-  const [logoutTarget, setLogoutTarget] = useState<ActiveLogoutTarget>(null);
-  const [isProcessingLogout, setIsProcessingLogout] = useState(false);
+  const [logoutTarget, setLogoutTarget] = useState<LogoutAction>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const isDismissingRef = useRef(false);
 
@@ -119,46 +263,33 @@ export default function DevicesScreen() {
     [hardwareInfo]
   );
 
-  // Initialize device ID and sync heartbeat to Firestore
+  // Sync heartbeat & persistent ID
   useEffect(() => {
     let isMounted = true;
-
-    async function initDevice() {
-      const id = await getPersistentDeviceId();
+    getPersistentDeviceId().then((id) => {
       if (isMounted) {
         setCurrentDeviceId(id);
         if (userId && userId !== "guest") {
-          await syncCurrentDevice(userId, id, hardwareInfo);
+          syncCurrentDevice(userId, id, hardwareInfo);
         }
       }
-    }
-
-    initDevice();
-
+    });
     return () => {
       isMounted = false;
     };
   }, [userId, hardwareInfo]);
 
-  // Subscribe to real-time active devices for this account in Firestore
+  // Subscribe to real-time active devices
   useEffect(() => {
-    if (!userId || userId === "guest") {
-      return;
-    }
-
-    const unsubscribe = subscribeActiveDevices(userId, (devices) => {
-      setAllDevices(devices);
-    });
-
-    return () => {
-      unsubscribe();
-    };
+    if (!userId || userId === "guest") return;
+    const unsubscribe = subscribeActiveDevices(userId, setAllDevices);
+    return () => unsubscribe();
   }, [userId]);
 
-  // Filter out this device to show other real active devices
-  const otherActiveDevices = useMemo(() => {
-    return allDevices.filter((d) => d.deviceId !== currentDeviceId);
-  }, [allDevices, currentDeviceId]);
+  const otherDevices = useMemo(
+    () => allDevices.filter((d) => d.deviceId !== currentDeviceId),
+    [allDevices, currentDeviceId]
+  );
 
   const handleDismiss = () => {
     if (isDismissingRef.current) return;
@@ -176,30 +307,31 @@ export default function DevicesScreen() {
 
   const handleConfirmLogout = async () => {
     if (!logoutTarget) return;
-    setIsProcessingLogout(true);
+    setIsProcessing(true);
     triggerHaptic();
 
     try {
       if (logoutTarget.type === "remote") {
         await removeActiveDevice(userId, logoutTarget.device.deviceId);
-        setLogoutTarget(null);
       } else if (logoutTarget.type === "all_others") {
         await removeAllOtherDevices(userId, currentDeviceId);
-        setLogoutTarget(null);
       }
+      setLogoutTarget(null);
     } catch (err: any) {
       Alert.alert("Logout Error", err.message || "Failed to log out session.");
     } finally {
-      setIsProcessingLogout(false);
+      setIsProcessing(false);
     }
   };
 
-  const currentDeviceIcon =
-    hardwareInfo.deviceType === "tablet"
-      ? "tablet-portrait-outline"
-      : hardwareInfo.deviceType === "desktop"
-      ? "desktop-outline"
-      : "phone-portrait-outline";
+  // Declarative hardware specifications data
+  const hardwareSpecs = [
+    { label: "Model", description: "Hardware model identifier", value: hardwareInfo.modelName },
+    { label: "Manufacturer", description: "Device maker & branding", value: hardwareInfo.brand },
+    { label: "Operating system", description: "Installed OS platform & build", value: `${hardwareInfo.osName} ${hardwareInfo.osVersion}` },
+    { label: "Application version", description: "Mark-X client release", value: `v${hardwareInfo.appVersion}` },
+    { label: "Device class", description: "Physical or virtual environment", value: hardwareInfo.isPhysical ? "Physical hardware" : "Simulator / Virtual" },
+  ];
 
   return (
     <View className="flex-1 bg-white">
@@ -241,48 +373,32 @@ export default function DevicesScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* ================= THIS DEVICE HEADER ================= */}
-        <View className="pb-5 mb-5 border-b border-[#EBEBEB] flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1 pr-3">
-            <View className="w-12 h-12 rounded-full bg-[#F7F7F7] border border-[#EBEBEB] items-center justify-center mr-3.5">
-              <Ionicons name={currentDeviceIcon} size={22} color="#222222" />
-            </View>
-
-            <View className="flex-1">
+        {/* ================= CURRENT DEVICE ================= */}
+        <DeviceRow
+          icon={getDeviceIcon(hardwareInfo.deviceType)}
+          title={deviceLabel}
+          subtitle={`${hardwareInfo.osName} ${hardwareInfo.osVersion}`}
+          rightElement={
+            <View className="flex-row items-center">
+              <Ionicons
+                name="checkmark-circle"
+                size={15}
+                color="#008A05"
+                style={{ marginRight: 4 }}
+              />
               <Text
-                className="text-[17px] text-[#222222]"
-                style={{ fontFamily: "Outfit_600SemiBold" }}
-                numberOfLines={1}
+                className="text-[13px] text-[#008A05]"
+                style={{ fontFamily: "Outfit_500Medium" }}
               >
-                {deviceLabel}
-              </Text>
-              <Text
-                className="text-[13px] text-[#717171] mt-0.5"
-                style={{ fontFamily: "Outfit_400Regular" }}
-                numberOfLines={1}
-              >
-                {hardwareInfo.osName} {hardwareInfo.osVersion}
+                Active now
               </Text>
             </View>
-          </View>
+          }
+        />
 
-          <View className="flex-row items-center">
-            <Ionicons
-              name="checkmark-circle"
-              size={15}
-              color="#008A05"
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              className="text-[13px] text-[#008A05]"
-              style={{ fontFamily: "Outfit_500Medium" }}
-            >
-              Active now
-            </Text>
-          </View>
-        </View>
+        <View className="h-5" />
 
-        {/* ================= SECTION 1: OTHER ACTIVE DEVICES ================= */}
+        {/* ================= OTHER ACTIVE DEVICES ================= */}
         <View className="mb-6">
           <View className="flex-row items-center justify-between mb-1">
             <Text
@@ -291,78 +407,55 @@ export default function DevicesScreen() {
             >
               Other active devices
             </Text>
-            {otherActiveDevices.length > 0 && (
+            {otherDevices.length > 0 && (
               <Text
                 className="text-[13px] text-[#717171]"
                 style={{ fontFamily: "Outfit_400Regular" }}
               >
-                {otherActiveDevices.length} {otherActiveDevices.length === 1 ? "device" : "devices"}
+                {otherDevices.length} {otherDevices.length === 1 ? "device" : "devices"}
               </Text>
             )}
           </View>
 
-          {otherActiveDevices.length > 0 ? (
+          {otherDevices.length > 0 ? (
             <>
-              {otherActiveDevices.map((device) => (
-                <View
+              {otherDevices.map((device, idx) => (
+                <DeviceRow
                   key={device.deviceId}
-                  className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
-                >
-                  <View className="flex-row items-center flex-1 pr-3">
-                    <View className="w-12 h-12 rounded-full bg-[#F7F7F7] border border-[#EBEBEB] items-center justify-center mr-3.5">
-                      <Ionicons
-                        name={getDeviceIcon(device.deviceType)}
-                        size={22}
-                        color="#222222"
-                      />
-                    </View>
-
-                    <View className="flex-1">
+                  icon={getDeviceIcon(device.deviceType)}
+                  title={device.name || device.modelName || "Authorized Device"}
+                  subtitle={`${device.osName} ${device.osVersion}`}
+                  showDivider={idx !== otherDevices.length - 1}
+                  rightElement={
+                    <View className="items-end pl-2">
                       <Text
-                        className="text-[17px] text-[#222222]"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                        numberOfLines={1}
-                      >
-                        {device.name || device.modelName || "Authorized Device"}
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#717171] mt-0.5"
+                        className="text-[12px] text-[#717171]"
                         style={{ fontFamily: "Outfit_400Regular" }}
-                        numberOfLines={1}
                       >
-                        {device.osName} {device.osVersion}
+                        {formatDeviceActivity(device.lastActive)}
                       </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          triggerHaptic();
+                          setLogoutTarget({ type: "remote", device });
+                        }}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        className="mt-1"
+                      >
+                        <Text
+                          className="text-[13px] text-[#E00B41]"
+                          style={{ fontFamily: "Outfit_500Medium" }}
+                        >
+                          Log out
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-
-                  <View className="items-end pl-2">
-                    <Text
-                      className="text-[12px] text-[#717171]"
-                      style={{ fontFamily: "Outfit_400Regular" }}
-                    >
-                      {formatDeviceActivity(device.lastActive)}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        setLogoutTarget({ type: "remote", device });
-                      }}
-                      activeOpacity={0.7}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      className="mt-1"
-                    >
-                      <Text
-                        className="text-[13px] text-[#E00B41]"
-                        style={{ fontFamily: "Outfit_500Medium" }}
-                      >
-                        Log out
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  }
+                />
               ))}
 
-              {/* Log out all other devices trigger */}
+              {/* Bulk terminate remote devices */}
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
@@ -386,14 +479,12 @@ export default function DevicesScreen() {
                   </Text>
                 </View>
 
-                <View className="py-0.5">
-                  <Text
-                    className="text-[14px] text-[#E00B41]"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    Log out all
-                  </Text>
-                </View>
+                <Text
+                  className="text-[14px] text-[#E00B41]"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                >
+                  Log out all
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -408,7 +499,7 @@ export default function DevicesScreen() {
           )}
         </View>
 
-        {/* ================= SECTION 2: DEVICE INFORMATION ================= */}
+        {/* ================= HARDWARE SPECIFICATIONS ================= */}
         <View className="mb-6">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -417,110 +508,37 @@ export default function DevicesScreen() {
             Device information
           </Text>
 
-          <DeviceInfoRow
-            label="Model"
-            description="Hardware model identifier"
-            value={hardwareInfo.modelName}
-          />
-          <DeviceInfoRow
-            label="Manufacturer"
-            description="Device maker & branding"
-            value={hardwareInfo.brand}
-          />
-          <DeviceInfoRow
-            label="Operating system"
-            description="Installed OS platform & build"
-            value={`${hardwareInfo.osName} ${hardwareInfo.osVersion}`}
-          />
-          <DeviceInfoRow
-            label="Application version"
-            description="Mark-X client release"
-            value={`v${hardwareInfo.appVersion}`}
-          />
-          <DeviceInfoRow
-            label="Device class"
-            description="Physical or virtual environment"
-            value={hardwareInfo.isPhysical ? "Physical hardware" : "Simulator / Virtual"}
-            isLast
-          />
+          {hardwareSpecs.map((spec, idx) => (
+            <SpecRow
+              key={spec.label}
+              label={spec.label}
+              description={spec.description}
+              value={spec.value}
+              isLast={idx === hardwareSpecs.length - 1}
+            />
+          ))}
         </View>
       </ScrollView>
 
-      {/* ================= UNIFIED MARK-X CONFIRMATION MODAL ================= */}
-      <Modal
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
         visible={logoutTarget !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLogoutTarget(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setLogoutTarget(null)}>
-          <View className="flex-1 bg-black/40 items-center justify-center px-8">
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                <View className="pt-5 px-4 pb-4 items-center">
-                  <Text
-                    className="text-[17px] text-[#000000] text-center mb-1.5"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    {logoutTarget?.type === "remote"
-                      ? "Log Out Device"
-                      : "Log Out All Devices"}
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#3C3C43] text-center leading-5"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    {logoutTarget?.type === "remote"
-                      ? `Are you sure you want to log out of "${
-                          logoutTarget.device.name || logoutTarget.device.modelName
-                        }"? It will be disconnected immediately.`
-                      : "This will terminate sessions on all other devices. You will stay signed in on this phone."}
-                  </Text>
-                </View>
-
-                <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                <View className="flex-row h-[44px]">
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      setLogoutTarget(null);
-                    }}
-                    activeOpacity={0.7}
-                    disabled={isProcessingLogout}
-                    className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#007AFF]"
-                      style={{ fontFamily: "Outfit_400Regular" }}
-                    >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={handleConfirmLogout}
-                    activeOpacity={0.7}
-                    disabled={isProcessingLogout}
-                    className="flex-1 items-center justify-center active:bg-black/5"
-                  >
-                    {isProcessingLogout ? (
-                      <ActivityIndicator size="small" color="#E00B41" />
-                    ) : (
-                      <Text
-                        className="text-[17px] text-[#E00B41]"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Log Out
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        title={
+          logoutTarget?.type === "remote"
+            ? "Log Out Device"
+            : "Log Out All Devices"
+        }
+        message={
+          logoutTarget?.type === "remote"
+            ? `Are you sure you want to log out of "${
+                logoutTarget.device.name || logoutTarget.device.modelName
+              }"? It will be disconnected immediately.`
+            : "This will terminate sessions on all other devices. You will stay signed in on this device."
+        }
+        isLoading={isProcessing}
+        onClose={() => setLogoutTarget(null)}
+        onConfirm={handleConfirmLogout}
+      />
     </View>
   );
 }
