@@ -24,8 +24,13 @@ export function ProfileCardRow({
   rightElement,
   onPress,
 }: ProfileCardRowProps) {
+  const lastPressRef = React.useRef(0);
+
   const handlePress = () => {
     if (onPress) {
+      const now = Date.now();
+      if (now - lastPressRef.current < 750) return;
+      lastPressRef.current = now;
       triggerHaptic();
       onPress();
     }

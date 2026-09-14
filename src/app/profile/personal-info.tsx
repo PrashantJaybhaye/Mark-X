@@ -294,13 +294,20 @@ export default function PersonalInfoScreen() {
     loadExtras();
   }, [user?.uid]);
 
+  const isDismissingRef = React.useRef(false);
+
   const handleDismiss = () => {
+    if (isDismissingRef.current) return;
+    isDismissingRef.current = true;
     triggerHaptic();
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/(main)/profile");
     }
+    setTimeout(() => {
+      isDismissingRef.current = false;
+    }, 750);
   };
 
   const handlePickPhoto = async () => {

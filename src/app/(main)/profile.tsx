@@ -12,7 +12,7 @@ import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
@@ -28,12 +28,35 @@ export default function ProfileScreen() {
   const [isTogglingBiometrics, setIsTogglingBiometrics] = useState(false);
   const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
 
+  // Prevent multiple rapid clicks from pushing duplicate screens
+  const isNavigatingRef = React.useRef(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      isNavigatingRef.current = false;
+    }, [])
+  );
+
+  const navigateSafely = React.useCallback(
+    (path: string) => {
+      if (isNavigatingRef.current) return;
+      isNavigatingRef.current = true;
+      router.push(path as any);
+
+      // Failsafe timeout to unlock if screen did not blur
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 750);
+    },
+    [router]
+  );
+
   const userName = user?.displayName || "User";
   const photoUri = user?.photoURL || user?.providerData?.[0]?.photoURL || null;
 
   const handleAvatarPress = () => {
     triggerHaptic();
-    router.push("/profile/personal-info");
+    navigateSafely("/profile/personal-info");
   };
 
   const handleToggleBiometrics = async (val: boolean) => {
@@ -175,12 +198,12 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="person-outline"
               title="Personal information"
-              onPress={() => router.push("/profile/personal-info")}
+              onPress={() => navigateSafely("/profile/personal-info")}
             />
             <ProfileCardRow
               icon="lock-closed-outline"
               title="Security & Privacy"
-              onPress={() => router.push("/profile/security")}
+              onPress={() => navigateSafely("/profile/security")}
             />
           </View>
 
@@ -218,7 +241,7 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="hardware-chip-outline"
               title="Active devices"
-              onPress={() => router.push("/profile/devices")}
+              onPress={() => navigateSafely("/profile/devices")}
             />
           </View>
 
@@ -234,18 +257,18 @@ export default function ProfileScreen() {
             <ProfileCardRow
               icon="help-circle-outline"
               title="Help & Support"
-              onPress={() => router.push("/profile/help")}
+              onPress={() => navigateSafely("/profile/help")}
             />
             <ProfileCardRow
               icon="document-text-outline"
               title="Terms & Conditions"
-              onPress={() => router.push("/profile/terms")}
+              onPress={() => navigateSafely("/profile/terms")}
             />
             <ProfileCardRow
               icon="information-circle-outline"
               title="About"
               showDivider={false}
-              onPress={() => router.push("/profile/about")}
+              onPress={() => navigateSafely("/profile/about")}
             />
           </View>
 
