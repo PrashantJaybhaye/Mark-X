@@ -29,20 +29,10 @@ export async function getPersistentDeviceId(): Promise<string> {
  * Resolves the device type enum to our domain DeviceType.
  */
 function resolveDeviceType(): DeviceType {
-  if (Platform.OS === "web") {
-    return "browser";
-  }
-
-  switch (Device.deviceType) {
-    case Device.DeviceType.TABLET:
-      return "tablet";
-    case Device.DeviceType.DESKTOP:
-      return "desktop";
-    case Device.DeviceType.PHONE:
-      return "phone";
-    default:
-      return Platform.OS === "ios" || Platform.OS === "android" ? "phone" : "desktop";
-  }
+  if (Platform.OS === "web") return "browser";
+  if (Device.deviceType === Device.DeviceType.TABLET) return "tablet";
+  if (Device.deviceType === Device.DeviceType.DESKTOP) return "desktop";
+  return "phone";
 }
 
 /**

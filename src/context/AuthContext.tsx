@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -18,7 +19,7 @@ import {
   signInWithCredential,
   signInWithPopup,
 } from "firebase/auth";
-import { Platform } from "react-native";
+import { Platform, AppState } from "react-native";
 import {
   GoogleSignin,
   isErrorWithCode,
@@ -26,6 +27,15 @@ import {
 } from "@react-native-google-signin/google-signin";
 import { auth } from "../services/firebase";
 import { syncUserMetadata } from "../services/userService";
+import {
+  getPersistentDeviceId,
+  getHardwareInfo,
+} from "../services/devices/deviceHardwareService";
+import {
+  syncCurrentDevice,
+  listenCurrentDeviceRevocation,
+  touchDeviceHeartbeat,
+} from "../services/deviceSyncService";
 
 if (Platform.OS !== "web") {
   GoogleSignin.configure({
@@ -66,17 +76,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const signOut = async () => {
+    if (Platform.OS !== "web") {
+      try {
+        await GoogleSignin.signOut();
+      } catch {}
+    }
+    await firebaseSignOut(auth);
+  };
+
+  const deviceIdRef = useRef<string>("");
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    let revocationUnsub: (() => void) | undefined;
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
       if (currentUser) {
         syncUserMetadata(currentUser);
+
+        // Snapchat-style real-time device sync & remote revocation listener
+        try {
+          const deviceId = await getPersistentDeviceId();
+          deviceIdRef.current = deviceId;
+          const info = getHardwareInfo();
+          await syncCurrentDevice(currentUser.uid, deviceId, info);
+
+          if (revocationUnsub) revocationUnsub();
+          revocationUnsub = listenCurrentDeviceRevocation(
+            currentUser.uid,
+            deviceId,
+            () => {
+              console.warn("[AuthContext] This device was logged out remotely.");
+              firebaseSignOut(auth);
+            }
+          );
+        } catch (e) {
+          console.warn("[AuthContext] Error setting up device session sync:", e);
+        }
+      } else {
+        deviceIdRef.current = "";
+        if (revocationUnsub) {
+          revocationUnsub();
+          revocationUnsub = undefined;
+        }
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (revocationUnsub) revocationUnsub();
+    };
   }, []);
+
+  // Presence heartbeat: refresh lastActive on app foreground
+  useEffect(() => {
+    if (!user) return;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && deviceIdRef.current) {
+        touchDeviceHeartbeat(user.uid, deviceIdRef.current);
+      }
+    });
+    return () => subscription.remove();
+  }, [user]);
 
   const signIn = async (identifier: string, pass: string) => {
     const email = normalizeEmail(identifier);
@@ -184,15 +248,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return updatedUser.emailVerified;
     }
     return false;
-  };
-
-  const signOut = async () => {
-    if (Platform.OS !== "web") {
-      try {
-        await GoogleSignin.signOut();
-      } catch {}
-    }
-    await firebaseSignOut(auth);
   };
 
   return (

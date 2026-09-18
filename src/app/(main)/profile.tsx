@@ -1,24 +1,24 @@
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useFocusEffect, useRouter } from "expo-router";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import React, { useState } from "react";
 import {
   Alert,
   Platform,
-  ScrollView,
   StatusBar as RNStatusBar,
+  ScrollView,
   Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Image } from "expo-image";
-import { StatusBar, setStatusBarStyle } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter, useFocusEffect } from "expo-router";
 
+import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
-import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -108,10 +108,10 @@ export default function ProfileScreen() {
 
   const joinedDate = user?.metadata?.creationTime
     ? new Date(user.metadata.creationTime).toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
     : "15 Nov 2024";
 
   return (

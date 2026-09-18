@@ -20,10 +20,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { updateProfile } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import * as Clipboard from "expo-clipboard";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../services/firebase";
 import { safePickImage } from "../../services/nativePickerService";
-import { copyToClipboard } from "../../services/clipboardService";
 import { updateUserMetadata } from "../../services/userService";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -418,7 +418,7 @@ export default function PersonalInfoScreen() {
   const handleCopyUid = async () => {
     if (!user?.uid) return;
     triggerHaptic();
-    const copied = await copyToClipboard(user.uid);
+    const copied = await Clipboard.setStringAsync(user.uid);
     if (copied) {
       Alert.alert("Copied", "Account ID copied to clipboard.");
     }

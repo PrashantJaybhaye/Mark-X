@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   StatusBar as RNStatusBar,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -17,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { triggerHaptic } from "../../utils/haptics";
 import { checkOtaUpdate, OtaCheckResult } from "../../services/updateService";
+import { IosDialog } from "../../components/common/IosDialog";
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -135,87 +134,41 @@ export default function AboutScreen() {
       </View>
 
       {/* Pixel-Perfect iOS Alert Modal */}
-      <Modal
+      <IosDialog
         visible={modalResult !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={handleCloseModal}
-      >
-        <TouchableWithoutFeedback onPress={handleCloseModal}>
-          <View className="flex-1 bg-black/40 items-center justify-center px-8">
-            <TouchableWithoutFeedback>
-              <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                {/* Content Area */}
-                <View className="pt-5 px-4 pb-4 items-center">
-                  <Text
-                    className="text-[17px] text-[#000000] text-center mb-1.5"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    {modalResult?.title}
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#3C3C43] text-center leading-5"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    {modalResult?.message}
-                  </Text>
-                </View>
-
-                {/* Hairline Divider */}
-                <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                {/* iOS Action Buttons */}
-                {modalResult?.hasUpdate && modalResult?.applyUpdate ? (
-                  <View className="flex-row h-[44px]">
-                    <TouchableOpacity
-                      onPress={handleCloseModal}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                    >
-                      <Text
-                        className="text-[17px] text-[#007AFF]"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        Later
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={async () => {
-                        handleCloseModal();
-                        if (modalResult.applyUpdate) {
-                          await modalResult.applyUpdate();
-                        }
-                      }}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center active:bg-black/5"
-                    >
-                      <Text
-                        className="text-[17px] text-[#007AFF]"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Update
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleCloseModal}
-                    activeOpacity={0.7}
-                    className="h-[44px] items-center justify-center active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#007AFF]"
-                      style={{ fontFamily: "Outfit_600SemiBold" }}
-                    >
-                      OK
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        title={modalResult?.title || ""}
+        message={modalResult?.message}
+        actions={
+          modalResult?.hasUpdate && modalResult?.applyUpdate
+            ? [
+                {
+                  text: "Later",
+                  style: "cancel",
+                  onPress: handleCloseModal,
+                },
+                {
+                  text: "Update",
+                  style: "default",
+                  bold: true,
+                  onPress: async () => {
+                    handleCloseModal();
+                    if (modalResult.applyUpdate) {
+                      await modalResult.applyUpdate();
+                    }
+                  },
+                },
+              ]
+            : [
+                {
+                  text: "OK",
+                  style: "default",
+                  bold: true,
+                  onPress: handleCloseModal,
+                },
+              ]
+        }
+        onClose={handleCloseModal}
+      />
     </View>
   );
 }

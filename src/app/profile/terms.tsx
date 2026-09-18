@@ -14,8 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import * as Clipboard from "expo-clipboard";
 import { triggerHaptic } from "../../utils/haptics";
-import { copyToClipboard } from "../../services/clipboardService";
 
 interface IosDialogButton {
   text: string;
@@ -50,7 +50,7 @@ export default function TermsScreen() {
 
   const handleCopySource = async () => {
     triggerHaptic();
-    await copyToClipboard("https://mark-x.app/terms");
+    await Clipboard.setStringAsync("https://mark-x.app/terms");
     setDialog({
       title: "Link Copied",
       message: "The official terms link has been copied to your clipboard.",
@@ -80,7 +80,7 @@ export default function TermsScreen() {
           text: "Copy Email",
           style: "default",
           onPress: async () => {
-            await copyToClipboard("support@mark-x.app");
+            await Clipboard.setStringAsync("support@mark-x.app");
             setDialog({
               title: "Email Copied",
               message: "support@mark-x.app copied to clipboard.",

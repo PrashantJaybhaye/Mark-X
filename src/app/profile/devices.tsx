@@ -1,14 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
   Platform,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -18,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../context/AuthContext";
 import { triggerHaptic } from "../../utils/haptics";
+import { IosDialog } from "../../components/common/IosDialog";
 import {
   getFormattedDeviceLabel,
   getHardwareInfo,
@@ -27,16 +24,9 @@ import {
   formatDeviceActivity,
   FirestoreDevice,
   removeActiveDevice,
-  removeAllOtherDevices,
   subscribeActiveDevices,
   syncCurrentDevice,
 } from "../../services/deviceSyncService";
-
-
-type LogoutAction =
-  | { type: "remote"; device: FirestoreDevice }
-  | { type: "all_others" }
-  | null;
 
 
 /**
@@ -134,95 +124,7 @@ function SpecRow({
   );
 }
 
-/**
- * Centered iOS confirmation dialog modal matching Mark-X design language.
- */
-function ConfirmationDialog({
-  visible,
-  title,
-  message,
-  isLoading,
-  onClose,
-  onConfirm,
-}: {
-  visible: boolean;
-  title: string;
-  message: string;
-  isLoading: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/40 items-center justify-center px-8">
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-              <View className="pt-5 px-4 pb-4 items-center">
-                <Text
-                  className="text-[17px] text-[#000000] text-center mb-1.5"
-                  style={{ fontFamily: "Outfit_600SemiBold" }}
-                >
-                  {title}
-                </Text>
-                <Text
-                  className="text-[13px] text-[#3C3C43] text-center leading-5"
-                  style={{ fontFamily: "Outfit_400Regular" }}
-                >
-                  {message}
-                </Text>
-              </View>
 
-              <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-              <View className="flex-row h-[44px]">
-                <TouchableOpacity
-                  onPress={() => {
-                    triggerHaptic();
-                    onClose();
-                  }}
-                  activeOpacity={0.7}
-                  disabled={isLoading}
-                  className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                >
-                  <Text
-                    className="text-[17px] text-[#007AFF]"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={onConfirm}
-                  activeOpacity={0.7}
-                  disabled={isLoading}
-                  className="flex-1 items-center justify-center active:bg-black/5"
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#E00B41" />
-                  ) : (
-                    <Text
-                      className="text-[17px] text-[#E00B41]"
-                      style={{ fontFamily: "Outfit_600SemiBold" }}
-                    >
-                      Log Out
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-}
 
 
 function getDeviceIcon(type: string): keyof typeof Ionicons.glyphMap {
@@ -247,8 +149,7 @@ export default function DevicesScreen() {
 
   const [currentDeviceId, setCurrentDeviceId] = useState<string>("");
   const [allDevices, setAllDevices] = useState<FirestoreDevice[]>([]);
-  const [logoutTarget, setLogoutTarget] = useState<LogoutAction>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [logoutTarget, setLogoutTarget] = useState<FirestoreDevice | null>(null);
 
   const isDismissingRef = useRef(false);
 
@@ -307,20 +208,17 @@ export default function DevicesScreen() {
 
   const handleConfirmLogout = async () => {
     if (!logoutTarget) return;
-    setIsProcessing(true);
+    const target = logoutTarget;
+    setLogoutTarget(null);
     triggerHaptic();
 
+    // Optimistically update list immediately for instant UI feedback
+    setAllDevices((prev) => prev.filter((d) => d.deviceId !== target.deviceId));
+
     try {
-      if (logoutTarget.type === "remote") {
-        await removeActiveDevice(userId, logoutTarget.device.deviceId);
-      } else if (logoutTarget.type === "all_others") {
-        await removeAllOtherDevices(userId, currentDeviceId);
-      }
-      setLogoutTarget(null);
+      await removeActiveDevice(userId, target.deviceId);
     } catch (err: any) {
-      Alert.alert("Logout Error", err.message || "Failed to log out session.");
-    } finally {
-      setIsProcessing(false);
+      console.warn("[DevicesScreen] Failed to remove active session:", err);
     }
   };
 
@@ -437,7 +335,7 @@ export default function DevicesScreen() {
                       <TouchableOpacity
                         onPress={() => {
                           triggerHaptic();
-                          setLogoutTarget({ type: "remote", device });
+                          setLogoutTarget(device);
                         }}
                         activeOpacity={0.7}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -454,38 +352,6 @@ export default function DevicesScreen() {
                   }
                 />
               ))}
-
-              {/* Bulk terminate remote devices */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  triggerHaptic();
-                  setLogoutTarget({ type: "all_others" });
-                }}
-                className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
-              >
-                <View className="flex-1 pr-3">
-                  <Text
-                    className="text-[15px] text-[#222222] mb-0.5"
-                    style={{ fontFamily: "Outfit_500Medium" }}
-                  >
-                    Log out of all other devices
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#717171]"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    Sign out of all sessions except this device
-                  </Text>
-                </View>
-
-                <Text
-                  className="text-[14px] text-[#E00B41]"
-                  style={{ fontFamily: "Outfit_600SemiBold" }}
-                >
-                  Log out all
-                </Text>
-              </TouchableOpacity>
             </>
           ) : (
             <View className="py-4 border-b border-[#EBEBEB]">
@@ -520,24 +386,30 @@ export default function DevicesScreen() {
         </View>
       </ScrollView>
 
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
+      {/* iOS Confirmation Dialog */}
+      <IosDialog
         visible={logoutTarget !== null}
-        title={
-          logoutTarget?.type === "remote"
-            ? "Log Out Device"
-            : "Log Out All Devices"
-        }
+        title="Log Out Device"
         message={
-          logoutTarget?.type === "remote"
+          logoutTarget
             ? `Are you sure you want to log out of "${
-                logoutTarget.device.name || logoutTarget.device.modelName
+                logoutTarget.name || logoutTarget.modelName
               }"? It will be disconnected immediately.`
-            : "This will terminate sessions on all other devices. You will stay signed in on this device."
+            : ""
         }
-        isLoading={isProcessing}
+        actions={[
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setLogoutTarget(null),
+          },
+          {
+            text: "Log Out",
+            style: "destructive",
+            onPress: handleConfirmLogout,
+          },
+        ]}
         onClose={() => setLogoutTarget(null)}
-        onConfirm={handleConfirmLogout}
       />
     </View>
   );

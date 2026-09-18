@@ -93,12 +93,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
     triggerHaptic();
   };
 
-  const isHome = activeTab === "home";
-  const isDrive = activeTab === "drive";
-  const isGallery = activeTab === "gallery";
-  const isNotes = activeTab === "notes";
-  const isProfile = activeTab === "profile";
-
   return (
     <View
       className="w-full bg-white border-t border-[#E5E5EA]"
@@ -106,49 +100,49 @@ export const BottomTabBar = React.memo(function BottomTabBar({
     >
       <View className="flex-row items-center justify-around h-[54px] px-3">
         {/* 1. Home Tab */}
-        <TabButton onPress={() => handleTabPress("home")} isActive={isHome}>
+        <TabButton onPress={() => handleTabPress("home")} isActive={activeTab === "home"}>
           <Image
-            source={isHome ? ICON_HOME_ACTIVE : ICON_HOME_INACTIVE}
+            source={activeTab === "home" ? ICON_HOME_ACTIVE : ICON_HOME_INACTIVE}
             style={{ width: 28, height: 28 }}
-            tintColor={isHome ? "#111111" : "#8E8E93"}
+            tintColor={activeTab === "home" ? "#111111" : "#8E8E93"}
             contentFit="contain"
           />
         </TabButton>
 
         {/* 2. Drive Tab */}
-        <TabButton onPress={() => handleTabPress("drive")} isActive={isDrive}>
+        <TabButton onPress={() => handleTabPress("drive")} isActive={activeTab === "drive"}>
           <Ionicons
-            name={isDrive ? "layers" : "layers-outline"}
+            name={activeTab === "drive" ? "layers" : "layers-outline"}
             size={28}
-            color={isDrive ? "#111111" : "#8E8E93"}
+            color={activeTab === "drive" ? "#111111" : "#8E8E93"}
           />
         </TabButton>
 
         {/* 3. Center Gallery / Inspiration Tab */}
-        <TabButton onPress={() => handleTabPress("gallery")} isActive={isGallery}>
+        <TabButton onPress={() => handleTabPress("gallery")} isActive={activeTab === "gallery"}>
           <Image
-            source={isGallery ? ICON_GALLERY_ACTIVE : ICON_GALLERY_INACTIVE}
+            source={activeTab === "gallery" ? ICON_GALLERY_ACTIVE : ICON_GALLERY_INACTIVE}
             style={{ width: 26, height: 26 }}
-            tintColor={isGallery ? "#111111" : "#8E8E93"}
+            tintColor={activeTab === "gallery" ? "#111111" : "#8E8E93"}
             contentFit="contain"
           />
         </TabButton>
 
         {/* 4. Notes Tab */}
-        <TabButton onPress={() => handleTabPress("notes")} isActive={isNotes}>
+        <TabButton onPress={() => handleTabPress("notes")} isActive={activeTab === "notes"}>
           <Image
-            source={isNotes ? ICON_NOTE_ACTIVE : ICON_NOTE_INACTIVE}
+            source={activeTab === "notes" ? ICON_NOTE_ACTIVE : ICON_NOTE_INACTIVE}
             style={{ width: 28, height: 28 }}
-            tintColor={isNotes ? "#111111" : "#8E8E93"}
+            tintColor={activeTab === "notes" ? "#111111" : "#8E8E93"}
             contentFit="contain"
           />
         </TabButton>
 
         {/* 5. Profile Tab */}
-        <TabButton onPress={() => handleTabPress("profile")} isActive={isProfile}>
+        <TabButton onPress={() => handleTabPress("profile")} isActive={activeTab === "profile"}>
           <View
             className={`w-[30px] h-[30px] rounded-full overflow-hidden items-center justify-center bg-[#E5E7EB] ${
-              isProfile ? "border-2 border-[#111111]" : "border border-black/10"
+              activeTab === "profile" ? "border-2 border-[#111111]" : "border border-black/10"
             }`}
           >
             <Image

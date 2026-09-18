@@ -30,29 +30,24 @@ function SwipeableTabView({
 }: SwipeableTabViewProps) {
   const { width: windowWidth } = useWindowDimensions();
   const scrollViewRef = useRef<ScrollView>(null);
-  const isProgrammaticScroll = useRef(false);
-  const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swipedToIndex = useRef<number | null>(null);
 
   useEffect(() => {
-    if (isProgrammaticScroll.current) return;
+    // If navigation change was initiated by swipe gesture, ScrollView is already in position
+    if (swipedToIndex.current === state.index) {
+      swipedToIndex.current = null;
+      return;
+    }
+    swipedToIndex.current = null;
+
     const targetX = state.index * windowWidth;
-    isProgrammaticScroll.current = true;
-    scrollViewRef.current?.scrollTo({ x: targetX, animated: true });
-
-    if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
-    programmaticTimer.current = setTimeout(() => {
-      isProgrammaticScroll.current = false;
-    }, 350);
-
-    return () => {
-      if (programmaticTimer.current) clearTimeout(programmaticTimer.current);
-    };
+    // Jump directly without animating linearly across intermediate pages (Instagram-style)
+    scrollViewRef.current?.scrollTo({ x: targetX, animated: false });
   }, [state.index, windowWidth]);
 
   const handleMomentumScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>
   ) => {
-    if (isProgrammaticScroll.current) return;
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / windowWidth);
 
@@ -61,6 +56,7 @@ function SwipeableTabView({
       newIndex < state.routes.length &&
       newIndex !== state.index
     ) {
+      swipedToIndex.current = newIndex;
       triggerSelectionHaptic();
       const route = state.routes[newIndex];
       const navEvent = navigation.emit({
@@ -74,6 +70,8 @@ function SwipeableTabView({
           ...TabActions.jumpTo(route.name),
           target: state.key,
         });
+      } else {
+        swipedToIndex.current = null;
       }
     }
   };

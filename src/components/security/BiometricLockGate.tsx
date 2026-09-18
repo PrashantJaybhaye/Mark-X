@@ -15,6 +15,7 @@ import { useBiometrics } from "../../context/BiometricsContext";
 import { useAuth } from "../../context/AuthContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { MarkXLogo } from "../common/MarkXLogo";
+import { IosDialog } from "../common/IosDialog";
 
 const ACCENT_COLOR = "#007AFF";
 const TEXT_MUTED = "#8E8E93";
@@ -206,73 +207,28 @@ export function BiometricLockGate() {
         </View>
       </Modal>
 
-      {/* Center iOS Alert Modal (matching profile/about.tsx) */}
-      <Modal
+      {/* Center iOS Alert Dialog */}
+      <IosDialog
         visible={isEmergencyModalVisible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setIsEmergencyModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsEmergencyModalVisible(false)}>
-          <View className="flex-1 bg-black/40 items-center justify-center px-8">
-            <TouchableWithoutFeedback>
-              <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                {/* Content Area */}
-                <View className="pt-5 px-4 pb-4 items-center">
-                  <Text
-                    className="text-[17px] text-[#000000] text-center mb-1.5"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    Emergency Access
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#3C3C43] text-center leading-5"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    Are you sure you want to sign out of your account?
-                  </Text>
-                </View>
-
-                {/* Hairline Divider */}
-                <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                {/* Action Buttons */}
-                <View className="flex-row h-[44px]">
-                  <TouchableOpacity
-                    onPress={() => setIsEmergencyModalVisible(false)}
-                    activeOpacity={0.7}
-                    className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#007AFF]"
-                      style={{ fontFamily: "Outfit_400Regular" }}
-                    >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setIsEmergencyModalVisible(false);
-                      handleSignOut();
-                    }}
-                    activeOpacity={0.7}
-                    className="flex-1 items-center justify-center active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#FF3B30]"
-                      style={{ fontFamily: "Outfit_600SemiBold" }}
-                    >
-                      Sign Out
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        title="Emergency Access"
+        message="Are you sure you want to sign out of your account?"
+        actions={[
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setIsEmergencyModalVisible(false),
+          },
+          {
+            text: "Sign Out",
+            style: "destructive",
+            onPress: () => {
+              setIsEmergencyModalVisible(false);
+              handleSignOut();
+            },
+          },
+        ]}
+        onClose={() => setIsEmergencyModalVisible(false)}
+      />
     </>
   );
 }

@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { copyToClipboard } from "../../services/clipboardService";
+import * as Clipboard from "expo-clipboard";
 import { triggerHaptic } from "../../utils/haptics";
 
 interface FAQItem {
@@ -158,7 +158,7 @@ export default function HelpScreen() {
           text: "Copy Email",
           style: "default",
           onPress: async () => {
-            await copyToClipboard(supportEmail);
+            await Clipboard.setStringAsync(supportEmail);
             setDialog({
               title: "Email Copied",
               message: "support@mark-x.app copied to your clipboard.",
@@ -181,7 +181,7 @@ export default function HelpScreen() {
             if (canOpen) {
               await Linking.openURL(mailtoUrl);
             } else {
-              await copyToClipboard(supportEmail);
+              await Clipboard.setStringAsync(supportEmail);
               setDialog({
                 title: "Mail App Unavailable",
                 message:

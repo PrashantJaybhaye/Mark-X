@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  getDocs,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -59,6 +58,62 @@ export async function syncCurrentDevice(
 }
 
 /**
+ * Updates the lastActive timestamp for the current device session.
+ */
+export async function touchDeviceHeartbeat(
+  userId: string,
+  deviceId: string
+): Promise<void> {
+  if (!userId || !deviceId || userId === "guest") return;
+  try {
+    const deviceRef = doc(db, "users", userId, "devices", deviceId);
+    await setDoc(deviceRef, { lastActive: serverTimestamp() }, { merge: true });
+  } catch (err) {
+    console.warn("[deviceSyncService] Failed to update heartbeat:", err);
+  }
+}
+
+/**
+ * Listens in real-time to the current device's session document in Firestore.
+ * If another device revokes this session (deleting the document), onRevoked() triggers immediately.
+ */
+export function listenCurrentDeviceRevocation(
+  userId: string,
+  deviceId: string,
+  onRevoked: () => void
+): () => void {
+  if (!userId || !deviceId || userId === "guest") {
+    return () => {};
+  }
+
+  try {
+    const deviceRef = doc(db, "users", userId, "devices", deviceId);
+    let hasInitialized = false;
+
+    return onSnapshot(
+      deviceRef,
+      (docSnap) => {
+        if (!hasInitialized) {
+          hasInitialized = true;
+          return;
+        }
+
+        if (!docSnap.exists()) {
+          console.warn("[deviceSyncService] Session revoked remotely from another device.");
+          onRevoked();
+        }
+      },
+      (error) => {
+        console.warn("[deviceSyncService] Error listening to device revocation:", error);
+      }
+    );
+  } catch (err) {
+    console.warn("[deviceSyncService] Exception setting up revocation listener:", err);
+    return () => {};
+  }
+}
+
+/**
  * Subscribes to real-time active devices in Firestore for the current user.
  */
 export function subscribeActiveDevices(
@@ -107,28 +162,6 @@ export async function removeActiveDevice(
   }
 }
 
-/**
- * Removes all other devices except the current active device from Firestore.
- */
-export async function removeAllOtherDevices(
-  userId: string,
-  currentDeviceId: string
-): Promise<void> {
-  if (!userId || userId === "guest") return;
-  try {
-    const devicesColRef = collection(db, "users", userId, "devices");
-    const snapshot = await getDocs(devicesColRef);
-    const deletePromises: Promise<void>[] = [];
-    snapshot.forEach((docSnap) => {
-      if (docSnap.id !== currentDeviceId) {
-        deletePromises.push(deleteDoc(docSnap.ref));
-      }
-    });
-    await Promise.all(deletePromises);
-  } catch (err) {
-    console.warn("[deviceSyncService] Failed to remove all other devices:", err);
-  }
-}
 
 /**
  * Formats a Firestore timestamp into a relative time string ("Active now", "15m ago", "Yesterday").
