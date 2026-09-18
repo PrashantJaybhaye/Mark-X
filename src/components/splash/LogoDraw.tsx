@@ -51,6 +51,11 @@ export function LogoDraw({
 }: LogoDrawProps) {
   const strokeProgress = useSharedValue(0);
   const fillOpacity = useSharedValue(0);
+  const onCompleteRef = React.useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     const drawDurationMs = drawDuration * 1000;
@@ -71,13 +76,13 @@ export function LogoDraw({
           easing: Easing.out(Easing.quad),
         },
         (finished) => {
-          if (finished && onComplete) {
-            runOnJS(onComplete)();
+          if (finished && onCompleteRef.current) {
+            runOnJS(onCompleteRef.current)();
           }
         }
       )
     );
-  }, [drawDuration, fillStartPercent, fillDuration, onComplete]);
+  }, [drawDuration, fillStartPercent, fillDuration]);
 
   const animatedStrokeProps = useAnimatedProps(() => ({
     strokeDashoffset: TOTAL_PATH_LENGTH * (1 - strokeProgress.value),

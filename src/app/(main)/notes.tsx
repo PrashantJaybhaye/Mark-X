@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { View, ScrollView, useWindowDimensions } from "react-native";
+import { View, ScrollView, useWindowDimensions, Platform, StatusBar as RNStatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
+import { useFocusEffect } from "expo-router";
 import Svg, {
   Defs,
   LinearGradient,
@@ -25,6 +26,15 @@ export default function NotesScreen() {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<NoteItem | null>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setStatusBarStyle("dark");
+      if (Platform.OS === "android") {
+        RNStatusBar.setBarStyle("dark-content");
+      }
+    }, [])
+  );
 
   // Hydrate notes on mount
   React.useEffect(() => {
@@ -60,11 +70,11 @@ export default function NotesScreen() {
     setIsEditModalOpen(true);
   };
 
-  const handleEditNote = (note: NoteItem) => {
+  const handleEditNote = React.useCallback((note: NoteItem) => {
     triggerHaptic();
     setSelectedNote(note);
     setIsEditModalOpen(true);
-  };
+  }, []);
 
   const handleSaveNote = (data: { id?: string; title: string; body: string; category: string; isPinned: boolean }) => {
     const formattedDate = new Date().toLocaleDateString("en-US", {

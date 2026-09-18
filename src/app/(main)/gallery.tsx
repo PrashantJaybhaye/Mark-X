@@ -5,10 +5,13 @@ import {
   ScrollView,
   Animated,
   useWindowDimensions,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 
 import { GalleryPin, INITIAL_GALLERY_PINS } from "../../utils/galleryData";
@@ -32,6 +35,15 @@ export default function GalleryScreen() {
   // Gallery state loaded from persistence
   const [pins, setPins] = useState<GalleryPin[]>(INITIAL_GALLERY_PINS);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setStatusBarStyle("dark");
+      if (Platform.OS === "android") {
+        RNStatusBar.setBarStyle("dark-content");
+      }
+    }, [])
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +71,14 @@ export default function GalleryScreen() {
   // Active Pin Modals
   const [selectedPin, setSelectedPin] = useState<GalleryPin | null>(null);
   const [optionsPin, setOptionsPin] = useState<GalleryPin | null>(null);
+
+  const handleSelectPin = React.useCallback((p: GalleryPin) => {
+    setSelectedPin(p);
+  }, []);
+
+  const handleOptionsPin = React.useCallback((p: GalleryPin) => {
+    setOptionsPin(p);
+  }, []);
 
   // Balance pins across 2 masonry columns based on dynamic height
   const { leftPins, rightPins } = useMemo(() => {
@@ -235,8 +255,8 @@ export default function GalleryScreen() {
                     key={pin.id}
                     pin={pin}
                     cardWidth={columnWidth}
-                    onPress={(p) => setSelectedPin(p)}
-                    onOptionsPress={(p) => setOptionsPin(p)}
+                    onPress={handleSelectPin}
+                    onOptionsPress={handleOptionsPin}
                   />
                 ))}
               </View>
@@ -248,8 +268,8 @@ export default function GalleryScreen() {
                     key={pin.id}
                     pin={pin}
                     cardWidth={columnWidth}
-                    onPress={(p) => setSelectedPin(p)}
-                    onOptionsPress={(p) => setOptionsPin(p)}
+                    onPress={handleSelectPin}
+                    onOptionsPress={handleOptionsPin}
                   />
                 ))}
               </View>

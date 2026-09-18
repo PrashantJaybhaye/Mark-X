@@ -3,13 +3,14 @@ import {
   Alert,
   Platform,
   ScrollView,
+  StatusBar as RNStatusBar,
   Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -27,14 +28,28 @@ export default function ProfileScreen() {
 
   const [isTogglingBiometrics, setIsTogglingBiometrics] = useState(false);
   const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
-
-  // Prevent multiple rapid clicks from pushing duplicate screens
+  const [isFocused, setIsFocused] = useState(false);
   const isNavigatingRef = React.useRef(false);
 
   useFocusEffect(
     React.useCallback(() => {
+      setIsFocused(true);
       isNavigatingRef.current = false;
-    }, [])
+      const targetStyle = isScrolledPastBanner ? "dark" : "light";
+      setStatusBarStyle(targetStyle);
+      if (Platform.OS === "android") {
+        RNStatusBar.setBarStyle(targetStyle === "dark" ? "dark-content" : "light-content");
+      }
+
+      return () => {
+        setIsFocused(false);
+        // ALWAYS restore to dark status bar when leaving Profile tab
+        setStatusBarStyle("dark");
+        if (Platform.OS === "android") {
+          RNStatusBar.setBarStyle("dark-content");
+        }
+      };
+    }, [isScrolledPastBanner])
   );
 
   const navigateSafely = React.useCallback(
@@ -101,7 +116,7 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      <StatusBar style={isScrolledPastBanner ? "dark" : "light"} />
+      {isFocused && <StatusBar style={isScrolledPastBanner ? "dark" : "light"} />}
 
       <ScrollView
         showsVerticalScrollIndicator={false}

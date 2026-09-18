@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, TouchableOpacity, ScrollView, Share } from "react-native";
+import { View, TouchableOpacity, ScrollView, Share, Platform, StatusBar as RNStatusBar } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 
 // Drive Components
 import { DriveHeader } from "../../components/drive/DriveHeader";
@@ -24,6 +25,15 @@ export default function DriveScreen() {
 
   // Files state initialized from storage
   const [files, setFiles] = useState<DriveItem[]>([]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setStatusBarStyle("dark");
+      if (Platform.OS === "android") {
+        RNStatusBar.setBarStyle("dark-content");
+      }
+    }, [])
+  );
 
   useEffect(() => {
     let isMounted = true;

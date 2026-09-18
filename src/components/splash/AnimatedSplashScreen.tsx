@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { StyleSheet, View, Text } from "react-native";
 import Animated, {
   useSharedValue,
@@ -32,17 +32,37 @@ export function AnimatedSplashScreen({
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
-  const handleDrawingComplete = () => {
+  // Reveal subtitle smoothly in sync with logo fill (starts at 750ms)
+  useEffect(() => {
+    subtitleOpacity.value = withDelay(
+      750,
+      withTiming(1, {
+        duration: 400,
+        easing: Easing.out(Easing.quad),
+      })
+    );
+  }, [subtitleOpacity]);
+
+  const handleDrawingComplete = useCallback(() => {
     setIsDrawingDone(true);
     subtitleOpacity.value = withTiming(1, {
-      duration: 280,
+      duration: 200,
       easing: Easing.out(Easing.quad),
     });
-  };
+  }, [subtitleOpacity]);
+
+  // Safety fallback timer: ensure drawing is marked done even if frame was dropped
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      setIsDrawingDone(true);
+    }, 1600);
+    return () => clearTimeout(fallbackTimer);
+  }, []);
 
   useEffect(() => {
     if (!isReady || !isDrawingDone) return;
 
+    // Comfortable dwell time (850ms) so users can clearly read both MARK-X and EXECUTIVE CLOUD
     const timeout = setTimeout(() => {
       triggerHaptic();
 
@@ -52,11 +72,11 @@ export function AnimatedSplashScreen({
       });
 
       opacity.value = withDelay(
-        40,
+        50,
         withTiming(
           0,
           {
-            duration: 340,
+            duration: 350,
             easing: Easing.bezier(0.25, 0.1, 0.25, 1),
           },
           (finished) => {
@@ -66,10 +86,10 @@ export function AnimatedSplashScreen({
           }
         )
       );
-    }, 500);
+    }, 850);
 
     return () => clearTimeout(timeout);
-  }, [isReady, isDrawingDone]);
+  }, [isReady, isDrawingDone, opacity, scale]);
 
   const animatedContainerStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -135,6 +155,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontFamily: "Outfit_700Bold",
+    fontWeight: "700",
     fontSize: 11.5,
     letterSpacing: 4.5,
     color: "#8E8E93",

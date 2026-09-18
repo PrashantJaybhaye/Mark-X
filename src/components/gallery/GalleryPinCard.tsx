@@ -13,7 +13,7 @@ interface GalleryPinCardProps {
   onOptionsPress: (pin: GalleryPin) => void;
 }
 
-export function GalleryPinCard({
+export const GalleryPinCard = React.memo(function GalleryPinCard({
   pin,
   cardWidth,
   onPress,
@@ -106,4 +106,5 @@ export function GalleryPinCard({
       </View>
     </View>
   );
-}
+});
+

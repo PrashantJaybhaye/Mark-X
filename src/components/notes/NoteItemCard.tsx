@@ -21,7 +21,7 @@ interface NoteItemCardProps {
   onOptionsPress?: (note: NoteItem) => void;
 }
 
-export function NoteItemCard({
+export const NoteItemCard = React.memo(function NoteItemCard({
   note,
   viewMode = "grid",
   onPress,
@@ -185,4 +185,5 @@ export function NoteItemCard({
       </View>
     </TouchableOpacity>
   );
-}
+});
+

@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import {
+  Platform,
   ScrollView,
+  StatusBar as RNStatusBar,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import Svg, {
@@ -76,7 +78,30 @@ export default function HomeScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      refreshCounts();
+      setStatusBarStyle("dark");
+      if (Platform.OS === "android") {
+        RNStatusBar.setBarStyle("dark-content");
+      }
+
+      let isMounted = true;
+      let idleId: number | undefined;
+
+      if (typeof requestIdleCallback !== "undefined") {
+        idleId = requestIdleCallback(() => {
+          if (isMounted) {
+            refreshCounts();
+          }
+        });
+      } else {
+        refreshCounts();
+      }
+
+      return () => {
+        isMounted = false;
+        if (idleId !== undefined && typeof cancelIdleCallback !== "undefined") {
+          cancelIdleCallback(idleId);
+        }
+      };
     }, [refreshCounts])
   );
 

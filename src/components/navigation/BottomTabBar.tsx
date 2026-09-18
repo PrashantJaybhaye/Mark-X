@@ -5,6 +5,14 @@ import { Image } from "expo-image";
 import { useAuth } from "../../context/AuthContext";
 import { triggerHaptic } from "../../utils/haptics";
 
+const ICON_HOME_ACTIVE = require("../../../assets/images/svg/active-home.svg");
+const ICON_HOME_INACTIVE = require("../../../assets/images/svg/home.svg");
+const ICON_GALLERY_ACTIVE = require("../../../assets/images/svg/active-gallery.png");
+const ICON_GALLERY_INACTIVE = require("../../../assets/images/svg/gallery.png");
+const ICON_NOTE_ACTIVE = require("../../../assets/images/svg/active-note.png");
+const ICON_NOTE_INACTIVE = require("../../../assets/images/svg/note.png");
+const DEFAULT_AVATAR = require("../../../assets/images/default-avatar.jpg");
+
 export type TabKey = "home" | "drive" | "gallery" | "notes" | "profile";
 
 interface BottomTabBarProps {
@@ -13,7 +21,7 @@ interface BottomTabBarProps {
   bottomInset: number;
 }
 
-export function BottomTabBar({
+export const BottomTabBar = React.memo(function BottomTabBar({
   activeTab,
   onTabChange,
   bottomInset,
@@ -21,8 +29,9 @@ export function BottomTabBar({
   const { user } = useAuth();
 
   const handleTabPress = (tab: TabKey) => {
-    triggerHaptic();
+    if (tab === activeTab) return;
     onTabChange(tab);
+    triggerHaptic();
   };
 
   const isHome = activeTab === "home";
@@ -44,11 +53,7 @@ export function BottomTabBar({
           className="flex-1 h-full items-center justify-center"
         >
           <Image
-            source={
-              isHome
-                ? require("../../../assets/images/svg/active-home.svg")
-                : require("../../../assets/images/svg/home.svg")
-            }
+            source={isHome ? ICON_HOME_ACTIVE : ICON_HOME_INACTIVE}
             style={{ width: 28, height: 28 }}
             tintColor={isHome ? "#111111" : "#8E8E93"}
             contentFit="contain"
@@ -75,11 +80,7 @@ export function BottomTabBar({
           className="flex-1 h-full items-center justify-center"
         >
           <Image
-            source={
-              isGallery
-                ? require("../../../assets/images/svg/active-gallery.png")
-                : require("../../../assets/images/svg/gallery.png")
-            }
+            source={isGallery ? ICON_GALLERY_ACTIVE : ICON_GALLERY_INACTIVE}
             style={{ width: 26, height: 26 }}
             tintColor={isGallery ? "#111111" : "#8E8E93"}
             contentFit="contain"
@@ -93,11 +94,7 @@ export function BottomTabBar({
           className="flex-1 h-full items-center justify-center"
         >
           <Image
-            source={
-              isNotes
-                ? require("../../../assets/images/svg/active-note.png")
-                : require("../../../assets/images/svg/note.png")
-            }
+            source={isNotes ? ICON_NOTE_ACTIVE : ICON_NOTE_INACTIVE}
             style={{ width: 28, height: 28 }}
             tintColor={isNotes ? "#111111" : "#8E8E93"}
             contentFit="contain"
@@ -119,7 +116,7 @@ export function BottomTabBar({
               source={
                 user?.photoURL || user?.providerData?.[0]?.photoURL
                   ? { uri: user?.photoURL || user?.providerData?.[0]?.photoURL! }
-                  : require("../../../assets/images/default-avatar.jpg")
+                  : DEFAULT_AVATAR
               }
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
@@ -129,4 +126,5 @@ export function BottomTabBar({
       </View>
     </View>
   );
-}
+});
+
