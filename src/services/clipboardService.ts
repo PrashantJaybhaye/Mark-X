@@ -36,26 +36,3 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   );
   return false;
 }
-
-export async function getClipboardString(): Promise<string> {
-  if (Platform.OS === "web" && typeof navigator !== "undefined" && navigator.clipboard?.readText) {
-    try {
-      return await navigator.clipboard.readText();
-    } catch {
-      return "";
-    }
-  }
-
-  const hasNativeClipboard = !!requireOptionalNativeModule("ExpoClipboard");
-  if (hasNativeClipboard) {
-    try {
-      const Clipboard = await import("expo-clipboard");
-      return await Clipboard.getStringAsync();
-    } catch (err) {
-      console.warn("[ClipboardService] Error reading from clipboard:", err);
-      return "";
-    }
-  }
-
-  return "";
-}

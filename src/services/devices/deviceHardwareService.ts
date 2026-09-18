@@ -1,6 +1,5 @@
 import { Platform } from "react-native";
 import * as Device from "expo-device";
-import * as Crypto from "expo-crypto";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DeviceType, HardwareInfo } from "../../types/device";
@@ -17,7 +16,10 @@ export async function getPersistentDeviceId(): Promise<string> {
       return existingId;
     }
 
-    const newId = Crypto.randomUUID();
+    const newId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     await AsyncStorage.setItem(INSTALLATION_ID_KEY, newId);
     return newId;
   } catch (err) {
