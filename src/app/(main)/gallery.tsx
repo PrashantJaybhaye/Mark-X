@@ -201,29 +201,27 @@ export default function GalleryScreen() {
             <MarkXLogo width={115} height={16} color="#111111" />
           </View>
 
-          {/* Right Actions: Refresh and Plus Buttons */}
-          <View className="flex-row items-center gap-2.5">
+          {/* Right Actions: Pill Container (Refresh & Add) */}
+          <View className="flex-row items-center bg-[#F0F2F4] border border-[#E5E7EB] rounded-full px-4 py-2 gap-4">
             {/* Refresh Button */}
             <TouchableOpacity
-              activeOpacity={0.75}
+              activeOpacity={0.7}
               onPress={handleRefreshPress}
               disabled={isRefreshing}
-              className="w-10 h-10 rounded-full bg-[#F0F2F4] items-center justify-center active:bg-[#E5E7EB]"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
               <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
-                <Ionicons name="refresh" size={20} color="#111111" />
+                <Ionicons name="refresh" size={19} color="#111111" />
               </Animated.View>
             </TouchableOpacity>
 
             {/* Plus Add Button */}
             <TouchableOpacity
-              activeOpacity={0.75}
+              activeOpacity={0.7}
               onPress={handleAddPhoto}
-              className="w-10 h-10 rounded-full bg-[#F0F2F4] items-center justify-center active:bg-[#E5E7EB]"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >
-              <Ionicons name="add" size={24} color="#111111" />
+              <Ionicons name="add" size={23} color="#111111" />
             </TouchableOpacity>
           </View>
         </View>

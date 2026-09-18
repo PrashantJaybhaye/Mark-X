@@ -1,4 +1,5 @@
 import React from "react";
+import { Easing } from "react-native";
 import { Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,7 +35,14 @@ export default function MainLayout() {
           headerShown: false,
           freezeOnBlur: false,
           lazy: false,
-          animation: "none",
+          animation: "shift",
+          transitionSpec: {
+            animation: "timing",
+            config: {
+              duration: 220,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+            },
+          },
         }}
       >
         <Tabs.Screen name="home" />

@@ -216,7 +216,7 @@ export default function DriveScreen() {
         />
       ) : (
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 80 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 30 }}
           showsVerticalScrollIndicator={false}
           bounces={false}
           alwaysBounceVertical={false}
