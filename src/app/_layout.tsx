@@ -20,7 +20,6 @@ import {
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
 import { Anton_400Regular } from "@expo-google-fonts/anton";
-import { BebasNeue_400Regular } from "@expo-google-fonts/bebas-neue";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
@@ -145,7 +144,6 @@ export default function RootLayout() {
     Outfit_800ExtraBold,
     Outfit_900Black,
     Anton_400Regular,
-    BebasNeue_400Regular,
   });
 
   const isFontsReady = !!(fontsLoaded || fontError);

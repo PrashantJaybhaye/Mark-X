@@ -1,9 +1,8 @@
 import React from "react";
-import { Easing } from "react-native";
-import { Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomTabBar, TabKey } from "../../components/navigation/BottomTabBar";
+import { SwipeableTabs } from "../../components/navigation/SwipeableTabNavigator";
 
 export default function MainLayout() {
   const insets = useSafeAreaInsets();
@@ -29,28 +28,18 @@ export default function MainLayout() {
   return (
     <>
       <StatusBar style="dark" />
-      <Tabs
+      <SwipeableTabs
         tabBar={renderTabBar}
         screenOptions={{
           headerShown: false,
-          freezeOnBlur: false,
-          lazy: false,
-          animation: "shift",
-          transitionSpec: {
-            animation: "timing",
-            config: {
-              duration: 220,
-              easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-            },
-          },
         }}
       >
-        <Tabs.Screen name="home" />
-        <Tabs.Screen name="drive" />
-        <Tabs.Screen name="gallery" />
-        <Tabs.Screen name="notes" />
-        <Tabs.Screen name="profile" />
-      </Tabs>
+        <SwipeableTabs.Screen name="home" />
+        <SwipeableTabs.Screen name="drive" />
+        <SwipeableTabs.Screen name="gallery" />
+        <SwipeableTabs.Screen name="notes" />
+        <SwipeableTabs.Screen name="profile" />
+      </SwipeableTabs>
     </>
   );
 }

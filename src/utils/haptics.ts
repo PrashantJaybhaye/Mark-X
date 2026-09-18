@@ -13,3 +13,14 @@ export async function triggerHaptic(
     Vibration.vibrate(Platform.OS === "android" ? 15 : 10);
   }
 }
+
+/**
+ * Triggers an ultra-crisp, subtle selection tick (ideal for tab swipes and pickers).
+ */
+export async function triggerSelectionHaptic(): Promise<void> {
+  try {
+    await Haptics.selectionAsync();
+  } catch {
+    Vibration.vibrate(Platform.OS === "android" ? 6 : 4);
+  }
+}

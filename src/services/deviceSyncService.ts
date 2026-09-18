@@ -131,18 +131,12 @@ export async function removeAllOtherDevices(
 }
 
 /**
- * Formats a Firestore timestamp into a relative time string ("Active now", "15m ago", "2h ago").
+ * Formats a Firestore timestamp into a relative time string ("Active now", "15m ago", "Yesterday").
  */
 export function formatDeviceActivity(timestamp: any): string {
   if (!timestamp) return "Active recently";
-
   try {
-    const millis = timestamp?.toMillis
-      ? timestamp.toMillis()
-      : typeof timestamp === "number"
-      ? timestamp
-      : new Date(timestamp).getTime();
-
+    const millis = timestamp?.toMillis ? timestamp.toMillis() : Number(new Date(timestamp));
     if (isNaN(millis)) return "Active recently";
 
     const diffSec = Math.floor((Date.now() - millis) / 1000);
@@ -158,10 +152,7 @@ export function formatDeviceActivity(timestamp: any): string {
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
 
-    return new Date(millis).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return new Date(millis).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   } catch {
     return "Active recently";
   }

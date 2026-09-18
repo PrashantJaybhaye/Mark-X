@@ -16,10 +16,7 @@ export async function getPersistentDeviceId(): Promise<string> {
       return existingId;
     }
 
-    const newId =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const newId = crypto.randomUUID();
     await AsyncStorage.setItem(INSTALLATION_ID_KEY, newId);
     return newId;
   } catch (err) {

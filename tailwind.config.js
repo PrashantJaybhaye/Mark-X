@@ -12,7 +12,6 @@ module.exports = {
         "outfit-extrabold": ["Outfit_800ExtraBold"],
         "outfit-black": ["Outfit_900Black"],
         anton: ["Anton_400Regular"],
-        bebas: ["BebasNeue_400Regular"],
       },
     },
   },
