@@ -142,40 +142,10 @@ export async function authenticateWithBiometrics(options?: {
       result.error === "app_cancel" ||
       result.error === "system_cancel";
 
-    let readableError = "Authentication failed.";
-    switch (result.error) {
-      case "user_cancel":
-      case "app_cancel":
-      case "system_cancel":
-        readableError = "Authentication was cancelled.";
-        break;
-      case "lockout":
-        readableError = "Too many failed attempts. Please use your device passcode.";
-        break;
-      case "not_enrolled":
-        readableError = "No biometric credentials enrolled on this device.";
-        break;
-      case "passcode_not_set":
-        readableError = "No device passcode or PIN is set on this device.";
-        break;
-      case "timeout":
-        readableError = "Authentication timed out. Tap to retry.";
-        break;
-      case "authentication_failed":
-        readableError = "Biometric not recognized. Please try again.";
-        break;
-      case "user_fallback":
-        readableError = "Device passcode requested.";
-        break;
-      default:
-        readableError = result.warning || "Biometric authentication was unsuccessful.";
-        break;
-    }
-
     return {
       success: false,
       cancelled: isCancelled,
-      error: readableError,
+      error: result.warning || result.error || "Biometric authentication was unsuccessful.",
     };
   } catch (error: any) {
     console.warn("[BiometricsService] Authentication error:", error);

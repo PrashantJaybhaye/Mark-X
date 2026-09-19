@@ -44,15 +44,11 @@ export async function uploadFileToTelegram(
     const result = JSON.parse(response.body);
     
     if (result.ok) {
-      // Extract file_id depending on type
-      let fileId = "";
-      if (isPhoto && result.result.photo) {
-        // Telegram returns an array of photo sizes. The last one is the largest.
-        const photos = result.result.photo;
-        fileId = photos[photos.length - 1].file_id;
-      } else if (result.result.document) {
-        fileId = result.result.document.file_id;
-      } else {
+      const fileId = isPhoto 
+        ? result.result.photo?.at(-1)?.file_id 
+        : result.result.document?.file_id;
+        
+      if (!fileId) {
         return { success: false, error: "Unknown response format from Telegram" };
       }
       return { success: true, fileId };
@@ -78,7 +74,6 @@ export async function getTelegramFileUrl(fileId: string): Promise<string | null>
 
     if (result.ok && result.result.file_path) {
       const url = `${FILE_BASE}/${result.result.file_path}`;
-      console.log("☁️ [Telegram Cloud URL Fetched]:", url);
       return url;
     }
     return null;

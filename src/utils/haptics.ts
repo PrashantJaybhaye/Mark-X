@@ -7,20 +7,12 @@ import { Platform, Vibration } from "react-native";
 export async function triggerHaptic(
   style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light
 ): Promise<void> {
-  try {
-    await Haptics.impactAsync(style);
-  } catch {
-    Vibration.vibrate(Platform.OS === "android" ? 15 : 10);
-  }
+  await Haptics.impactAsync(style);
 }
 
 /**
  * Triggers an ultra-crisp, subtle selection tick (ideal for tab swipes and pickers).
  */
 export async function triggerSelectionHaptic(): Promise<void> {
-  try {
-    await Haptics.selectionAsync();
-  } catch {
-    Vibration.vibrate(Platform.OS === "android" ? 6 : 4);
-  }
+  await Haptics.selectionAsync();
 }

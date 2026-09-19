@@ -80,20 +80,42 @@ async function updateStats(updates: Partial<UserPreferences["stats"]>) {
     updateUserMetadata(auth.currentUser.uid, { stats: newStats }).catch(console.warn);
   }
 }
+async function recalculateTotalStorage(galleryCount: number, driveItems: DriveItem[]) {
+  const driveSizeMB = driveItems.reduce((acc, item) => {
+    if (!item.size) return acc + 1.2;
+    const num = parseFloat(item.size);
+    return isNaN(num) ? acc + 1.0 : acc + num;
+  }, 0);
+  return parseFloat(((driveSizeMB + galleryCount * 2.5) / 1024).toFixed(2));
+}
+export const forceSyncAllStats = async () => {
+  try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return false;
+
+    // Pull directly from the user's Firestore metadata document
+    const { getUserMetadata } = await import("./userService");
+    const metadata = await getUserMetadata(uid);
+
+    if (metadata && metadata.stats) {
+      const currentPrefs = await loadUserPreferences();
+      await saveUserPreferences({ ...currentPrefs, stats: metadata.stats });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("[StorageService] Failed to pull stats from Firestore:", error);
+    return false;
+  }
+};
 
 export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITEMS, []);
 export const saveDriveItems = async (items: DriveItem[]) => {
   await saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
   
-  const driveSizeMB = items.reduce((acc, item) => {
-    if (!item.size) return acc + 1.2;
-    const num = parseFloat(item.size);
-    return isNaN(num) ? acc + 1.0 : acc + num;
-  }, 0);
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
-  const gallerySizeMB = currentStats.galleryCount * 2.5;
-  const totalGB = parseFloat(((driveSizeMB + gallerySizeMB) / 1024).toFixed(2));
+  const totalGB = await recalculateTotalStorage(currentStats.galleryCount, items);
   
   await updateStats({ driveCount: items.length, usedStorageGB: totalGB });
 };
@@ -104,16 +126,8 @@ export const updateGalleryStats = async (delta: number) => {
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
   const newCount = Math.max(0, currentStats.galleryCount + delta);
   
-  const gallerySizeMB = newCount * 2.5;
-  
   const driveItems = await loadDriveItems();
-  const driveSizeMB = driveItems.reduce((acc, item) => {
-    if (!item.size) return acc + 1.2;
-    const num = parseFloat(item.size);
-    return isNaN(num) ? acc + 1.0 : acc + num;
-  }, 0);
-  
-  const totalGB = parseFloat(((driveSizeMB + gallerySizeMB) / 1024).toFixed(2));
+  const totalGB = await recalculateTotalStorage(newCount, driveItems);
   await updateStats({ galleryCount: newCount, usedStorageGB: totalGB });
 };
 

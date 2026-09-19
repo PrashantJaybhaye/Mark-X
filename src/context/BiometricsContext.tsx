@@ -46,16 +46,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
   const lastBackgroundTime = useRef<number | null>(null);
   const isAuthenticatingRef = useRef<boolean>(false);
 
-  // Synchronized refs for AppState listener to avoid recreating listeners on every state change
-  const biometricsEnabledRef = useRef(isBiometricsEnabled);
-  const lockTimeoutRef = useRef(lockTimeoutMinutes);
-  const userRef = useRef(user);
 
-  useEffect(() => {
-    biometricsEnabledRef.current = isBiometricsEnabled;
-    lockTimeoutRef.current = lockTimeoutMinutes;
-    userRef.current = user;
-  }, [isBiometricsEnabled, lockTimeoutMinutes, user]);
 
   const refreshCapability = async () => {
     const cap = await checkBiometricsCapability();
@@ -111,11 +102,11 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       } else if (nextAppState === "active") {
         if (
           lastBackgroundTime.current !== null &&
-          biometricsEnabledRef.current &&
-          userRef.current
+          isBiometricsEnabled &&
+          user
         ) {
           const elapsedMinutes = (Date.now() - lastBackgroundTime.current) / (1000 * 60);
-          if (elapsedMinutes >= lockTimeoutRef.current) {
+          if (elapsedMinutes >= lockTimeoutMinutes) {
             setIsLockedState(true);
           }
         }
@@ -127,7 +118,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [isBiometricsEnabled, lockTimeoutMinutes, user]);
 
   const unlockApp = async (): Promise<BiometricAuthResult> => {
     if (!capability?.hasHardware || !capability?.isEnrolled) {
