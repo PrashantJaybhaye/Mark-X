@@ -2,14 +2,12 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { Image } from "expo-image";
@@ -21,6 +19,7 @@ import { updateProfile } from "firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import * as Clipboard from "expo-clipboard";
+import { IosDialog } from "../../components/common/IosDialog";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../services/firebase";
 import { safePickImage } from "../../services/nativePickerService";
@@ -75,103 +74,6 @@ function ProfileItemRow({
   );
 }
 
-// ================= AUTHENTIC IOS ALERT MODAL =================
-interface IOSDialogProps {
-  visible: boolean;
-  onClose: () => void;
-  title: string;
-  message: string;
-  confirmText: string;
-  confirmColor?: string;
-  onConfirm: () => void;
-  isLoading?: boolean;
-  children?: React.ReactNode;
-}
-
-function IOSDialog({
-  visible,
-  onClose,
-  title,
-  message,
-  confirmText,
-  confirmColor = "#007AFF",
-  onConfirm,
-  isLoading = false,
-  children,
-}: IOSDialogProps) {
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/40 items-center justify-center px-8">
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-              <View className="pt-5 px-4 pb-3 items-center">
-                <Text
-                  className="text-[17px] text-[#000000] text-center mb-1.5"
-                  style={{ fontFamily: "Outfit_600SemiBold" }}
-                >
-                  {title}
-                </Text>
-                <Text
-                  className="text-[13px] text-[#3C3C43] text-center leading-5 mb-3"
-                  style={{ fontFamily: "Outfit_400Regular" }}
-                >
-                  {message}
-                </Text>
-                {children}
-              </View>
-
-              <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-              <View className="flex-row h-[44px]">
-                <TouchableOpacity
-                  onPress={() => {
-                    triggerHaptic();
-                    onClose();
-                  }}
-                  activeOpacity={0.7}
-                  disabled={isLoading}
-                  className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                >
-                  <Text
-                    className="text-[17px] text-[#007AFF]"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={onConfirm}
-                  activeOpacity={0.7}
-                  disabled={isLoading}
-                  className="flex-1 items-center justify-center active:bg-black/5"
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color={confirmColor} />
-                  ) : (
-                    <Text
-                      className="text-[17px]"
-                      style={{ fontFamily: "Outfit_600SemiBold", color: confirmColor }}
-                    >
-                      {confirmText}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-}
-
 // ================= REUSABLE FIELD INPUT MODAL =================
 interface InputDialogProps {
   visible: boolean;
@@ -203,15 +105,15 @@ function InputDialog({
   isLoading,
 }: InputDialogProps) {
   return (
-    <IOSDialog
+    <IosDialog
       visible={visible}
       onClose={onClose}
       title={title}
       message={message}
-      confirmText="Save"
-      confirmColor="#007AFF"
-      onConfirm={onConfirm}
-      isLoading={isLoading}
+      actions={[
+        { text: "Cancel", style: "cancel", onPress: onClose },
+        { text: "Save", style: "default", bold: true, loading: isLoading, onPress: onConfirm },
+      ]}
     >
       <View className="w-full bg-white rounded-lg px-3 py-2 border border-[#3C3C43]/20">
         <Text
@@ -242,7 +144,7 @@ function InputDialog({
           />
         </View>
       </View>
-    </IOSDialog>
+    </IosDialog>
   );
 }
 
@@ -682,14 +584,15 @@ export default function PersonalInfoScreen() {
       />
 
       {/* Remove Photo Confirmation Modal */}
-      <IOSDialog
+      <IosDialog
         visible={activeModal === "remove_photo"}
         onClose={() => setActiveModal(null)}
         title="Remove Photo"
         message="Are you sure you want to remove your custom profile photo?"
-        confirmText="Remove"
-        confirmColor="#E00B41"
-        onConfirm={handleConfirmRemovePhoto}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveModal(null) },
+          { text: "Remove", style: "destructive", bold: true, onPress: handleConfirmRemovePhoto },
+        ]}
       />
     </View>
   );

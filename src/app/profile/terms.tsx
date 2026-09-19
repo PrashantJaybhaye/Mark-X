@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import {
-  Modal,
   Platform,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -15,24 +13,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Clipboard from "expo-clipboard";
+import { IosDialog, IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
-
-interface IosDialogButton {
-  text: string;
-  style?: "default" | "cancel" | "destructive";
-  onPress: () => void;
-}
-
-interface IosDialogState {
-  title: string;
-  message: string;
-  buttons: IosDialogButton[];
-}
 
 export default function TermsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [dialog, setDialog] = useState<IosDialogState | null>(null);
+  const [dialog, setDialog] = useState<{ title: string; message: string; actions?: IosDialogAction[] } | null>(null);
 
   const topInset = Math.max(
     insets.top,
@@ -54,13 +41,7 @@ export default function TermsScreen() {
     setDialog({
       title: "Link Copied",
       message: "The official terms link has been copied to your clipboard.",
-      buttons: [
-        {
-          text: "OK",
-          style: "default",
-          onPress: () => setDialog(null),
-        },
-      ],
+      actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
     });
   };
 
@@ -68,29 +49,19 @@ export default function TermsScreen() {
     triggerHaptic();
     setDialog({
       title: "Contact Team",
-      message:
-        "Have questions about your data, privacy, or security? Reach out directly to support@mark-x.app.",
-      buttons: [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => setDialog(null),
-        },
+      message: "Have questions about your data, privacy, or security? Reach out directly to support@mark-x.app.",
+      actions: [
+        { text: "Cancel", style: "cancel", onPress: () => setDialog(null) },
         {
           text: "Copy Email",
           style: "default",
+          bold: true,
           onPress: async () => {
             await Clipboard.setStringAsync("support@mark-x.app");
             setDialog({
               title: "Email Copied",
               message: "support@mark-x.app copied to clipboard.",
-              buttons: [
-                {
-                  text: "OK",
-                  style: "default",
-                  onPress: () => setDialog(null),
-                },
-              ],
+              actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
             });
           },
         },
@@ -361,106 +332,13 @@ export default function TermsScreen() {
         </View>
       </ScrollView>
 
-      {/* iOS Modal Dialog for Dialog Actions */}
-      <Modal
+      <IosDialog
         visible={dialog !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDialog(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setDialog(null)}>
-          <View className="flex-1 bg-black/40 items-center justify-center px-8">
-            <TouchableWithoutFeedback>
-              <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                {/* Content Area */}
-                <View className="pt-5 px-4 pb-4 items-center">
-                  <Text
-                    className="text-[17px] text-[#000000] text-center mb-1.5"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    {dialog?.title}
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#3C3C43] text-center leading-5"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    {dialog?.message}
-                  </Text>
-                </View>
-
-                {/* Hairline Divider */}
-                <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                {/* Action Buttons */}
-                {dialog && dialog.buttons.length === 2 ? (
-                  <View className="flex-row h-[44px]">
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        dialog.buttons[0].onPress();
-                      }}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                    >
-                      <Text
-                        className="text-[17px] text-[#007AFF]"
-                        style={{
-                          fontFamily:
-                            dialog.buttons[0].style === "cancel"
-                              ? "Outfit_400Regular"
-                              : "Outfit_600SemiBold",
-                        }}
-                      >
-                        {dialog.buttons[0].text}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        dialog.buttons[1].onPress();
-                      }}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center active:bg-black/5"
-                    >
-                      <Text
-                        className={`text-[17px] ${
-                          dialog.buttons[1].style === "destructive"
-                            ? "text-[#FF3B30]"
-                            : "text-[#007AFF]"
-                        }`}
-                        style={{
-                          fontFamily:
-                            dialog.buttons[1].style === "cancel"
-                              ? "Outfit_400Regular"
-                              : "Outfit_600SemiBold",
-                        }}
-                      >
-                        {dialog.buttons[1].text}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : dialog && dialog.buttons.length === 1 ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      dialog.buttons[0].onPress();
-                    }}
-                    activeOpacity={0.7}
-                    className="h-[44px] items-center justify-center active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#007AFF]"
-                      style={{ fontFamily: "Outfit_600SemiBold" }}
-                    >
-                      {dialog.buttons[0].text}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        title={dialog?.title || ""}
+        message={dialog?.message}
+        actions={dialog?.actions}
+        onClose={() => setDialog(null)}
+      />
     </View>
   );
 }

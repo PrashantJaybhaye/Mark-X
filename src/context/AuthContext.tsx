@@ -28,13 +28,11 @@ import {
 import { auth } from "../services/firebase";
 import { syncUserMetadata } from "../services/userService";
 import {
-  getPersistentDeviceId,
-  getHardwareInfo,
-} from "../services/devices/deviceHardwareService";
-import {
   syncCurrentDevice,
   listenCurrentDeviceRevocation,
   touchDeviceHeartbeat,
+  getPersistentDeviceId,
+  getHardwareInfo,
 } from "../services/deviceSyncService";
 
 if (Platform.OS !== "web") {

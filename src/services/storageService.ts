@@ -72,6 +72,22 @@ export const saveGalleryPins = (pins: GalleryPin[]) => saveItem(STORAGE_KEYS.GAL
 export const loadNotes = () => loadItem<NoteItem[]>(STORAGE_KEYS.NOTES, []);
 export const saveNotes = (notes: NoteItem[]) => saveItem(STORAGE_KEYS.NOTES, notes);
 
+export const getNoteById = async (id: string): Promise<NoteItem | null> => {
+  const notes = await loadNotes();
+  return notes.find((n) => n.id === id) ?? null;
+};
+
+export const saveSingleNote = async (note: NoteItem): Promise<void> => {
+  const notes = await loadNotes();
+  const idx = notes.findIndex((n) => n.id === note.id);
+  idx >= 0 ? (notes[idx] = note) : notes.unshift(note);
+  await saveNotes(notes);
+};
+
+export const deleteNoteById = async (id: string): Promise<void> => {
+  await saveNotes((await loadNotes()).filter((n) => n.id !== id));
+};
+
 // User Preferences
 export const loadUserPreferences = () =>
   loadItem<UserPreferences>(STORAGE_KEYS.USER_PREFERENCES, {

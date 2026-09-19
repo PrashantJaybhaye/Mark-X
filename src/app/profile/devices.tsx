@@ -19,8 +19,6 @@ import {
   getFormattedDeviceLabel,
   getHardwareInfo,
   getPersistentDeviceId,
-} from "../../services/devices/deviceHardwareService";
-import {
   formatDeviceActivity,
   FirestoreDevice,
   removeActiveDevice,

@@ -2,12 +2,15 @@ import React from "react";
 import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
 import * as Haptics from "expo-haptics";
 import { triggerHaptic } from "../../utils/haptics";
+import { NoteItem } from "./NoteItemCard";
 
 interface NotesStackedBannerProps {
+  notes?: NoteItem[];
   onPress?: () => void;
+  onNotePress?: (note: NoteItem) => void;
 }
 
-export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
+export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesStackedBannerProps) {
   const { width: screenWidth } = useWindowDimensions();
 
   const handlePress = () => {

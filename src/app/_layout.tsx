@@ -53,6 +53,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
     const inAuthGroup = segments[0] === "(auth)";
     const inMainGroup = segments[0] === "(main)";
     const isProfileGroup = segments[0] === "profile";
+    const isNoteGroup = segments[0] === "note";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
     const isOnboarding = !segments[0];
 
@@ -60,7 +61,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
       if (!isMounted) return;
 
       if (!user) {
-        if (inMainGroup || isProfileGroup || isVerifyScreen) {
+        if (inMainGroup || isProfileGroup || isNoteGroup || isVerifyScreen) {
           router.replace("/(auth)/login");
         } else {
           markDecisionComplete();
@@ -128,6 +129,7 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(main)" />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="note" />
         </Stack>
         <BiometricLockGate />
       </ThemeProvider>

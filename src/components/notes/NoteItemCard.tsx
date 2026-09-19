@@ -8,7 +8,6 @@ export interface NoteItem {
   id: string;
   title: string;
   body?: string;
-  category?: string;
   iconName?: keyof typeof Ionicons.glyphMap;
   createdAt: string;
   isPinned?: boolean;
@@ -48,10 +47,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
         onPress={handlePress}
         className="w-full bg-white rounded-[22px] p-4 mb-3 border border-black/[0.05] shadow-xs flex-row items-center justify-between"
       >
-        {/* Left: Tonal Icon Capsule */}
-        <View className="w-11 h-11 rounded-2xl bg-[#F6F7F9] border border-black/[0.03] items-center justify-center mr-3.5">
-          <Ionicons name={iconName} size={20} color="#3E140A" />
-        </View>
 
         {/* Center: Title, Body, and Timestamp */}
         <View className="flex-1 mr-3 justify-center">
@@ -66,9 +61,9 @@ export const NoteItemCard = React.memo(function NoteItemCard({
             </Text>
             {note.isPinned && (
               <Ionicons
-                name="pin"
+                name="bookmark-sharp"
                 size={13}
-                color="#EB5B49"
+                color="#E5A93C"
                 style={{ marginLeft: 4 }}
               />
             )}
@@ -86,17 +81,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
           ) : null}
 
           <View className="flex-row items-center">
-            {note.category ? (
-              <View className="bg-[#F6F7F9] px-2 py-0.5 rounded-full mr-2">
-                <Text
-                  allowFontScaling={false}
-                  className="text-[10px] text-[#4B5563]"
-                  style={{ fontFamily: "Outfit_500Medium" }}
-                >
-                  {note.category}
-                </Text>
-              </View>
-            ) : null}
             <Text
               allowFontScaling={false}
               className="text-[11px] text-[#9CA3AF]"
@@ -127,26 +111,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
       onPress={handlePress}
       className="w-full bg-white rounded-[24px] p-4 mb-3.5 border border-black/[0.05] shadow-sm shadow-black/[0.03] justify-between min-h-[160px]"
     >
-      {/* Top Row: Category tag and subtle floating icon badge */}
-      <View className="flex-row items-center justify-between w-full mb-3">
-        {note.category ? (
-          <View className="bg-[#F6F7F9] px-2.5 py-1 rounded-full border border-black/[0.03]">
-            <Text
-              allowFontScaling={false}
-              className="text-[11px] text-[#4B5563]"
-              style={{ fontFamily: "Outfit_500Medium" }}
-            >
-              {note.category}
-            </Text>
-          </View>
-        ) : (
-          <View />
-        )}
-
-        <View className="w-8 h-8 rounded-full bg-[#F6F7F9] items-center justify-center border border-black/[0.03]">
-          <Ionicons name={iconName} size={15} color="#3E140A" />
-        </View>
-      </View>
 
       {/* Middle Content: Clean typography */}
       <View className="flex-1 justify-start">
@@ -154,7 +118,7 @@ export const NoteItemCard = React.memo(function NoteItemCard({
           allowFontScaling={false}
           className="text-[16px] text-[#111111] leading-[22px] tracking-tight mb-1.5"
           style={{ fontFamily: "Outfit_600SemiBold" }}
-          numberOfLines={3}
+          numberOfLines={1}
         >
           {note.title}
         </Text>
@@ -180,7 +144,7 @@ export const NoteItemCard = React.memo(function NoteItemCard({
           {note.createdAt}
         </Text>
         {note.isPinned && (
-          <Ionicons name="pin" size={12} color="#EB5B49" />
+          <Ionicons name="bookmark-sharp" size={13} color="#E5A93C" />
         )}
       </View>
     </TouchableOpacity>

@@ -8,8 +8,64 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { HardwareInfo } from "../types/device";
-import { getFormattedDeviceLabel } from "./devices/deviceHardwareService";
+import { Platform } from "react-native";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DeviceType, HardwareInfo } from "../types/device";
+
+const INSTALLATION_ID_KEY = "@markx_installation_device_id";
+
+export async function getPersistentDeviceId(): Promise<string> {
+  try {
+    const existingId = await AsyncStorage.getItem(INSTALLATION_ID_KEY);
+    if (existingId) return existingId;
+    const newId = crypto.randomUUID();
+    await AsyncStorage.setItem(INSTALLATION_ID_KEY, newId);
+    return newId;
+  } catch (err) {
+    console.warn("[deviceSyncService] Error accessing device ID:", err);
+    return "markx-default-device-id";
+  }
+}
+
+function resolveDeviceType(): DeviceType {
+  if (Platform.OS === "web") return "browser";
+  if (Device.deviceType === Device.DeviceType.TABLET) return "tablet";
+  if (Device.deviceType === Device.DeviceType.DESKTOP) return "desktop";
+  return "phone";
+}
+
+export function getHardwareInfo(): HardwareInfo {
+  const brand = Device.brand || Platform.select({ ios: "Apple", android: "Android", default: "Generic" });
+  const manufacturer = Device.manufacturer || brand;
+  const modelName = Device.modelName || Platform.select({ ios: "iPhone", android: "Android Device", default: "Web Client" });
+  const deviceName = Device.deviceName || modelName;
+  const osName = Device.osName || Platform.select({ ios: "iOS", android: "Android", default: "Web" });
+  const osVersion = Device.osVersion || (Platform.Version ? String(Platform.Version) : "1.0");
+
+  return {
+    brand,
+    manufacturer,
+    modelName,
+    deviceName,
+    deviceType: resolveDeviceType(),
+    osName,
+    osVersion,
+    apiLevel: Device.platformApiLevel ?? null,
+    appVersion: Constants.expoConfig?.version || "1.0.0",
+    cpuArchitectures: Device.supportedCpuArchitectures || [Platform.OS === "android" ? "arm64-v8a" : "arm64"],
+    isPhysical: Device.isDevice ?? (Platform.OS !== "web"),
+  };
+}
+
+export function getFormattedDeviceLabel(info: HardwareInfo): string {
+  if (info.deviceName && info.deviceName !== info.modelName) return info.deviceName;
+  if (info.brand && info.modelName && !info.modelName.toLowerCase().startsWith(info.brand.toLowerCase())) {
+    return `${info.brand} ${info.modelName}`;
+  }
+  return info.modelName || "My Device";
+}
 
 export interface FirestoreDevice {
   deviceId: string;

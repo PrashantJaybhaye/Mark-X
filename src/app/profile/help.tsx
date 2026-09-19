@@ -1,13 +1,11 @@
 import React, { useState } from "react";
 import {
   Linking,
-  Modal,
   Platform,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -16,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import * as Clipboard from "expo-clipboard";
+import { IosDialog, IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
 
 interface FAQItem {
@@ -28,18 +27,6 @@ interface TopicItem {
   id: string;
   title: string;
   description: string;
-}
-
-interface IosDialogButton {
-  text: string;
-  style?: "default" | "cancel" | "destructive";
-  onPress: () => void;
-}
-
-interface IosDialogState {
-  title: string;
-  message: string;
-  buttons: IosDialogButton[];
 }
 
 const FAQS: FAQItem[] = [
@@ -93,7 +80,7 @@ const TOPICS: TopicItem[] = [
 export default function HelpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [dialog, setDialog] = useState<IosDialogState | null>(null);
+  const [dialog, setDialog] = useState<{ title: string; message: string; actions?: IosDialogAction[] } | null>(null);
 
   const topInset = Math.max(
     insets.top,
@@ -114,13 +101,7 @@ export default function HelpScreen() {
     setDialog({
       title: faq.question,
       message: faq.answer,
-      buttons: [
-        {
-          text: "OK",
-          style: "default",
-          onPress: () => setDialog(null),
-        },
-      ],
+      actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
     });
   };
 
@@ -129,13 +110,7 @@ export default function HelpScreen() {
     setDialog({
       title: topic.title,
       message: topic.description,
-      buttons: [
-        {
-          text: "OK",
-          style: "default",
-          onPress: () => setDialog(null),
-        },
-      ],
+      actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
     });
   };
 
@@ -146,14 +121,9 @@ export default function HelpScreen() {
 
     setDialog({
       title: "Contact Support",
-      message:
-        "Our team typically responds within a few hours. How would you like to get in touch?",
-      buttons: [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => setDialog(null),
-        },
+      message: "Our team typically responds within a few hours. How would you like to get in touch?",
+      actions: [
+        { text: "Cancel", style: "cancel", onPress: () => setDialog(null) },
         {
           text: "Copy Email",
           style: "default",
@@ -162,19 +132,14 @@ export default function HelpScreen() {
             setDialog({
               title: "Email Copied",
               message: "support@mark-x.app copied to your clipboard.",
-              buttons: [
-                {
-                  text: "OK",
-                  style: "default",
-                  onPress: () => setDialog(null),
-                },
-              ],
+              actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
             });
           },
         },
         {
           text: "Open Mail",
           style: "default",
+          bold: true,
           onPress: async () => {
             setDialog(null);
             const canOpen = await Linking.canOpenURL(mailtoUrl);
@@ -184,15 +149,8 @@ export default function HelpScreen() {
               await Clipboard.setStringAsync(supportEmail);
               setDialog({
                 title: "Mail App Unavailable",
-                message:
-                  "No default mail client found. We copied support@mark-x.app to your clipboard.",
-                buttons: [
-                  {
-                    text: "OK",
-                    style: "default",
-                    onPress: () => setDialog(null),
-                  },
-                ],
+                message: "No default mail client found. We copied support@mark-x.app to your clipboard.",
+                actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
               });
             }
           },
@@ -352,140 +310,13 @@ export default function HelpScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Authentic iOS Alert Modal Dialog */}
-      <Modal
+      <IosDialog
         visible={dialog !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDialog(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setDialog(null)}>
-          <View className="flex-1 bg-black/40 items-center justify-center px-8">
-            <TouchableWithoutFeedback>
-              <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                {/* Content Area */}
-                <View className="pt-5 px-4 pb-4 items-center">
-                  <Text
-                    className="text-[17px] text-[#000000] text-center mb-1.5"
-                    style={{ fontFamily: "Outfit_600SemiBold" }}
-                  >
-                    {dialog?.title}
-                  </Text>
-                  <Text
-                    className="text-[13px] text-[#3C3C43] text-center leading-5"
-                    style={{ fontFamily: "Outfit_400Regular" }}
-                  >
-                    {dialog?.message}
-                  </Text>
-                </View>
-
-                {/* Hairline Divider */}
-                <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                {/* Action Buttons */}
-                {dialog && dialog.buttons.length > 2 ? (
-                  <View>
-                    {dialog.buttons.map((btn, index) => (
-                      <View key={btn.text}>
-                        {index > 0 ? (
-                          <View className="h-[0.5px] bg-[#3C3C43]/20" />
-                        ) : null}
-                        <TouchableOpacity
-                          onPress={() => {
-                            triggerHaptic();
-                            btn.onPress();
-                          }}
-                          activeOpacity={0.7}
-                          className="h-[44px] items-center justify-center active:bg-black/5"
-                        >
-                          <Text
-                            className={`text-[17px] ${
-                              btn.style === "destructive"
-                                ? "text-[#FF3B30]"
-                                : "text-[#007AFF]"
-                            }`}
-                            style={{
-                              fontFamily:
-                                btn.style === "cancel"
-                                  ? "Outfit_400Regular"
-                                  : "Outfit_600SemiBold",
-                            }}
-                          >
-                            {btn.text}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                ) : dialog && dialog.buttons.length === 2 ? (
-                  <View className="flex-row h-[44px]">
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        dialog.buttons[0].onPress();
-                      }}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                    >
-                      <Text
-                        className="text-[17px] text-[#007AFF]"
-                        style={{
-                          fontFamily:
-                            dialog.buttons[0].style === "cancel"
-                              ? "Outfit_400Regular"
-                              : "Outfit_600SemiBold",
-                        }}
-                      >
-                        {dialog.buttons[0].text}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        dialog.buttons[1].onPress();
-                      }}
-                      activeOpacity={0.7}
-                      className="flex-1 items-center justify-center active:bg-black/5"
-                    >
-                      <Text
-                        className={`text-[17px] ${
-                          dialog.buttons[1].style === "destructive"
-                            ? "text-[#FF3B30]"
-                            : "text-[#007AFF]"
-                        }`}
-                        style={{
-                          fontFamily:
-                            dialog.buttons[1].style === "cancel"
-                              ? "Outfit_400Regular"
-                              : "Outfit_600SemiBold",
-                        }}
-                      >
-                        {dialog.buttons[1].text}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : dialog && dialog.buttons.length === 1 ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerHaptic();
-                      dialog.buttons[0].onPress();
-                    }}
-                    activeOpacity={0.7}
-                    className="h-[44px] items-center justify-center active:bg-black/5"
-                  >
-                    <Text
-                      className="text-[17px] text-[#007AFF]"
-                      style={{ fontFamily: "Outfit_600SemiBold" }}
-                    >
-                      {dialog.buttons[0].text}
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        title={dialog?.title || ""}
+        message={dialog?.message}
+        actions={dialog?.actions}
+        onClose={() => setDialog(null)}
+      />
     </View>
   );
 }

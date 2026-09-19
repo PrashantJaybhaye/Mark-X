@@ -2,23 +2,21 @@ import React, { useState, useMemo } from "react";
 import { View, ScrollView, useWindowDimensions, Platform, StatusBar as RNStatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { NotesHeader, NoteViewMode } from "../../components/notes/NotesHeader";
 import { NotesStackedBanner } from "../../components/notes/NotesStackedBanner";
 import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
 import { NotesEmptyState } from "../../components/notes/NotesEmptyState";
-import { NoteEditModal } from "../../components/notes/NoteEditModal";
 import { triggerHaptic } from "../../utils/haptics";
 import { loadNotes, saveNotes } from "../../services/storageService";
 
 export default function NotesScreen() {
+  const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
   const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedNote, setSelectedNote] = useState<NoteItem | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -26,6 +24,8 @@ export default function NotesScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
+      // Reload notes every time screen comes into focus (catches deletions/edits)
+      loadNotes().then((stored) => setNotes(stored ?? []));
     }, [])
   );
 
@@ -59,55 +59,24 @@ export default function NotesScreen() {
 
   const handleAddNote = () => {
     triggerHaptic();
-    setSelectedNote(null);
-    setIsEditModalOpen(true);
+    router.push({
+      pathname: "/note/[id]",
+      params: { id: "new" },
+    });
   };
 
   const handleEditNote = React.useCallback((note: NoteItem) => {
     triggerHaptic();
-    setSelectedNote(note);
-    setIsEditModalOpen(true);
-  }, []);
-
-  const handleSaveNote = (data: { id?: string; title: string; body: string; category: string; isPinned: boolean }) => {
-    const formattedDate = new Date().toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
+    router.push({
+      pathname: "/note/[id]",
+      params: { id: note.id },
     });
+  }, [router]);
 
-    if (data.id) {
-      // Update existing
-      updateNotesAndPersist((prev) =>
-        prev.map((n) =>
-          n.id === data.id
-            ? {
-                ...n,
-                title: data.title,
-                body: data.body,
-                category: data.category,
-                isPinned: data.isPinned,
-                createdAt: `Edited ${formattedDate}`,
-              }
-            : n
-        )
-      );
-    } else {
-      // Create new
-      const newNote: NoteItem = {
-        id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        title: data.title,
-        body: data.body,
-        category: data.category,
-        isPinned: data.isPinned,
-        createdAt: formattedDate,
-      };
-      updateNotesAndPersist((prev) => [newNote, ...prev]);
-    }
-  };
-
-  const handleDeleteNote = (id: string) => {
-    updateNotesAndPersist((prev) => prev.filter((n) => n.id !== id));
-  };
+  const handleDeleteNote = React.useCallback((note: NoteItem) => {
+    triggerHaptic();
+    updateNotesAndPersist((prev) => prev.filter((n) => n.id !== note.id));
+  }, []);
 
   // Filter notes by search query if user searches
   const filteredNotes = useMemo(() => {
@@ -155,7 +124,7 @@ export default function NotesScreen() {
           }}
         >
           {/* 1. Stacked Cards Banner */}
-          <NotesStackedBanner onPress={handleAddNote} />
+          <NotesStackedBanner notes={notes} onPress={handleAddNote} onNotePress={handleEditNote} />
 
           {/* 2. Bottom Notes Area (Grid & List View Modes) */}
           <View className="px-5 pt-1">
@@ -178,6 +147,7 @@ export default function NotesScreen() {
                       note={note}
                       viewMode="grid"
                       onPress={handleEditNote}
+                      onOptionsPress={handleDeleteNote}
                     />
                   ))}
                 </View>
@@ -190,6 +160,7 @@ export default function NotesScreen() {
                       note={note}
                       viewMode="grid"
                       onPress={handleEditNote}
+                      onOptionsPress={handleDeleteNote}
                     />
                   ))}
                 </View>
@@ -203,6 +174,7 @@ export default function NotesScreen() {
                     note={note}
                     viewMode="list"
                     onPress={handleEditNote}
+                    onOptionsPress={handleDeleteNote}
                   />
                 ))}
               </View>
@@ -210,15 +182,6 @@ export default function NotesScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
-
-      {/* Interactive Note Creation / Edit Modal */}
-      <NoteEditModal
-        visible={isEditModalOpen}
-        note={selectedNote}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSaveNote}
-        onDelete={handleDeleteNote}
-      />
     </View>
   );
 }
