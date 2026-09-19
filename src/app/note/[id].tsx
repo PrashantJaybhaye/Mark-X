@@ -37,24 +37,57 @@ const BLOCK_TYPOGRAPHY: Record<string, { fontFamily: string; fontSize: number; l
   paragraph: { fontFamily: "Outfit_400Regular", fontSize: 15, lineHeight: 20, color: "#27272A", includeFontPadding: false },
 };
 
-function renderInlineContent(text: string, baseStyle: any) {
-  if (!text) return null;
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|<u>[^<]+<\/u>)/g);
-  if (parts.length <= 1) return text;
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-      return <Text key={i} style={[baseStyle, { fontFamily: "Outfit_700Bold", fontWeight: "700" }]}>{part.slice(2, -2)}</Text>;
+export interface FormatRange {
+  type: "bold" | "italic" | "underline" | "strikethrough";
+  start: number;
+  length: number;
+}
+
+function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
+  if (!formats || formats.length === 0) return <Text allowFontScaling={false} style={baseStyle}>{text}</Text>;
+  
+  const charFormats = Array.from({ length: text.length }, () => new Set<string>());
+  for (const f of formats) {
+    for (let i = f.start; i < f.start + f.length; i++) {
+      if (i < text.length) charFormats[i].add(f.type);
     }
-    if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
-      return <Text key={i} style={[baseStyle, { fontStyle: "italic" }]}>{part.slice(1, -1)}</Text>;
+  }
+
+  const chunks: { text: string; formats: Set<string> }[] = [];
+  let currentText = "";
+  let currentFormats = new Set<string>();
+
+  for (let i = 0; i <= text.length; i++) {
+    const formatsAtI = i < text.length ? charFormats[i] : new Set<string>();
+    
+    let changed = false;
+    if (formatsAtI.size !== currentFormats.size) changed = true;
+    else {
+      for (const f of currentFormats) {
+        if (!formatsAtI.has(f)) { changed = true; break; }
+      }
     }
-    if (part.startsWith("~~") && part.endsWith("~~") && part.length > 4) {
-      return <Text key={i} style={[baseStyle, { textDecorationLine: "line-through" }]}>{part.slice(2, -2)}</Text>;
+
+    if (changed || i === text.length) {
+      if (currentText.length > 0) chunks.push({ text: currentText, formats: currentFormats });
+      if (i < text.length) {
+        currentText = text[i];
+        currentFormats = formatsAtI;
+      }
+    } else {
+      if (i < text.length) currentText += text[i];
     }
-    if (part.startsWith("<u>") && part.endsWith("</u>") && part.length > 7) {
-      return <Text key={i} style={[baseStyle, { textDecorationLine: "underline" }]}>{part.slice(3, -4)}</Text>;
-    }
-    return part;
+  }
+
+  return chunks.map((chunk, i) => {
+    const style: any = { ...baseStyle };
+    if (chunk.formats.has("bold")) { style.fontFamily = "Outfit_700Bold"; style.fontWeight = "bold"; }
+    if (chunk.formats.has("italic")) style.fontStyle = "italic";
+    const decs = [];
+    if (chunk.formats.has("underline")) decs.push("underline");
+    if (chunk.formats.has("strikethrough")) decs.push("line-through");
+    if (decs.length > 0) style.textDecorationLine = decs.join(" ");
+    return <Text allowFontScaling={false} key={i} style={style}>{chunk.text}</Text>;
   });
 }
 
@@ -65,34 +98,78 @@ export interface NoteBlock {
   type: BlockType;
   text: string;
   checked?: boolean;
-  bold?: boolean;
-  italic?: boolean;
-  underline?: boolean;
-  strikethrough?: boolean;
+  formats?: FormatRange[];
 }
 
 function parseFormattedText(rawText: string) {
-  let text = rawText;
-  let bold = false, italic = false, underline = false, strikethrough = false;
-  let changed = true;
-  while (changed) {
-    changed = false;
-    const t = text.trim();
-    if (t.startsWith("<u>") && t.endsWith("</u>") && t.length >= 7) { underline = true; text = t.slice(3, -4); changed = true; }
-    if (t.startsWith("~~") && t.endsWith("~~") && t.length >= 4) { strikethrough = true; text = t.slice(2, -2); changed = true; }
-    if (t.startsWith("**") && t.endsWith("**") && t.length >= 4) { bold = true; text = t.slice(2, -2); changed = true; }
-    if (t.startsWith("*") && t.endsWith("*") && t.length >= 2) { italic = true; text = t.slice(1, -1); changed = true; }
+  let text = "";
+  const formats: FormatRange[] = [];
+  const parts = rawText.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|<u>[^<]+<\/u>)/g);
+  
+  for (const part of parts) {
+    if (!part) continue;
+    let type: "bold" | "italic" | "underline" | "strikethrough" | null = null;
+    let content = part;
+    
+    if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) { type = "bold"; content = part.slice(2, -2); }
+    else if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) { type = "strikethrough"; content = part.slice(2, -2); }
+    else if (part.startsWith("<u>") && part.endsWith("</u>") && part.length >= 7) { type = "underline"; content = part.slice(3, -4); }
+    else if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) { type = "italic"; content = part.slice(1, -1); }
+
+    if (type) {
+      formats.push({ type, start: text.length, length: content.length });
+    }
+    text += content;
   }
-  return { text, bold, italic, underline, strikethrough };
+  
+  return { text, formats };
 }
 
 function formatBlockText(block: NoteBlock): string {
-  let text = block.text;
-  if (block.bold) text = `**${text}**`;
-  if (block.italic) text = `*${text}*`;
-  if (block.strikethrough) text = `~~${text}~~`;
-  if (block.underline) text = `<u>${text}</u>`;
-  return text;
+  if (!block.formats || block.formats.length === 0) return block.text;
+  
+  const charFormats = Array.from({ length: block.text.length }, () => new Set<string>());
+  for (const f of block.formats) {
+    for (let i = f.start; i < f.start + f.length; i++) {
+      if (i < block.text.length) charFormats[i].add(f.type);
+    }
+  }
+
+  const chunks: { text: string; formats: Set<string> }[] = [];
+  let currentText = "";
+  let currentFormats = new Set<string>();
+
+  for (let i = 0; i <= block.text.length; i++) {
+    const formatsAtI = i < block.text.length ? charFormats[i] : new Set<string>();
+    let changed = false;
+    if (formatsAtI.size !== currentFormats.size) changed = true;
+    else {
+      for (const f of currentFormats) {
+        if (!formatsAtI.has(f)) { changed = true; break; }
+      }
+    }
+
+    if (changed || i === block.text.length) {
+      if (currentText.length > 0) chunks.push({ text: currentText, formats: currentFormats });
+      if (i < block.text.length) {
+        currentText = block.text[i];
+        currentFormats = formatsAtI;
+      }
+    } else {
+      if (i < block.text.length) currentText += block.text[i];
+    }
+  }
+
+  let result = "";
+  for (const chunk of chunks) {
+    let chunkStr = chunk.text;
+    if (chunk.formats.has("bold")) chunkStr = `**${chunkStr}**`;
+    if (chunk.formats.has("italic")) chunkStr = `*${chunkStr}*`;
+    if (chunk.formats.has("underline")) chunkStr = `<u>${chunkStr}</u>`;
+    if (chunk.formats.has("strikethrough")) chunkStr = `~~${chunkStr}~~`;
+    result += chunkStr;
+  }
+  return result;
 }
 
 function parseBodyToBlocks(raw: string): NoteBlock[] {
@@ -127,8 +204,8 @@ function parseBodyToBlocks(raw: string): NoteBlock[] {
       }
     }
 
-    const { text, bold, italic, underline, strikethrough } = parseFormattedText(content);
-    return { id, type: blockType, text, checked, bold: bold || undefined, italic: italic || undefined, underline: underline || undefined, strikethrough: strikethrough || undefined };
+    const { text, formats } = parseFormattedText(content);
+    return { id, type: blockType, text, checked, formats };
   });
 }
 
@@ -171,6 +248,7 @@ export default function NoteDetailScreen() {
   const [showFormatSheet, setShowFormatSheet] = useState(false);
   const [selectedTextStyle, setSelectedTextStyle] = useState("Body");
   const [activeFormats, setActiveFormats] = useState<{ [key: string]: boolean }>({});
+  const [activeSelection, setActiveSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
 
   const [activeDialog, setActiveDialog] = useState<"delete" | "more" | "unsaved" | null>(null);
 
@@ -208,17 +286,23 @@ export default function NoteDetailScreen() {
         cur.type === "title" ? "Title" : cur.type === "heading" ? "Heading" : cur.type === "subheading" ? "Subheading" : "Body";
       setSelectedTextStyle((prev) => (prev !== nextStyle ? nextStyle : prev));
       setActiveFormats((prev) => {
-        const b = !!cur.bold;
-        const it = !!cur.italic;
-        const u = !!cur.underline;
-        const s = !!cur.strikethrough;
+        let b = false, it = false, u = false, s = false;
+        if (cur.formats) {
+          const { start, end } = activeSelection;
+          const pos = Math.min(start, end);
+          const formatsAtCursor = cur.formats.filter((f) => f.start <= pos && f.start + f.length >= pos);
+          b = formatsAtCursor.some(f => f.type === "bold");
+          it = formatsAtCursor.some(f => f.type === "italic");
+          u = formatsAtCursor.some(f => f.type === "underline");
+          s = formatsAtCursor.some(f => f.type === "strikethrough");
+        }
         if (prev.bold === b && prev.italic === it && prev.underline === u && prev.strikethrough === s) {
           return prev;
         }
         return { bold: b, italic: it, underline: u, strikethrough: s };
       });
     }
-  }, [activeBlockIndex, blocks]);
+  }, [activeBlockIndex, blocks, activeSelection]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) => setKeyboardHeight(e.endCoordinates.height));
@@ -423,9 +507,34 @@ export default function NoteDetailScreen() {
         updated[activeBlockIndex] = { ...cur, type: cur.type === listType ? "paragraph" : listType };
       } else if (["bold", "italic", "underline", "strikethrough"].includes(type)) {
         const key = type as "bold" | "italic" | "underline" | "strikethrough";
-        const nextVal = !cur[key];
-        updated[activeBlockIndex] = { ...cur, [key]: nextVal || undefined };
-        setActiveFormats((p) => ({ ...p, [key]: nextVal }));
+        
+        const { start, end } = activeSelection;
+        const selStart = Math.min(start, end);
+        const selEnd = Math.max(start, end);
+        
+        if (selStart !== selEnd) {
+          const length = selEnd - selStart;
+          const formats = cur.formats ? [...cur.formats] : [];
+          const isFullyFormatted = formats.some(f => f.type === key && f.start <= selStart && f.start + f.length >= selEnd);
+          
+          if (isFullyFormatted) {
+            const newFormats = [];
+            for (const f of formats) {
+              if (f.type === key && f.start < selEnd && f.start + f.length > selStart) {
+                if (f.start < selStart) newFormats.push({ type: key, start: f.start, length: selStart - f.start });
+                if (f.start + f.length > selEnd) newFormats.push({ type: key, start: selEnd, length: (f.start + f.length) - selEnd });
+              } else {
+                newFormats.push(f);
+              }
+            }
+            updated[activeBlockIndex] = { ...cur, formats: newFormats };
+          } else {
+            formats.push({ type: key, start: selStart, length });
+            updated[activeBlockIndex] = { ...cur, formats };
+          }
+        } else {
+          setActiveFormats((p) => ({ ...p, [key]: !p[key] }));
+        }
       } else if (type === "marker") {
         updated[activeBlockIndex] = { ...cur, text: cur.text ? `✍️ ${cur.text}` : "✍️ " };
       } else if (type === "color") {
@@ -475,10 +584,7 @@ export default function NoteDetailScreen() {
           type: nextType,
           text: partText,
           checked: false,
-          bold: cur.bold,
-          italic: cur.italic,
-          underline: cur.underline,
-          strikethrough: cur.strikethrough,
+          formats: [],
         }));
 
         updateBlocksAndSave((prev) => {
@@ -500,10 +606,7 @@ export default function NoteDetailScreen() {
         type: nextType,
         text: nextText,
         checked: false,
-        bold: cur.bold,
-        italic: cur.italic,
-        underline: cur.underline,
-        strikethrough: cur.strikethrough,
+        formats: [],
       };
 
       updateBlocksAndSave((prev) => {
@@ -520,7 +623,57 @@ export default function NoteDetailScreen() {
 
     updateBlocksAndSave((prev) => {
       const updated = [...prev];
-      if (updated[index]) updated[index] = { ...updated[index], text };
+      if (updated[index]) {
+        const cur = updated[index];
+        const oldText = cur.text;
+        
+        let start = 0;
+        while (start < oldText.length && start < text.length && oldText[start] === text[start]) start++;
+        let oldEnd = oldText.length - 1;
+        let newEnd = text.length - 1;
+        while (oldEnd >= start && newEnd >= start && oldText[oldEnd] === text[newEnd]) {
+          oldEnd--; newEnd--;
+        }
+        
+        const removedLen = oldEnd - start + 1;
+        const addedLen = newEnd - start + 1;
+        const delta = addedLen - removedLen;
+
+        const newFormats = (cur.formats || []).map(f => {
+          let fStart = f.start;
+          let fEnd = f.start + f.length;
+
+          if (start < fStart) {
+            fStart += delta;
+            fEnd += delta;
+          } else if (start >= fEnd) {
+            // no change
+          } else {
+            if (addedLen > 0 && removedLen === 0) {
+              fEnd += addedLen;
+            } else if (removedLen > 0) {
+              const overlapStart = Math.max(start, fStart);
+              const overlapEnd = Math.min(start + removedLen, fEnd);
+              const overlap = Math.max(0, overlapEnd - overlapStart);
+              fEnd -= overlap;
+              if (start < fStart) {
+                 fStart -= Math.min(fStart - start, removedLen);
+              }
+            }
+          }
+          return { ...f, start: fStart, length: fEnd - fStart };
+        }).filter(f => f.length > 0);
+
+        if (addedLen > 0 && activeSelection.start === activeSelection.end && start === activeSelection.start) {
+          Object.keys(activeFormats).forEach(key => {
+            if (activeFormats[key]) {
+              newFormats.push({ type: key as any, start, length: addedLen });
+            }
+          });
+        }
+
+        updated[index] = { ...cur, text, formats: newFormats };
+      }
       return updated;
     });
   };
@@ -699,11 +852,8 @@ export default function NoteDetailScreen() {
               const isNumbered = block.type === "numbered";
 
               const fontStyle: any = { ...(BLOCK_TYPOGRAPHY[block.type] || BLOCK_TYPOGRAPHY.paragraph) };
-              if (block.bold) { fontStyle.fontFamily = "Outfit_700Bold"; fontStyle.fontWeight = "bold"; }
-              if (block.italic) fontStyle.fontStyle = "italic";
               const decs: string[] = [];
-              if (block.underline) decs.push("underline");
-              if (block.strikethrough || (isTodo && block.checked)) decs.push("line-through");
+              if (isTodo && block.checked) decs.push("line-through");
               if (decs.length > 0) fontStyle.textDecorationLine = decs.join(" ");
               if (isTodo && block.checked) fontStyle.color = "#8E8E93";
 
@@ -771,7 +921,9 @@ export default function NoteDetailScreen() {
                           el.focus();
                         }
                       }}
-                      value={block.text}
+                      onSelectionChange={(e) => {
+                        setActiveSelection({ start: e.nativeEvent.selection.start, end: e.nativeEvent.selection.end });
+                      }}
                       onFocus={() => { setIsEditing(true); setActiveBlockIndex(index); }}
                       onChangeText={(val) => handleBlockChangeText(block.id, index, val)}
                       onKeyPress={(e) => handleKeyPress(index, e)}
@@ -793,7 +945,9 @@ export default function NoteDetailScreen() {
                         },
                         fontStyle,
                       ]}
-                    />
+                    >
+                      {renderRichText(block.text, block.formats || [], fontStyle)}
+                    </TextInput>
                   ) : (
                     <Pressable
                       onPress={() => {
@@ -806,7 +960,7 @@ export default function NoteDetailScreen() {
                       {block.text.trim() === "" ? (
                         <Text allowFontScaling={false} style={[fontStyle, { color: "#C7C7CC" }]}>{placeholder}</Text>
                       ) : (
-                        <Text allowFontScaling={false} style={fontStyle}>{renderInlineContent(block.text, fontStyle)}</Text>
+                        <Text allowFontScaling={false} style={fontStyle}>{renderRichText(block.text, block.formats || [], fontStyle)}</Text>
                       )}
                     </Pressable>
                   )}

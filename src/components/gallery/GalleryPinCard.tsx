@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Animated } from "react-native";
+import { getTelegramFileUrl } from "../../services/telegramStorage";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -43,6 +44,20 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     }
   }, [isLoaded, pulseAnim]);
 
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (pin.telegramFileId) {
+      getTelegramFileUrl(pin.telegramFileId).then((url) => {
+        if (isMounted && url) setRemoteUrl(url);
+      });
+    }
+    return () => { isMounted = false; };
+  }, [pin.telegramFileId]);
+
+  const displayUrl = remoteUrl || pin.imageUrl;
+
   // Compute dynamic height based on aspect ratio (e.g. 0.58 -> tall, 1.1 -> wide)
   const imageHeight = Math.min(Math.max(cardWidth / pin.aspectRatio, 120), 320);
 
@@ -73,7 +88,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         )}
 
         <Image
-          source={{ uri: pin.imageUrl }}
+          source={{ uri: displayUrl }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           transition={250}

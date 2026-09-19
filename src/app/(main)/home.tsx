@@ -33,12 +33,13 @@ import { triggerHaptic } from "../../utils/haptics";
 import {
   loadDriveItems,
   saveDriveItems,
-  loadGalleryPins,
-  saveGalleryPins,
-  loadNotes,
+  loadUserPreferences,
 } from "../../services/storageService";
+import { addGalleryPinToFirestore } from "../../services/galleryFirebaseService";
+import { uploadFileToTelegram } from "../../services/telegramStorage";
 import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
 import { GalleryPin } from "../../utils/galleryData";
+import { generateUUID } from "../../utils/uuid";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -52,25 +53,18 @@ export default function HomeScreen() {
 
   const refreshCounts = React.useCallback(async () => {
     try {
-      const [driveItems, galleryPins, notes] = await Promise.all([
-        loadDriveItems(),
-        loadGalleryPins(),
-        loadNotes(),
-      ]);
+      const prefs = await loadUserPreferences();
+      const stats = prefs.stats || {
+        notesCount: 0,
+        galleryCount: 0,
+        driveCount: 0,
+        usedStorageGB: 0,
+      };
 
-      setDocsCount(driveItems.length);
-      setGalleryCount(galleryPins.length);
-      setNotesCount(notes.length);
-
-      // Approximate storage calculation in GB
-      const driveSizeMB = driveItems.reduce((acc, item) => {
-        if (!item.size) return acc + 1.2;
-        const num = parseFloat(item.size);
-        return isNaN(num) ? acc + 1.0 : acc + num;
-      }, 0);
-      const gallerySizeMB = galleryPins.length * 2.5;
-      const totalGB = ((driveSizeMB + gallerySizeMB) / 1024).toFixed(2);
-      setUsedStorage(totalGB);
+      setDocsCount(stats.driveCount);
+      setGalleryCount(stats.galleryCount);
+      setNotesCount(stats.notesCount);
+      setUsedStorage(stats.usedStorageGB.toFixed(2));
     } catch (err) {
       console.warn("[HomeScreen] Could not refresh metrics:", err);
     }
@@ -130,7 +124,7 @@ export default function HomeScreen() {
     const img = await safePickImage();
     if (img && img.uri) {
       const newPin: GalleryPin = {
-        id: `pin-${Date.now()}`,
+        id: `pin-${generateUUID()}`,
         title: img.fileName || "Captured photo",
         author: "You",
         imageUrl: img.uri,
@@ -140,8 +134,20 @@ export default function HomeScreen() {
         isLiked: true,
         saved: true,
       };
-      const existing = await loadGalleryPins();
-      await saveGalleryPins([newPin, ...existing]);
+      
+      // Save metadata to Firestore
+      await addGalleryPinToFirestore(newPin);
+      
+      // Upload physical file to Telegram in background
+      uploadFileToTelegram(img.uri, img.mimeType || "image/jpeg", img.fileName || "photo.jpg", true).then(res => {
+        if (res.success && res.fileId) {
+          // Update Firestore doc with the telegram file ID
+          import("../../services/galleryFirebaseService").then(m => {
+            m.updateGalleryPinInFirestore(newPin.id, { telegramFileId: res.fileId });
+          });
+        }
+      });
+      
       await refreshCounts();
     }
   };

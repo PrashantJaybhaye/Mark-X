@@ -85,13 +85,18 @@ export function BiometricLockGate() {
 
   return (
     <>
-      <Modal
-        visible={isLocked}
-        animationType="none"
-        transparent={false}
-        statusBarTranslucent
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99998,
+          elevation: 99998,
+        }}
+        className="bg-black"
       >
-        <View className="flex-1 bg-black">
           <StatusBar style="dark" />
 
           {/* Floating White Sheet */}
@@ -204,8 +209,7 @@ export function BiometricLockGate() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+      </View>
 
       {/* Center iOS Alert Dialog */}
       <IosDialog

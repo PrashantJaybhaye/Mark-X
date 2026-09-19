@@ -14,6 +14,12 @@ const STORAGE_KEYS = {
 export interface UserPreferences {
   isBiometricsEnabled?: boolean;
   lockTimeoutMinutes?: number; // 0 = immediately upon leaving app, 1, 5, 15 minutes
+  stats?: {
+    notesCount: number;
+    galleryCount: number;
+    driveCount: number;
+    usedStorageGB: number;
+  };
 }
 
 /**
@@ -61,16 +67,62 @@ async function saveItem<T>(baseKey: string, value: T): Promise<void> {
 }
 
 // Drive Items
+
+import { updateUserMetadata } from "./userService";
+
+async function updateStats(updates: Partial<UserPreferences["stats"]>) {
+  const current = await loadUserPreferences();
+  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
+  const newStats = { ...currentStats, ...updates };
+  await saveUserPreferences({ stats: newStats });
+  
+  if (auth.currentUser?.uid) {
+    updateUserMetadata(auth.currentUser.uid, { stats: newStats }).catch(console.warn);
+  }
+}
+
 export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITEMS, []);
-export const saveDriveItems = (items: DriveItem[]) => saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
+export const saveDriveItems = async (items: DriveItem[]) => {
+  await saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
+  
+  const driveSizeMB = items.reduce((acc, item) => {
+    if (!item.size) return acc + 1.2;
+    const num = parseFloat(item.size);
+    return isNaN(num) ? acc + 1.0 : acc + num;
+  }, 0);
+  const current = await loadUserPreferences();
+  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
+  const gallerySizeMB = currentStats.galleryCount * 2.5;
+  const totalGB = parseFloat(((driveSizeMB + gallerySizeMB) / 1024).toFixed(2));
+  
+  await updateStats({ driveCount: items.length, usedStorageGB: totalGB });
+};
 
 // Gallery Pins
-export const loadGalleryPins = () => loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
-export const saveGalleryPins = (pins: GalleryPin[]) => saveItem(STORAGE_KEYS.GALLERY_PINS, pins);
+export const updateGalleryStats = async (delta: number) => {
+  const current = await loadUserPreferences();
+  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
+  const newCount = Math.max(0, currentStats.galleryCount + delta);
+  
+  const gallerySizeMB = newCount * 2.5;
+  
+  const driveItems = await loadDriveItems();
+  const driveSizeMB = driveItems.reduce((acc, item) => {
+    if (!item.size) return acc + 1.2;
+    const num = parseFloat(item.size);
+    return isNaN(num) ? acc + 1.0 : acc + num;
+  }, 0);
+  
+  const totalGB = parseFloat(((driveSizeMB + gallerySizeMB) / 1024).toFixed(2));
+  await updateStats({ galleryCount: newCount, usedStorageGB: totalGB });
+};
 
 // Notes
 export const loadNotes = () => loadItem<NoteItem[]>(STORAGE_KEYS.NOTES, []);
-export const saveNotes = (notes: NoteItem[]) => saveItem(STORAGE_KEYS.NOTES, notes);
+export const saveNotes = async (notes: NoteItem[]) => {
+  await saveItem(STORAGE_KEYS.NOTES, notes);
+  await updateStats({ notesCount: notes.length });
+};
 
 export const getNoteById = async (id: string): Promise<NoteItem | null> => {
   const notes = await loadNotes();

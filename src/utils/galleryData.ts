@@ -5,6 +5,7 @@ export interface GalleryPin {
   author: string;
   authorAvatar?: string;
   imageUrl: string;
+  telegramFileId?: string;
   aspectRatio: number; // width / height (e.g. 0.65 to 1.3)
   category: string;
   likes: number;

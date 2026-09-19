@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { IosDialog } from "../../components/common/IosDialog";
 import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
@@ -27,7 +28,12 @@ export default function ProfileScreen() {
   const { isBiometricsEnabled, setBiometricsEnabled, capability } = useBiometrics();
 
   const [isTogglingBiometrics, setIsTogglingBiometrics] = useState(false);
-  const [isScrolledPastBanner, setIsScrolledPastBanner] = useState(false);
+  const [dialogState, setDialogState] = useState<{
+    visible: boolean;
+    title: string;
+    message?: string;
+  }>({ visible: false, title: "" });
+
   const [isFocused, setIsFocused] = useState(false);
   const isNavigatingRef = React.useRef(false);
 
@@ -35,10 +41,9 @@ export default function ProfileScreen() {
     React.useCallback(() => {
       setIsFocused(true);
       isNavigatingRef.current = false;
-      const targetStyle = isScrolledPastBanner ? "dark" : "light";
-      setStatusBarStyle(targetStyle);
+      setStatusBarStyle("dark");
       if (Platform.OS === "android") {
-        RNStatusBar.setBarStyle(targetStyle === "dark" ? "dark-content" : "light-content");
+        RNStatusBar.setBarStyle("dark-content");
       }
 
       return () => {
@@ -49,7 +54,7 @@ export default function ProfileScreen() {
           RNStatusBar.setBarStyle("dark-content");
         }
       };
-    }, [isScrolledPastBanner])
+    }, [])
   );
 
   const navigateSafely = React.useCallback(
@@ -79,12 +84,13 @@ export default function ProfileScreen() {
     triggerHaptic();
 
     if (val && (!capability?.hasHardware || !capability?.isEnrolled)) {
-      Alert.alert(
-        "Biometrics Unavailable",
-        !capability?.hasHardware
+      setDialogState({
+        visible: true,
+        title: "Biometrics Unavailable",
+        message: !capability?.hasHardware
           ? "Your device does not appear to support biometric hardware."
           : "No biometric credentials enrolled. Please register your fingerprint or face in device Settings first."
-      );
+      });
       return;
     }
 
@@ -93,13 +99,18 @@ export default function ProfileScreen() {
       const result = await setBiometricsEnabled(val);
       if (!result.success) {
         if (result.error && result.error !== "Authentication cancelled.") {
-          Alert.alert("Verification Failed", result.error);
+          setDialogState({
+            visible: true,
+            title: "Verification Failed",
+            message: result.error
+          });
         }
       } else if (val) {
-        Alert.alert(
-          "Biometric Lock Active",
-          `Mark-X is now secured with ${capability?.sensorName || "device biometrics"}.`
-        );
+        setDialogState({
+          visible: true,
+          title: "Biometric Lock Active",
+          message: `Mark-X is now secured with ${capability?.sensorName || "device biometrics"}.`
+        });
       }
     } finally {
       setIsTogglingBiometrics(false);
@@ -116,16 +127,12 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      {isFocused && <StatusBar style={isScrolledPastBanner ? "dark" : "light"} />}
+      {isFocused && <StatusBar style="dark" />}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEventThrottle={16}
-        onScroll={(e) => {
-          const y = e.nativeEvent.contentOffset.y;
-          setIsScrolledPastBanner(y > 100);
-        }}
       >
         {/* City Skyline Banner */}
         <View className="w-full h-[180px] relative">
@@ -152,14 +159,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               onPress={handleAvatarPress}
               activeOpacity={0.85}
-              className="w-[104px] h-[104px] rounded-full overflow-hidden border-[4px] border-white bg-[#C6F043]"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.12,
-                shadowRadius: 8,
-                elevation: 4,
-              }}
+              className="w-[104px] h-[104px] rounded-full overflow-hidden border-[4px] border-white bg-[#000000]"
             >
               <Image
                 source={
@@ -177,6 +177,7 @@ export default function ProfileScreen() {
           <Text
             className="text-[23px] text-[#222222] mt-3"
             style={{ fontFamily: "Outfit_700Bold" }}
+            numberOfLines={1}
           >
             {userName}
           </Text>
@@ -289,6 +290,20 @@ export default function ProfileScreen() {
           <View className="h-10" />
         </View>
       </ScrollView>
+
+      <IosDialog
+        visible={dialogState.visible}
+        title={dialogState.title}
+        message={dialogState.message}
+        onClose={() => setDialogState(prev => ({ ...prev, visible: false }))}
+        actions={[
+          {
+            text: "OK",
+            bold: true,
+            onPress: () => setDialogState(prev => ({ ...prev, visible: false })),
+          }
+        ]}
+      />
     </View>
   );
 }

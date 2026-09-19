@@ -20,6 +20,12 @@ export interface UserMetadata {
   createdAt: FieldValue | string;
   lastLoginAt: FieldValue | string;
   updatedAt: FieldValue | string;
+  stats?: {
+    notesCount: number;
+    galleryCount: number;
+    driveCount: number;
+    usedStorageGB: number;
+  };
 }
 
 /**

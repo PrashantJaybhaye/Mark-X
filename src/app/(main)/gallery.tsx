@@ -23,8 +23,15 @@ import { GalleryMasonrySkeleton } from "../../components/gallery/GallerySkeleton
 import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import { safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
+import { generateUUID } from "../../utils/uuid";
 
-import { loadGalleryPins, saveGalleryPins } from "../../services/storageService";
+import { 
+  fetchGalleryPinsFromFirestore, 
+  addGalleryPinToFirestore, 
+  deleteGalleryPinFromFirestore, 
+  updateGalleryPinInFirestore 
+} from "../../services/galleryFirebaseService";
+import { uploadFileToTelegram } from "../../services/telegramStorage";
 
 export default function GalleryScreen() {
   const { width: windowWidth } = useWindowDimensions();
@@ -47,23 +54,17 @@ export default function GalleryScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    loadGalleryPins().then((stored) => {
-      if (isMounted && stored.length > 0) {
-        setPins(stored);
+    const fetchPins = async () => {
+      const fetched = await fetchGalleryPinsFromFirestore();
+      if (isMounted) {
+        setPins(fetched);
       }
-    });
+    };
+    fetchPins();
     return () => {
       isMounted = false;
     };
   }, []);
-
-  const updatePinsAndPersist = (updater: (prev: GalleryPin[]) => GalleryPin[]) => {
-    setPins((prev) => {
-      const updated = updater(prev);
-      saveGalleryPins(updated);
-      return updated;
-    });
-  };
 
   // Spin animation for refresh button
   const [spinAnim] = useState(() => new Animated.Value(0));
@@ -103,30 +104,42 @@ export default function GalleryScreen() {
   }, [pins, columnWidth]);
 
   // Like Toggle
-  const handleLikeToggle = (pinId: string) => {
-    updatePinsAndPersist((prev) =>
-      prev.map((pin) =>
-        pin.id === pinId ? { ...pin, isLiked: !pin.isLiked, likes: pin.isLiked ? pin.likes - 1 : pin.likes + 1 } : pin
+  const handleLikeToggle = async (pinId: string) => {
+    const pin = pins.find((p) => p.id === pinId);
+    if (!pin) return;
+    const newIsLiked = !pin.isLiked;
+    const newLikes = newIsLiked ? pin.likes + 1 : pin.likes - 1;
+
+    setPins((prev) =>
+      prev.map((p) =>
+        p.id === pinId ? { ...p, isLiked: newIsLiked, likes: newLikes } : p
       )
     );
+    await updateGalleryPinInFirestore(pinId, { isLiked: newIsLiked, likes: newLikes });
   };
 
   // Save Toggle
-  const handleSaveToggle = (pinId: string) => {
-    updatePinsAndPersist((prev) =>
-      prev.map((pin) =>
-        pin.id === pinId ? { ...pin, saved: !pin.saved } : pin
+  const handleSaveToggle = async (pinId: string) => {
+    const pin = pins.find((p) => p.id === pinId);
+    if (!pin) return;
+    const newSaved = !pin.saved;
+
+    setPins((prev) =>
+      prev.map((p) =>
+        p.id === pinId ? { ...p, saved: newSaved } : p
       )
     );
+    await updateGalleryPinInFirestore(pinId, { saved: newSaved });
   };
 
   // Hide Pin
-  const handleHidePin = (pinId: string) => {
-    updatePinsAndPersist((prev) => prev.filter((p) => p.id !== pinId));
+  const handleHidePin = async (pinId: string) => {
+    setPins((prev) => prev.filter((p) => p.id !== pinId));
+    await deleteGalleryPinFromFirestore(pinId);
   };
 
   // Manual Refresh Button Press
-  const handleRefreshPress = () => {
+  const handleRefreshPress = async () => {
     if (isRefreshing) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -140,21 +153,12 @@ export default function GalleryScreen() {
 
     setIsRefreshing(true);
 
-    // Simulate feed refresh / shuffle
-    setTimeout(() => {
-      setPins((prev) => {
-        if (prev.length === 0) return prev;
-        const copy = [...prev];
-        // Shuffle subtly
-        for (let i = copy.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [copy[i], copy[j]] = [copy[j], copy[i]];
-        }
-        return copy;
-      });
-      setIsRefreshing(false);
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    }, 650);
+    const fetched = await fetchGalleryPinsFromFirestore();
+    if (fetched.length > 0) {
+      setPins(fetched);
+    }
+    setIsRefreshing(false);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
   };
 
   // Pick photo to add to user's inspiration pins
@@ -168,8 +172,8 @@ export default function GalleryScreen() {
           : 0.75;
 
       const newPin: GalleryPin = {
-        id: `pin-user-${Date.now()}`,
-        title: result.fileName || "Captured inspiration",
+        id: `pin-${generateUUID()}`,
+        title: result.fileName || "New Inspiration",
         domain: "my-uploads",
         author: "You",
         imageUrl: result.uri,
@@ -181,7 +185,22 @@ export default function GalleryScreen() {
         tags: ["MyUploads", "Inspiration"],
         description: "Added to your inspiration collection.",
       };
-      updatePinsAndPersist((prev) => [newPin, ...prev]);
+      
+      // Update local state immediately
+      setPins((prev) => [newPin, ...prev]);
+
+      // Use Firestore for metadata instead of local array rewrite
+      await addGalleryPinToFirestore(newPin);
+
+      // Upload to Telegram in background
+      uploadFileToTelegram(result.uri, result.mimeType || "image/jpeg", result.fileName || "photo.jpg", true).then(async res => {
+        if (res.success && res.fileId) {
+          setPins((prev) => 
+            prev.map(p => p.id === newPin.id ? { ...p, telegramFileId: res.fileId } : p)
+          );
+          await updateGalleryPinInFirestore(newPin.id, { telegramFileId: res.fileId });
+        }
+      });
     }
   };
 
