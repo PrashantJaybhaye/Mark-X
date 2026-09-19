@@ -291,6 +291,14 @@ This project is licensed under the MIT License - see the [LICENSE](file:///d:/Ma
 
 ---
 
-<div align="center">
-  <sub>Built with ❤️ by Prashant Jaybhaye • Powered by Expo SDK 57 & Firebase</sub>
+<div align="left">
+  # Release APK
+cd android; .\gradlew.bat assembleRelease
+
+# Debug APK
+cd android; .\gradlew.bat assembleDebug
+
+# Both APKs simultaneously
+cd android; .\gradlew.bat assembleDebug assembleRelease
+
 </div>

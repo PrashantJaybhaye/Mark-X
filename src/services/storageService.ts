@@ -1,8 +1,12 @@
+import '../utils/cryptoPolyfill';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./firebase";
 import { DriveItem } from "../utils/driveFileTypes";
 import { GalleryPin } from "../utils/galleryData";
 import { NoteItem } from "../components/notes/NoteItemCard";
+import * as SecureStore from "expo-secure-store";
+import CryptoJS from "crypto-js";
+import { generateUUID } from "../utils/uuid";
 
 const STORAGE_KEYS = {
   DRIVE_ITEMS: "@markx_drive_items_v1",
@@ -31,7 +35,21 @@ function getScopedKey(baseKey: string): string {
 }
 
 /**
+ * Retrieves or generates a persistent encryption key stored in the device's secure enclave.
+ */
+async function getEncryptionKey(): Promise<string> {
+  const KEY_NAME = "MARK_X_ENCRYPTION_KEY";
+  let key = await SecureStore.getItemAsync(KEY_NAME);
+  if (!key) {
+    key = generateUUID() + generateUUID(); // Simple 64-char random key
+    await SecureStore.setItemAsync(KEY_NAME, key);
+  }
+  return key;
+}
+
+/**
  * Loads and parses JSON data from AsyncStorage with automatic user scoping and legacy migration.
+ * Transparently decrypts data encrypted with AES.
  */
 async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
   try {
@@ -47,6 +65,13 @@ async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
       }
     }
 
+    if (raw && raw.startsWith("ENC::")) {
+      const ciphertext = raw.substring(5);
+      const encKey = await getEncryptionKey();
+      const bytes = CryptoJS.AES.decrypt(ciphertext, encKey);
+      raw = bytes.toString(CryptoJS.enc.Utf8);
+    }
+
     return raw ? JSON.parse(raw) : defaultValue;
   } catch (error) {
     console.warn(`[StorageService] Failed to load ${baseKey}:`, error);
@@ -55,12 +80,16 @@ async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
 }
 
 /**
- * Serializes and saves JSON data to user-scoped AsyncStorage.
+ * Serializes, encrypts, and saves JSON data to user-scoped AsyncStorage.
  */
 async function saveItem<T>(baseKey: string, value: T): Promise<void> {
   try {
     const key = getScopedKey(baseKey);
-    await AsyncStorage.setItem(key, JSON.stringify(value));
+    const jsonStr = JSON.stringify(value);
+    const encKey = await getEncryptionKey();
+    const ciphertext = CryptoJS.AES.encrypt(jsonStr, encKey).toString();
+    
+    await AsyncStorage.setItem(key, "ENC::" + ciphertext);
   } catch (error) {
     console.warn(`[StorageService] Failed to save ${baseKey}:`, error);
   }

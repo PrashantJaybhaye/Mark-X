@@ -1,3 +1,4 @@
+import '../utils/cryptoPolyfill';
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import {
   initializeAuth,
