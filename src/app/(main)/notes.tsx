@@ -3,13 +3,6 @@ import { View, ScrollView, useWindowDimensions, Platform, StatusBar as RNStatusB
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { useFocusEffect } from "expo-router";
-import Svg, {
-  Defs,
-  LinearGradient,
-  RadialGradient,
-  Rect,
-  Stop,
-} from "react-native-svg";
 
 import { NotesHeader, NoteViewMode } from "../../components/notes/NotesHeader";
 import { NotesStackedBanner } from "../../components/notes/NotesStackedBanner";
@@ -20,7 +13,7 @@ import { triggerHaptic } from "../../utils/haptics";
 import { loadNotes, saveNotes } from "../../services/storageService";
 
 export default function NotesScreen() {
-  const { height: screenHeight, width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
   const [notes, setNotes] = useState<NoteItem[]>([]);
@@ -140,45 +133,9 @@ export default function NotesScreen() {
   const rightColumnNotes = sortedNotes.filter((_, i) => i % 2 !== 0);
 
   return (
-    <View className="flex-1 bg-[#F4F5F7]">
+    <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Top Ambient Atmospheric Glow (Mark-X Signature Glow) */}
-      <Svg
-        width="100%"
-        height={screenHeight > 800 ? 560 : 490}
-        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
-        pointerEvents="none"
-      >
-        <Defs>
-          <LinearGradient id="topGlow" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#FF8A5B" stopOpacity="0.92" />
-            <Stop offset="20%" stopColor="#FF9B73" stopOpacity="0.75" />
-            <Stop offset="45%" stopColor="#FFB69A" stopOpacity="0.5" />
-            <Stop offset="70%" stopColor="#FFD8C7" stopOpacity="0.22" />
-            <Stop offset="90%" stopColor="#F6F7F9" stopOpacity="0.05" />
-            <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
-          </LinearGradient>
-
-          <RadialGradient id="coreAmberGlow" cx="80%" cy="2%" rx="75%" ry="50%">
-            <Stop offset="0%" stopColor="#FF7043" stopOpacity="0.75" />
-            <Stop offset="25%" stopColor="#FF825A" stopOpacity="0.55" />
-            <Stop offset="50%" stopColor="#FFA17F" stopOpacity="0.3" />
-            <Stop offset="75%" stopColor="#FFC8B5" stopOpacity="0.1" />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-          </RadialGradient>
-
-          <RadialGradient id="softCoralGlow" cx="15%" cy="8%" rx="60%" ry="40%">
-            <Stop offset="0%" stopColor="#FFD0BC" stopOpacity="0.28" />
-            <Stop offset="50%" stopColor="#FFE5D9" stopOpacity="0.1" />
-            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-
-        <Rect width="100%" height="100%" fill="url(#topGlow)" />
-        <Rect width="100%" height="100%" fill="url(#coreAmberGlow)" />
-        <Rect width="100%" height="100%" fill="url(#softCoralGlow)" />
-      </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
         {/* Top Header Bar */}

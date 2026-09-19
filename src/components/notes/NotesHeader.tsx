@@ -70,8 +70,8 @@ export function NotesHeader({
           </Text>
         </View>
 
-        {/* Right Actions: Signature Warm Frosted Pill */}
-        <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4 shadow-sm shadow-[#FF7043]/10">
+        {/* Right Actions: Neutral Pill */}
+        <View className="flex-row items-center bg-[#F0F0F0] border border-black/[0.06] rounded-full px-4 py-2 gap-4">
           {/* Search Toggle */}
           <TouchableOpacity
             activeOpacity={0.7}
@@ -81,7 +81,7 @@ export function NotesHeader({
             <Ionicons
               name={isSearchActive ? "close" : "search"}
               size={19}
-              color="#3E140A"
+              color="#374151"
             />
           </TouchableOpacity>
 
@@ -94,7 +94,7 @@ export function NotesHeader({
             <Ionicons
               name={viewMode === "grid" ? "list-outline" : "grid-outline"}
               size={19}
-              color="#3E140A"
+              color="#374151"
             />
           </TouchableOpacity>
 
@@ -104,23 +104,23 @@ export function NotesHeader({
             onPress={handleAddPress}
             hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
           >
-            <Ionicons name="add" size={23} color="#3E140A" />
+            <Ionicons name="add" size={23} color="#374151" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Expandable Warm Frosted Search Bar */}
+      {/* Expandable Search Bar */}
       {isSearchActive && (
         <View className="px-5 pt-1 pb-3">
-          <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/70 rounded-full px-4 h-[46px] shadow-sm shadow-[#FF7043]/10">
-            <Ionicons name="search" size={18} color="#78350F" />
+          <View className="flex-row items-center bg-[#F0F0F0] border border-black/[0.06] rounded-full px-4 h-[46px]">
+            <Ionicons name="search" size={18} color="#6B7280" />
             <TextInput
               ref={searchInputRef}
               value={searchQuery}
               onChangeText={onSearchChange}
               placeholder="Search notes and ideas..."
-              placeholderTextColor="#8A5A4A"
-              className="flex-1 text-[15px] text-[#3E140A] px-2.5 py-0"
+              placeholderTextColor="#9CA3AF"
+              className="flex-1 text-[15px] text-[#111111] px-2.5 py-0"
               style={{ fontFamily: "Outfit_400Regular" }}
               returnKeyType="search"
               clearButtonMode="while-editing"
@@ -130,7 +130,7 @@ export function NotesHeader({
                 onPress={() => onSearchChange("")}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close-circle" size={18} color="#78350F" />
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
               </TouchableOpacity>
             )}
           </View>

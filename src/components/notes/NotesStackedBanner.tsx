@@ -29,7 +29,7 @@ export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
         className="relative w-full justify-center"
         style={{ height: cardHeight + 12 }}
       >
-        {/* Card 3: Warm Amber Back Card (Peeking on right) */}
+        {/* Card 3: Back card */}
         <View
           style={{
             position: "absolute",
@@ -37,14 +37,14 @@ export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
             top: 7,
             width: frontCardWidth,
             height: cardHeight,
-            backgroundColor: "#F6A87C",
+            backgroundColor: "#D1D5DB",
             borderRadius: 30,
             transform: [{ rotate: "2.4deg" }],
           }}
           className="shadow-sm"
         />
 
-        {/* Card 2: Mark-X Signature Coral Middle Peeking Card */}
+        {/* Card 2: Mid card */}
         <View
           style={{
             position: "absolute",
@@ -52,7 +52,7 @@ export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
             top: 3.5,
             width: frontCardWidth,
             height: cardHeight,
-            backgroundColor: "#EB5B49",
+            backgroundColor: "#6B7280",
             borderRadius: 30,
             transform: [{ rotate: "1.2deg" }],
           }}
@@ -87,7 +87,7 @@ export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
               className="text-white text-[25px] tracking-tight leading-tight mb-1.5"
               style={{ fontFamily: "Outfit_700Bold" }}
             >
-              ideas become reality
+              Capture every idea.
             </Text>
             <Text
               allowFontScaling={false}
@@ -95,7 +95,7 @@ export function NotesStackedBanner({ onPress }: NotesStackedBannerProps) {
               style={{ fontFamily: "Outfit_400Regular" }}
               numberOfLines={2}
             >
-              End-to-end encrypted notes, quick ideas & checklists synced in real time.
+              Your notes, quick thoughts & checklists — all in one place.
             </Text>
           </View>
         </View>
