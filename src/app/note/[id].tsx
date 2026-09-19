@@ -26,6 +26,7 @@ import {
   getNoteById,
   saveSingleNote,
 } from "../../services/storageService";
+import { syncNoteToFirestore, deleteNoteFromFirestore } from "../../services/notesSyncService";
 import { triggerHaptic } from "../../utils/haptics";
 
 
@@ -171,7 +172,7 @@ export default function NoteDetailScreen() {
   const [selectedTextStyle, setSelectedTextStyle] = useState("Body");
   const [activeFormats, setActiveFormats] = useState<{ [key: string]: boolean }>({});
 
-  const [activeDialog, setActiveDialog] = useState<"delete" | "more" | null>(null);
+  const [activeDialog, setActiveDialog] = useState<"delete" | "more" | "unsaved" | null>(null);
 
   const historyRef = useRef<{ title: string; body: string }[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -231,7 +232,8 @@ export default function NoteDetailScreen() {
   latestTitleRef.current = title;
   const isPinnedRef = useRef<boolean>(isPinned);
   isPinnedRef.current = isPinned;
-  const isDeletedRef = useRef(false); // prevents cleanup save after delete
+  const isDeletedRef = useRef(false);
+  const hasUnsavedChanges = useRef(false);
 
   const commitNote = useCallback(
     async (currentTitle: string, currentBody: string, currentPinned: boolean) => {
@@ -240,26 +242,19 @@ export default function NoteDetailScreen() {
       if (!trimmedTitle && !trimmedBody) return;
 
       const resolvedTitle = trimmedTitle || (trimmedBody ? trimmedBody.split("\n")[0].trim().slice(0, 40) : "") || "New Note";
-      const formattedDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const formattedDate = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      const finalCreatedAt = createdAt || formattedDate;
       await saveSingleNote({
         id: noteId,
         title: resolvedTitle,
         body: trimmedBody,
         isPinned: currentPinned,
-        createdAt: createdAt || formattedDate,
+        createdAt: finalCreatedAt,
+        updatedAt: formattedDate,
       });
+      return { createdAt: finalCreatedAt, updatedAt: formattedDate };
     },
     [noteId, createdAt]
-  );
-
-  const triggerAutoSave = useCallback(
-    (nextTitle: string, nextBody: string) => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        commitNote(nextTitle, nextBody, isPinnedRef.current);
-      }, 350);
-    },
-    [commitNote]
   );
 
   const updateBlocksAndSave = (updater: (prev: NoteBlock[]) => NoteBlock[]) => {
@@ -268,7 +263,7 @@ export default function NoteDetailScreen() {
       latestBlocksRef.current = next;
       const newBody = blocksToBody(next);
       setBody(newBody);
-      triggerAutoSave(latestTitleRef.current, newBody);
+      hasUnsavedChanges.current = true;
       return next;
     });
   };
@@ -276,9 +271,17 @@ export default function NoteDetailScreen() {
   const handleBack = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     Keyboard.dismiss();
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    const currentBody = blocksToBody(latestBlocksRef.current);
-    await commitNote(latestTitleRef.current, currentBody, isPinnedRef.current);
+    
+    if (hasUnsavedChanges.current) {
+      setActiveDialog("unsaved");
+      return;
+    }
+    
+    router.back();
+  };
+
+  const handleSaveAndExit = async () => {
+    await handleFinishEditing();
     router.back();
   };
 
@@ -287,9 +290,19 @@ export default function NoteDetailScreen() {
     Keyboard.dismiss();
     setIsEditing(false);
     setShowFormatSheet(false);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     const currentBody = blocksToBody(latestBlocksRef.current);
-    await commitNote(latestTitleRef.current, currentBody, isPinnedRef.current);
+    const dates = await commitNote(latestTitleRef.current, currentBody, isPinnedRef.current);
+    if (dates) {
+      syncNoteToFirestore({
+        id: noteId,
+        title: latestTitleRef.current,
+        body: currentBody,
+        isPinned: isPinnedRef.current,
+        createdAt: dates.createdAt,
+        updatedAt: dates.updatedAt,
+      });
+    }
+    hasUnsavedChanges.current = false;
   };
 
   const handleTitleChange = (nextTitle: string) => {
@@ -297,17 +310,10 @@ export default function NoteDetailScreen() {
     if (Math.abs(nextTitle.length - title.length) > 3) historyRef.current.push({ title, body: currentBody });
     setTitle(nextTitle);
     latestTitleRef.current = nextTitle;
-    triggerAutoSave(nextTitle, currentBody);
+    hasUnsavedChanges.current = true;
   };
 
-  useEffect(() => {
-    return () => {
-      if (isDeletedRef.current) return; // note was deleted — don't re-save
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      const currentBody = blocksToBody(latestBlocksRef.current);
-      commitNote(latestTitleRef.current, currentBody, isPinnedRef.current);
-    };
-  }, [commitNote]);
+  // Removed automatic unmount save to ensure explicit saving
 
   const handleUndo = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
@@ -316,7 +322,7 @@ export default function NoteDetailScreen() {
       setTitle(prev.title);
       setBody(prev.body);
       setBlocks(parseBodyToBlocks(prev.body));
-      triggerAutoSave(prev.title, prev.body);
+      hasUnsavedChanges.current = true;
     }
   };
 
@@ -329,9 +335,12 @@ export default function NoteDetailScreen() {
 
   const handleDeleteConfirmed = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    isDeletedRef.current = true; // block cleanup save on unmount
+    isDeletedRef.current = true;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (noteId) await deleteNoteById(noteId);
+    if (noteId) {
+      await deleteNoteById(noteId);
+      deleteNoteFromFirestore(noteId);
+    }
     router.back();
   };
 
@@ -392,7 +401,7 @@ export default function NoteDetailScreen() {
     setCreatedAt("");
     setIsEditing(true);
     setShowFormatSheet(false);
-    historyRef.current = [];
+    hasUnsavedChanges.current = false;
   };
 
   const handleApplyFormat = (type: string) => {
@@ -461,7 +470,6 @@ export default function NoteDetailScreen() {
       const nextType: BlockType = ["todo", "bullet", "numbered"].includes(cur.type) ? cur.type : "paragraph";
 
       if (parts.length > 2) {
-        // Multi-line paste support
         const newBlocks: NoteBlock[] = parts.slice(1).map((partText) => ({
           id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           type: nextType,
@@ -569,7 +577,6 @@ export default function NoteDetailScreen() {
     <SafeAreaView edges={["top"]} className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Top Header Navigation */}
       <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white">
         <TouchableOpacity
           activeOpacity={0.65}
@@ -627,7 +634,6 @@ export default function NoteDetailScreen() {
         </View>
       </View>
 
-      {/* Note Content Canvas */}
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -677,7 +683,6 @@ export default function NoteDetailScreen() {
             </Pressable>
           )}
 
-          {/* Blocks */}
           <View style={{ minHeight: 320 }}>
             {blocks.map((block, index) => {
               let currentNum = 1;
@@ -813,7 +818,6 @@ export default function NoteDetailScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Format Bottom Sheet */}
       {showFormatSheet ? (
         <View
           style={{
@@ -840,7 +844,6 @@ export default function NoteDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Text Styles (Continuous capsule design matching other rows) */}
           <View
             style={{
               flexDirection: "row",
@@ -884,7 +887,6 @@ export default function NoteDetailScreen() {
             })}
           </View>
 
-          {/* B, I, U, S + Marker + Color */}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F2F2F7", borderRadius: 16, padding: 3, flex: 1, marginRight: 8, height: 44 }}>
               {[
@@ -925,7 +927,6 @@ export default function NoteDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Lists & Indentation */}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F2F2F7", borderRadius: 16, padding: 3, flex: 1.3, marginRight: 8, height: 44 }}>
               {[
@@ -952,7 +953,6 @@ export default function NoteDetailScreen() {
           </View>
         </View>
       ) : (
-        /* Floating Bottom Toolbar (Header button matching style with extra keyboard clearance) */
         <View
           pointerEvents="box-none"
           style={{
@@ -965,7 +965,6 @@ export default function NoteDetailScreen() {
             alignItems: "center",
           }}
         >
-          {/* Left Island Capsule */}
           <View
             style={{
               flexDirection: "row",
@@ -978,7 +977,6 @@ export default function NoteDetailScreen() {
               overflow: "hidden",
             }}
           >
-            {/* Checklist: Circular checkmark */}
             <TouchableOpacity
               activeOpacity={0.65}
               onPress={handleInsertChecklist}
@@ -987,7 +985,6 @@ export default function NoteDetailScreen() {
               <Ionicons name="checkmark-circle-outline" size={22} color="#1C1C1E" />
             </TouchableOpacity>
 
-            {/* Photos / Media */}
             <TouchableOpacity
               activeOpacity={0.65}
               onPress={handleInsertAttachment}
@@ -996,7 +993,6 @@ export default function NoteDetailScreen() {
               <Ionicons name="images-outline" size={21} color="#1C1C1E" />
             </TouchableOpacity>
 
-            {/* Format tool: Signature Apple Notes 'Aa' typography */}
             <TouchableOpacity
               activeOpacity={0.65}
               onPress={() => {
@@ -1020,7 +1016,6 @@ export default function NoteDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Right Island Circular Button: Crisp Add Plus */}
           <TouchableOpacity
             activeOpacity={0.65}
             onPress={handleNewNote}
@@ -1041,7 +1036,6 @@ export default function NoteDetailScreen() {
         </View>
       )}
 
-      {/* Unified Modals */}
       <IosDialog
         visible={activeDialog === "delete"}
         title="Delete Note"
@@ -1062,13 +1056,26 @@ export default function NoteDetailScreen() {
             onPress: () => {
               setIsPinned((prev) => {
                 const next = !prev;
-                commitNote(title, body, next);
+                isPinnedRef.current = next;
+                hasUnsavedChanges.current = true;
                 return next;
               });
               setActiveDialog(null);
             },
           },
           { text: "Delete Note", style: "destructive", onPress: () => setActiveDialog("delete") },
+          { text: "Cancel", style: "cancel", onPress: () => setActiveDialog(null) },
+        ]}
+        onClose={() => setActiveDialog(null)}
+      />
+
+      <IosDialog
+        visible={activeDialog === "unsaved"}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Do you want to save or discard them?"
+        actions={[
+          { text: "Save", bold: true, onPress: () => { setActiveDialog(null); handleSaveAndExit(); } },
+          { text: "Discard", style: "destructive", onPress: () => { setActiveDialog(null); router.back(); } },
           { text: "Cancel", style: "cancel", onPress: () => setActiveDialog(null) },
         ]}
         onClose={() => setActiveDialog(null)}

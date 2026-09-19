@@ -10,6 +10,8 @@ import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
 import { NotesEmptyState } from "../../components/notes/NotesEmptyState";
 import { triggerHaptic } from "../../utils/haptics";
 import { loadNotes, saveNotes } from "../../services/storageService";
+import { pullAndMergeNotesFromFirestore, deleteNoteFromFirestore, syncNoteToFirestore } from "../../services/notesSyncService";
+import { IosDialog } from "../../components/common/IosDialog";
 
 export default function NotesScreen() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export default function NotesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
   const [notes, setNotes] = useState<NoteItem[]>([]);
+  const [selectedNote, setSelectedNote] = useState<NoteItem | null>(null);
+  const [activeDialog, setActiveDialog] = useState<"more" | "delete" | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -24,23 +28,16 @@ export default function NotesScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-      // Reload notes every time screen comes into focus (catches deletions/edits)
-      loadNotes().then((stored) => setNotes(stored ?? []));
+
+      // 1. Instantly show local notes (zero latency)
+      loadNotes().then((local) => setNotes(local ?? []));
+
+      // 2. Pull from Firestore in background and merge (cross-device sync)
+      pullAndMergeNotesFromFirestore().then((merged) => {
+        if (merged) setNotes(merged);
+      });
     }, [])
   );
-
-  // Hydrate notes on mount
-  React.useEffect(() => {
-    let isMounted = true;
-    loadNotes().then((stored) => {
-      if (isMounted && stored.length > 0) {
-        setNotes(stored);
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const updateNotesAndPersist = (updater: (prev: NoteItem[]) => NoteItem[]) => {
     setNotes((prev) => {
@@ -73,29 +70,45 @@ export default function NotesScreen() {
     });
   }, [router]);
 
-  const handleDeleteNote = React.useCallback((note: NoteItem) => {
+  const handleOptionsPress = React.useCallback((note: NoteItem) => {
     triggerHaptic();
-    updateNotesAndPersist((prev) => prev.filter((n) => n.id !== note.id));
+    setSelectedNote(note);
+    setActiveDialog("more");
   }, []);
+
+  const handleDeleteConfirmed = React.useCallback(() => {
+    if (!selectedNote) return;
+    triggerHaptic();
+    updateNotesAndPersist((prev) => prev.filter((n) => n.id !== selectedNote.id));
+    deleteNoteFromFirestore(selectedNote.id);
+    setSelectedNote(null);
+    setActiveDialog(null);
+  }, [selectedNote]);
+
+  const handleTogglePin = React.useCallback(() => {
+    if (!selectedNote) return;
+    triggerHaptic();
+    const updatedNote = { ...selectedNote, isPinned: !selectedNote.isPinned };
+    updateNotesAndPersist((prev) =>
+      prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
+    );
+    syncNoteToFirestore(updatedNote);
+    setSelectedNote(null);
+    setActiveDialog(null);
+  }, [selectedNote]);
 
   // Filter notes by search query if user searches
   const filteredNotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return notes;
     return notes.filter(
-      (n) =>
-        n.title.toLowerCase().includes(q) ||
-        (n.body && n.body.toLowerCase().includes(q))
+      (n) => n.title.toLowerCase().includes(q) || n.body?.toLowerCase().includes(q)
     );
   }, [notes, searchQuery]);
 
   // Distribute notes into two columns for grid masonry (pinned items first)
   const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return 0;
-    });
+    return [...filteredNotes].sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned));
   }, [filteredNotes]);
 
   const leftColumnNotes = sortedNotes.filter((_, i) => i % 2 === 0);
@@ -137,51 +150,50 @@ export default function NotesScreen() {
                 onCreateNote={handleAddNote}
               />
             ) : viewMode === "grid" ? (
-              /* --- Grid Mode (2-Column Masonry Layout) --- */
               <View className="flex-row justify-between w-full">
-                {/* Left Column */}
-                <View style={{ width: columnWidth }}>
-                  {leftColumnNotes.map((note) => (
-                    <NoteItemCard
-                      key={note.id}
-                      note={note}
-                      viewMode="grid"
-                      onPress={handleEditNote}
-                      onOptionsPress={handleDeleteNote}
-                    />
-                  ))}
-                </View>
-
-                {/* Right Column */}
-                <View style={{ width: columnWidth }}>
-                  {rightColumnNotes.map((note) => (
-                    <NoteItemCard
-                      key={note.id}
-                      note={note}
-                      viewMode="grid"
-                      onPress={handleEditNote}
-                      onOptionsPress={handleDeleteNote}
-                    />
-                  ))}
-                </View>
+                {[leftColumnNotes, rightColumnNotes].map((col, i) => (
+                  <View key={i} style={{ width: columnWidth }}>
+                    {col.map((note) => (
+                      <NoteItemCard key={note.id} note={note} viewMode="grid" onPress={handleEditNote} onOptionsPress={handleOptionsPress} />
+                    ))}
+                  </View>
+                ))}
               </View>
             ) : (
-              /* --- Row / Card List Mode --- */
               <View className="w-full">
                 {filteredNotes.map((note) => (
-                  <NoteItemCard
-                    key={note.id}
-                    note={note}
-                    viewMode="list"
-                    onPress={handleEditNote}
-                    onOptionsPress={handleDeleteNote}
-                  />
+                  <NoteItemCard key={note.id} note={note} viewMode="list" onPress={handleEditNote} onOptionsPress={handleOptionsPress} />
                 ))}
               </View>
             )}
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <IosDialog
+        visible={activeDialog === "delete"}
+        title="Delete Note"
+        message={`Are you sure you want to delete "${selectedNote?.title || "this note"}"? This cannot be undone.`}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveDialog(null) },
+          { text: "Delete", style: "destructive", bold: true, onPress: handleDeleteConfirmed },
+        ]}
+        onClose={() => setActiveDialog(null)}
+      />
+
+      <IosDialog
+        visible={activeDialog === "more"}
+        title={selectedNote?.title || "Note Options"}
+        actions={[
+          {
+            text: selectedNote?.isPinned ? "Unpin Note" : "Pin Note",
+            onPress: handleTogglePin,
+          },
+          { text: "Delete Note", style: "destructive", onPress: () => setActiveDialog("delete") },
+          { text: "Cancel", style: "cancel", onPress: () => setActiveDialog(null) },
+        ]}
+        onClose={() => setActiveDialog(null)}
+      />
     </View>
   );
 }

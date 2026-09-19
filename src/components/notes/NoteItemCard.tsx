@@ -10,6 +10,7 @@ export interface NoteItem {
   body?: string;
   iconName?: keyof typeof Ionicons.glyphMap;
   createdAt: string;
+  updatedAt?: string;
   isPinned?: boolean;
 }
 
@@ -86,7 +87,7 @@ export const NoteItemCard = React.memo(function NoteItemCard({
               className="text-[11px] text-[#9CA3AF]"
               style={{ fontFamily: "Outfit_400Regular" }}
             >
-              {note.createdAt}
+              {note.updatedAt || note.createdAt}
             </Text>
           </View>
         </View>
@@ -141,7 +142,7 @@ export const NoteItemCard = React.memo(function NoteItemCard({
           className="text-[11px] text-[#9CA3AF]"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
-          {note.createdAt}
+          {note.updatedAt || note.createdAt}
         </Text>
         {note.isPinned && (
           <Ionicons name="bookmark-sharp" size={13} color="#E5A93C" />
