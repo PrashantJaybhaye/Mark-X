@@ -1,36 +1,57 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Default deny: Block all unauthorized access
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // 2. Strict User Isolation: Users can ONLY access their own document and subtrees
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
 
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+    // 1. User Root Document & Subcollections
+    // Automatically secures:
+    // - users/{userId} (Profile & Preferences)
+    // - users/{userId}/notes/{noteId} (Smart Notes)
+    // - users/{userId}/gallery/{pinId} (Inspiration Gallery)
+    // - users/{userId}/devices/{deviceId} (Device Fleet & Telemetry)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /{subcollection=**} {
+        allow read, write: if isOwner(userId);
       }
     }
 
-    // 3. User Notes: Only owner can create, read, update, or delete
+    // 2. Root-Level Notes (when queried directly)
     match /notes/{noteId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() 
+                    && resource.data.userId == request.auth.uid 
+                    && request.resource.data.userId == request.auth.uid;
     }
 
-    // 4. Drive Items: Enforce user ownership on files & folders
+    // 3. Root-Level Drive Items (Vault Files & Folders)
     match /drive_items/{itemId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() 
+                    && resource.data.userId == request.auth.uid 
+                    && request.resource.data.userId == request.auth.uid;
     }
 
-    // 5. Gallery Pins: Private collections protected by UID
+    // 4. Root-Level Gallery Pins
     match /gallery_pins/{pinId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() 
+                    && resource.data.userId == request.auth.uid 
+                    && request.resource.data.userId == request.auth.uid;
     }
   }
 }
+
