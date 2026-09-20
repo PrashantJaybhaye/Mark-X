@@ -3,11 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./firebase";
 import { DriveItem } from "../utils/driveFileTypes";
 import { GalleryPin } from "../utils/galleryData";
-import { NoteItem } from "../components/notes/NoteItemCard";
+import { NoteItem } from "../types/note";
 import * as SecureStore from "expo-secure-store";
 import CryptoJS from "crypto-js";
 import { generateUUID } from "../utils/uuid";
-import { updateUserMetadata } from "./userService";
+import { updateUserStats, getUserMetadata } from "./userService";
 
 const STORAGE_KEYS = {
   DRIVE_ITEMS: "@markx_drive_items_v1",
@@ -98,33 +98,24 @@ async function saveItem<T>(baseKey: string, value: T): Promise<void> {
 
 // Drive Items
 
-async function updateStats(updates: Partial<UserPreferences["stats"]>) {
+async function updateStats(updates: Partial<NonNullable<UserPreferences["stats"]>>) {
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
   const newStats = { ...currentStats, ...updates };
   await saveUserPreferences({ stats: newStats });
   
   if (auth.currentUser?.uid) {
-    updateUserMetadata(auth.currentUser.uid, { stats: newStats }).catch(console.warn);
+    // Only update specific modified fields in Firestore (never overwrites other counters!)
+    updateUserStats(auth.currentUser.uid, updates).catch(console.warn);
   }
 }
-async function recalculateTotalStorage(galleryCount: number, driveItems: DriveItem[]) {
-  const driveSizeMB = driveItems.reduce((acc, item) => {
-    if (!item.size) return acc + 1.2;
-    const num = parseFloat(item.size);
-    return isNaN(num) ? acc + 1.0 : acc + num;
-  }, 0);
-  return parseFloat(((driveSizeMB + galleryCount * 2.5) / 1024).toFixed(2));
-}
+
 export const forceSyncAllStats = async () => {
   try {
     const uid = auth.currentUser?.uid;
     if (!uid) return false;
 
-    // Pull directly from the user's Firestore metadata document
-    const { getUserMetadata } = await import("./userService");
     const metadata = await getUserMetadata(uid);
-
     if (metadata && metadata.stats) {
       const currentPrefs = await loadUserPreferences();
       await saveUserPreferences({ ...currentPrefs, stats: metadata.stats });
@@ -140,12 +131,7 @@ export const forceSyncAllStats = async () => {
 export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITEMS, []);
 export const saveDriveItems = async (items: DriveItem[]) => {
   await saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
-  
-  const current = await loadUserPreferences();
-  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
-  const totalGB = await recalculateTotalStorage(currentStats.galleryCount, items);
-  
-  await updateStats({ driveCount: items.length, usedStorageGB: totalGB });
+  await updateStats({ driveCount: items.length });
 };
 
 // Gallery Pins
@@ -156,21 +142,14 @@ export const saveCachedGalleryPins = (pins: GalleryPin[]): Promise<void> =>
   saveItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, pins);
 
 export const syncGalleryStats = async (count: number) => {
-  const current = await loadUserPreferences();
-  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
-  const driveItems = await loadDriveItems();
-  const totalGB = await recalculateTotalStorage(count, driveItems);
-  await updateStats({ galleryCount: count, usedStorageGB: totalGB });
+  await updateStats({ galleryCount: count });
 };
 
 export const updateGalleryStats = async (delta: number) => {
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
   const newCount = Math.max(0, currentStats.galleryCount + delta);
-  
-  const driveItems = await loadDriveItems();
-  const totalGB = await recalculateTotalStorage(newCount, driveItems);
-  await updateStats({ galleryCount: newCount, usedStorageGB: totalGB });
+  await updateStats({ galleryCount: newCount });
 };
 
 // Notes

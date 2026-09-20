@@ -30,10 +30,12 @@ import {
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
+import { useAuth } from "../../context/AuthContext";
 import {
   loadDriveItems,
   saveDriveItems,
   loadUserPreferences,
+  saveUserPreferences,
   loadCachedGalleryPins,
   saveCachedGalleryPins,
 } from "../../services/storageService";
@@ -41,34 +43,80 @@ import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
 import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
 import { GalleryPin, formatBytes } from "../../utils/galleryData";
+import { auth } from "../../services/firebase";
+import { getUserMetadata, subscribeUserStats } from "../../services/userService";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { height: screenHeight } = useWindowDimensions();
 
-  // Storage and file counter states dynamically derived from real storage
+  // Storage and file counter states dynamically derived from real storage & Firestore
   const [usedStorage, setUsedStorage] = useState("0.00");
   const [galleryCount, setGalleryCount] = useState(0);
   const [notesCount, setNotesCount] = useState(0);
   const [docsCount, setDocsCount] = useState(0);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
 
-  const refreshCounts = React.useCallback(async () => {
+  const applyStats = React.useCallback((stats: { driveCount?: number; galleryCount?: number; notesCount?: number; usedStorageGB?: number }) => {
+    setDocsCount(stats.driveCount ?? 0);
+    setGalleryCount(stats.galleryCount ?? 0);
+    setNotesCount(stats.notesCount ?? 0);
+    setUsedStorage((stats.usedStorageGB ?? 0).toFixed(2));
+    setIsStatsLoading(false);
+  }, []);
+
+  const refreshCounts = React.useCallback(async (explicitUid?: string) => {
     try {
+      // 1. Fast local cache path for immediate 0ms rendering
       const prefs = await loadUserPreferences();
-      const stats = prefs.stats || {
-        notesCount: 0,
-        galleryCount: 0,
-        driveCount: 0,
-        usedStorageGB: 0,
-      };
-      setDocsCount(stats.driveCount);
-      setGalleryCount(stats.galleryCount);
-      setNotesCount(stats.notesCount);
-      setUsedStorage(stats.usedStorageGB.toFixed(2));
+      if (prefs.stats) {
+        applyStats(prefs.stats);
+      }
+
+      // 2. Fetch fresh user stats from Firestore user metadata
+      const uid = explicitUid || user?.uid || auth.currentUser?.uid;
+      if (uid) {
+        const metadata = await getUserMetadata(uid);
+        if (metadata && metadata.stats) {
+          applyStats(metadata.stats);
+          await saveUserPreferences({ ...prefs, stats: metadata.stats });
+        } else if (!prefs.stats) {
+          setIsStatsLoading(false);
+        }
+      }
     } catch (err) {
       console.warn("[HomeScreen] Could not refresh metrics:", err);
+      setIsStatsLoading(false);
     }
-  }, []);
+  }, [user?.uid, applyStats]);
+
+  // Real-time listener for user stats in Firestore
+  React.useEffect(() => {
+    // Safety fallback: if no stats loaded after 2.5s (offline or new user), stop loading skeleton
+    const timer = setTimeout(() => {
+      setIsStatsLoading(false);
+    }, 2500);
+
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (!uid) return () => clearTimeout(timer);
+
+    // Refresh immediately when user becomes available
+    refreshCounts(uid);
+
+    // Live subscription: updates automatically if changed on any device/backend
+    const unsubscribe = subscribeUserStats(uid, (stats) => {
+      applyStats(stats);
+      loadUserPreferences().then((prefs) => {
+        saveUserPreferences({ ...prefs, stats }).catch(console.warn);
+      });
+    });
+
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [user?.uid, refreshCounts, applyStats]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -100,82 +148,76 @@ export default function HomeScreen() {
     }
   };
 
+  const updateCachedPinStatus = async (pinId: string, status: "synced" | "failed", url?: string) => {
+    try {
+      const currentCached = await loadCachedGalleryPins();
+      await saveCachedGalleryPins(
+        currentCached.map((p) =>
+          p.id === pinId
+            ? { ...p, uploadStatus: status, ...(url ? { imageUrl: url } : {}) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.warn("[HomeScreen] Could not update cached pin status:", err);
+    }
+  };
+
   const handleAddPhoto = async () => {
     triggerHaptic();
     const img = await safePickImage();
-    if (img && img.uri) {
-      const isVideo = img.type === "video";
-      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
-      const timestampNow = Date.now();
-      const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
-      const newPinId = `pin-${timestampNow}`;
-      const calculatedRatio = img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75;
-      const fileSize = img.fileSize || (isVideo ? 14800000 : 2800000);
+    if (!img?.uri) return;
 
-      const newPin: GalleryPin = {
-        id: newPinId,
-        fileName: shortFileName,
-        author: "You",
-        imageUrl: img.uri,
-        mediaType: isVideo ? "video" : "image",
-        duration: img.duration,
-        aspectRatio: calculatedRatio,
-        width: img.width || (calculatedRatio >= 1 ? 1920 : 1080),
-        height: img.height || Math.round((img.width || 1080) / calculatedRatio),
-        fileSize,
-        fileSizeFormatted: formatBytes(fileSize),
-        mimeType: img.mimeType || defaultMime,
-        likes: 1,
-        isLiked: true,
-        saved: true,
-        uploadStatus: "uploading",
-      };
-      
-      // Save metadata to server (gallery screen manages its own cache on focus)
-      await addGalleryPinToServer(newPin);
-      
-      // Upload physical file to Mark-X Storage in background with shortFileName
-      uploadFileToMarkx(img.uri, img.mimeType || defaultMime, shortFileName)
-        .then(async (res) => {
-          if (res.success && res.url) {
-            await updateGalleryPinInServer(newPin.id, {
-              imageUrl: res.url,
-              uploadStatus: "synced",
-            });
-            const currentCached = await loadCachedGalleryPins();
-            await saveCachedGalleryPins(
-              currentCached.map((p) =>
-                p.id === newPin.id
-                  ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const }
-                  : p
-              )
-            );
-          } else {
-            console.warn("[HomeUpload] Upload failed:", res.error);
-            const currentCached = await loadCachedGalleryPins();
-            await saveCachedGalleryPins(
-              currentCached.map((p) =>
-                p.id === newPin.id
-                  ? { ...p, uploadStatus: "failed" as const }
-                  : p
-              )
-            );
-          }
-        })
-        .catch(async (err) => {
-          console.error("[HomeUpload] Error:", err);
-          const currentCached = await loadCachedGalleryPins();
-          await saveCachedGalleryPins(
-            currentCached.map((p) =>
-              p.id === newPin.id
-                ? { ...p, uploadStatus: "failed" as const }
-                : p
-            )
-          );
-        });
-      
-      await refreshCounts();
-    }
+    const isVideo = img.type === "video";
+    const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+    const timestampNow = Date.now();
+    const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
+    const newPinId = `pin-${timestampNow}`;
+    const calculatedRatio = img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75;
+    const fileSize = img.fileSize || (isVideo ? 14800000 : 2800000);
+
+    const newPin: GalleryPin = {
+      id: newPinId,
+      fileName: shortFileName,
+      author: user?.displayName || "You",
+      imageUrl: img.uri,
+      mediaType: isVideo ? "video" : "image",
+      duration: img.duration,
+      aspectRatio: calculatedRatio,
+      width: img.width || (calculatedRatio >= 1 ? 1920 : 1080),
+      height: img.height || Math.round((img.width || 1080) / calculatedRatio),
+      fileSize,
+      fileSizeFormatted: formatBytes(fileSize),
+      mimeType: img.mimeType || defaultMime,
+      likes: 0,
+      isLiked: false,
+      saved: false,
+      uploadStatus: "uploading",
+    };
+
+    // Save metadata to server
+    await addGalleryPinToServer(newPin);
+
+    // Upload physical file to Mark-X Storage in background with shortFileName
+    uploadFileToMarkx(img.uri, img.mimeType || defaultMime, shortFileName)
+      .then(async (res) => {
+        if (res.success && res.url) {
+          await updateGalleryPinInServer(newPin.id, {
+            imageUrl: res.url,
+            uploadStatus: "synced",
+          });
+          await updateCachedPinStatus(newPin.id, "synced", res.url);
+        } else {
+          console.warn("[HomeUpload] Upload failed:", res.error);
+          await updateCachedPinStatus(newPin.id, "failed");
+        }
+      })
+      .catch(async (err) => {
+        console.error("[HomeUpload] Error:", err);
+        await updateCachedPinStatus(newPin.id, "failed");
+      });
+
+    await refreshCounts();
   };
 
   return (
@@ -253,7 +295,7 @@ export default function HomeScreen() {
         <View className="px-4 pt-3 pb-1">
           <StorageHeroCard
             usedStorage={usedStorage}
-
+            isStatsLoading={isStatsLoading}
             onUploadFile={handleUploadFile}
             onAddPhoto={handleAddPhoto}
           />
@@ -278,6 +320,7 @@ export default function HomeScreen() {
               <FeatureCard
                 title="Gallery"
                 count={galleryCount}
+                isLoading={isStatsLoading}
                 subtitle="Photos & Videos"
                 onPress={() => {
                   triggerHaptic();
@@ -305,6 +348,7 @@ export default function HomeScreen() {
               <FeatureCard
                 title="Secure Notes"
                 count={notesCount}
+                isLoading={isStatsLoading}
                 subtitle="Continuous Autosave"
                 onPress={() => {
                   triggerHaptic();
@@ -317,6 +361,7 @@ export default function HomeScreen() {
               <FeatureCard
                 title="Document Drive"
                 count={docsCount}
+                isLoading={isStatsLoading}
                 subtitle="Fast Secure Sync"
                 onPress={() => {
                   triggerHaptic();

@@ -2,6 +2,8 @@ import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
+  onSnapshot,
   serverTimestamp,
   FieldValue,
 } from "firebase/firestore";
@@ -96,6 +98,71 @@ export async function updateUserMetadata(
 }
 
 /**
+ * Updates individual user stats fields atomically in Firestore without overwriting other counters.
+ */
+export async function updateUserStats(
+  uid: string,
+  statsUpdates: Partial<{
+    notesCount: number;
+    galleryCount: number;
+    driveCount: number;
+    usedStorageGB: number;
+  }>
+): Promise<void> {
+  if (!uid || Object.keys(statsUpdates).length === 0) return;
+
+  try {
+    const userDocRef = doc(db, "users", uid);
+    const dotPayload: Record<string, any> = {
+      updatedAt: serverTimestamp(),
+    };
+
+    for (const [key, value] of Object.entries(statsUpdates)) {
+      if (value !== undefined) {
+        dotPayload[`stats.${key}`] = value;
+      }
+    }
+
+    await updateDoc(userDocRef, dotPayload).catch(() =>
+      setDoc(
+        userDocRef,
+        {
+          stats: statsUpdates,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      )
+    );
+  } catch (error) {
+    console.warn("[UserService] Failed to update user stats in Firestore:", error);
+  }
+}
+
+/**
+ * Subscribes to real-time user stats updates from Firestore.
+ */
+export function subscribeUserStats(
+  uid: string,
+  onUpdate: (stats: NonNullable<UserMetadata["stats"]>) => void
+): () => void {
+  if (!uid) return () => {};
+  try {
+    const userDocRef = doc(db, "users", uid);
+    return onSnapshot(userDocRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as UserMetadata;
+        if (data.stats) {
+          onUpdate(data.stats);
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("[UserService] Failed to subscribe to user stats:", e);
+    return () => {};
+  }
+}
+
+/**
  * Fetches user metadata document from Firestore.
  */
 export async function getUserMetadata(
@@ -115,3 +182,4 @@ export async function getUserMetadata(
     return null;
   }
 }
+

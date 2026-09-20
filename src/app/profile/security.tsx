@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
+import { IosDialog } from "../../components/common/IosDialog";
 
 type ActiveModal =
   | "reset_password"
@@ -72,7 +73,7 @@ export default function SecurityScreen() {
 
   const topInset = Math.max(
     insets.top,
-    Platform.OS === "android" ? (RNStatusBar.currentHeight || 24) : 16
+    Platform.OS === "android" ? RNStatusBar.currentHeight || 24 : 16
   );
 
   const sensorName = capability?.sensorName || "Biometrics";
@@ -105,10 +106,8 @@ export default function SecurityScreen() {
     setIsTogglingBiometrics(true);
     try {
       const result = await setBiometricsEnabled(val);
-      if (!result.success) {
-        if (result.error && result.error !== "Authentication cancelled.") {
-          Alert.alert("Verification Failed", result.error);
-        }
+      if (!result.success && result.error && result.error !== "Authentication cancelled.") {
+        Alert.alert("Verification Failed", result.error);
       }
     } finally {
       setIsTogglingBiometrics(false);
@@ -153,16 +152,6 @@ export default function SecurityScreen() {
     }
   };
 
-  const handleOpenAutoLockPicker = () => {
-    triggerHaptic();
-    setActiveModal("auto_lock");
-  };
-
-  const handleLockVaultNow = () => {
-    triggerHaptic();
-    setActiveModal("lock_vault");
-  };
-
   const handleSignOut = async () => {
     setActiveModal(null);
     triggerHaptic();
@@ -170,16 +159,6 @@ export default function SecurityScreen() {
       await signOut();
     } catch (err: any) {
       Alert.alert("Sign Out Error", err.message || "Failed to sign out.");
-    }
-  };
-
-  const handleDeactivate = async () => {
-    setActiveModal(null);
-    triggerHaptic();
-    try {
-      await signOut();
-    } catch (err: any) {
-      Alert.alert("Deactivation Error", err.message || "Failed to deactivate session.");
     }
   };
 
@@ -462,7 +441,10 @@ export default function SecurityScreen() {
           {/* Auto-Lock Timer Row */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={handleOpenAutoLockPicker}
+            onPress={() => {
+              triggerHaptic();
+              setActiveModal("auto_lock");
+            }}
             className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between"
           >
             <View className="flex-1 pr-3">
@@ -495,7 +477,10 @@ export default function SecurityScreen() {
           {/* Lock Vault Now Row */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={handleLockVaultNow}
+            onPress={() => {
+              triggerHaptic();
+              setActiveModal("lock_vault");
+            }}
             className="py-3.5 flex-row items-center justify-between"
           >
             <View className="flex-1 pr-3">
@@ -695,9 +680,72 @@ export default function SecurityScreen() {
         </View>
       </ScrollView>
 
-      {/* ================= UNIFIED CENTERED IOS DIALOG MODAL ================= */}
+      {/* ================= DIALOGS ================= */}
+      <IosDialog
+        visible={activeModal === "reset_password"}
+        title="Update Password"
+        message={`We will send a secure password reset link to ${user?.email || "your email"}.`}
+        onClose={() => setActiveModal(null)}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveModal(null) },
+          { text: "Send Link", style: "default", bold: true, onPress: handleConfirmResetPassword },
+        ]}
+      />
+
+      <IosDialog
+        visible={activeModal === "lock_vault"}
+        title={isBiometricsEnabled ? "Lock Vault Now" : "Biometrics Inactive"}
+        message={
+          isBiometricsEnabled
+            ? `Lock your active session now? You will need ${sensorName} to unlock your private vault.`
+            : `Enable ${sensorName} authentication first to lock and safeguard your private vault.`
+        }
+        onClose={() => setActiveModal(null)}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveModal(null) },
+          {
+            text: isBiometricsEnabled ? "Lock" : "Enable",
+            style: "default",
+            bold: true,
+            onPress: () => {
+              setActiveModal(null);
+              setTimeout(() => {
+                if (isBiometricsEnabled) {
+                  lockApp();
+                } else {
+                  handleToggleBiometrics(true);
+                }
+              }, 100);
+            },
+          },
+        ]}
+      />
+
+      <IosDialog
+        visible={activeModal === "sign_out"}
+        title="Log out"
+        message="Are you sure you want to log out of Mark-X? You will need to sign in again to access your account."
+        onClose={() => setActiveModal(null)}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveModal(null) },
+          { text: "Log out", style: "destructive", bold: true, onPress: handleSignOut },
+        ]}
+      />
+
+      <IosDialog
+        visible={activeModal === "deactivate"}
+        title="Deactivate Account"
+        message="Are you sure you want to deactivate your account? All active sessions will be terminated and your local vault will be locked."
+        onClose={() => setActiveModal(null)}
+        actions={[
+          { text: "Cancel", style: "cancel", onPress: () => setActiveModal(null) },
+          { text: "Deactivate", style: "destructive", bold: true, onPress: handleSignOut },
+        ]}
+      />
+
+      {/* Auto-Lock Picker Modal */}
       <Modal
-        visible={activeModal !== null}
+        visible={activeModal === "auto_lock"}
         transparent
         animationType="fade"
         onRequestClose={() => setActiveModal(null)}
@@ -706,333 +754,74 @@ export default function SecurityScreen() {
           <View className="flex-1 bg-black/40 items-center justify-center px-8">
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
               <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-                {activeModal === "reset_password" && (
-                  <>
-                    <View className="pt-5 px-4 pb-4 items-center">
-                      <Text
-                        className="text-[17px] text-[#000000] text-center mb-1.5"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Update Password
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#3C3C43] text-center leading-5"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        We will send a secure password reset link to {user?.email || "your email"}.
-                      </Text>
-                    </View>
+                <View className="pt-5 px-4 pb-3 items-center">
+                  <Text
+                    className="text-[17px] text-[#000000] text-center mb-1.5"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Auto-Lock Timer
+                  </Text>
+                  <Text
+                    className="text-[13px] text-[#3C3C43] text-center leading-5"
+                    style={{ fontFamily: "Outfit_400Regular" }}
+                  >
+                    Choose how quickly Mark-X locks after moving to the background.
+                  </Text>
+                </View>
 
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
 
-                    <View className="flex-row h-[44px]">
+                {TIMEOUT_OPTIONS.map((opt, index) => {
+                  const isSelected = lockTimeoutMinutes === opt.value;
+                  return (
+                    <View key={opt.value}>
+                      {index > 0 && <View className="h-[0.5px] bg-[#3C3C43]/20" />}
                       <TouchableOpacity
-                        onPress={() => {
+                        onPress={async () => {
                           triggerHaptic();
                           setActiveModal(null);
+                          await setLockTimeout(opt.value);
                         }}
                         activeOpacity={0.7}
-                        className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
+                        className="h-[44px] flex-row items-center justify-between px-5 active:bg-black/5"
                       >
                         <Text
-                          className="text-[17px] text-[#007AFF]"
-                          style={{ fontFamily: "Outfit_400Regular" }}
-                        >
-                          Cancel
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={handleConfirmResetPassword}
-                        activeOpacity={0.7}
-                        className="flex-1 items-center justify-center active:bg-black/5"
-                      >
-                        <Text
-                          className="text-[17px] text-[#007AFF]"
-                          style={{ fontFamily: "Outfit_600SemiBold" }}
-                        >
-                          Send Link
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-
-                {activeModal === "auto_lock" && (
-                  <>
-                    <View className="pt-5 px-4 pb-3 items-center">
-                      <Text
-                        className="text-[17px] text-[#000000] text-center mb-1.5"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Auto-Lock Timer
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#3C3C43] text-center leading-5"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        Choose how quickly Mark-X locks after moving to the background.
-                      </Text>
-                    </View>
-
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                    {TIMEOUT_OPTIONS.map((opt, index) => {
-                      const isSelected = lockTimeoutMinutes === opt.value;
-                      return (
-                        <View key={opt.value}>
-                          {index > 0 && <View className="h-[0.5px] bg-[#3C3C43]/20" />}
-                          <TouchableOpacity
-                            onPress={async () => {
-                              triggerHaptic();
-                              setActiveModal(null);
-                              await setLockTimeout(opt.value);
-                            }}
-                            activeOpacity={0.7}
-                            className="h-[44px] flex-row items-center justify-between px-5 active:bg-black/5"
-                          >
-                            <Text
-                              className={`text-[16px] ${
-                                isSelected ? "text-[#007AFF]" : "text-[#000000]"
-                              }`}
-                              style={{
-                                fontFamily: isSelected
-                                  ? "Outfit_600SemiBold"
-                                  : "Outfit_400Regular",
-                              }}
-                            >
-                              {opt.label}
-                            </Text>
-                            {isSelected && (
-                              <Ionicons name="checkmark" size={18} color="#007AFF" />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })}
-
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                    <TouchableOpacity
-                      onPress={() => {
-                        triggerHaptic();
-                        setActiveModal(null);
-                      }}
-                      activeOpacity={0.7}
-                      className="h-[44px] items-center justify-center active:bg-black/5"
-                    >
-                      <Text
-                        className="text-[17px] text-[#007AFF]"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Done
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-
-                {activeModal === "lock_vault" && (
-                  <>
-                    <View className="pt-5 px-4 pb-4 items-center">
-                      <Text
-                        className="text-[17px] text-[#000000] text-center mb-1.5"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        {isBiometricsEnabled ? "Lock Vault Now" : "Biometrics Inactive"}
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#3C3C43] text-center leading-5"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        {isBiometricsEnabled
-                          ? `Lock your active session now? You will need ${sensorName} to unlock your private vault.`
-                          : `Enable ${sensorName} authentication first to lock and safeguard your private vault.`}
-                      </Text>
-                    </View>
-
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                    {isBiometricsEnabled ? (
-                      <View className="flex-row h-[44px]">
-                        <TouchableOpacity
-                          onPress={() => {
-                            triggerHaptic();
-                            setActiveModal(null);
+                          className={`text-[16px] ${
+                            isSelected ? "text-[#007AFF]" : "text-[#000000]"
+                          }`}
+                          style={{
+                            fontFamily: isSelected
+                              ? "Outfit_600SemiBold"
+                              : "Outfit_400Regular",
                           }}
-                          activeOpacity={0.7}
-                          className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
                         >
-                          <Text
-                            className="text-[17px] text-[#007AFF]"
-                            style={{ fontFamily: "Outfit_400Regular" }}
-                          >
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={() => {
-                            triggerHaptic();
-                            setActiveModal(null);
-                            setTimeout(() => {
-                              lockApp();
-                            }, 100);
-                          }}
-                          activeOpacity={0.7}
-                          className="flex-1 items-center justify-center active:bg-black/5"
-                        >
-                          <Text
-                            className="text-[17px] text-[#007AFF]"
-                            style={{ fontFamily: "Outfit_600SemiBold" }}
-                          >
-                            Lock
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View className="flex-row h-[44px]">
-                        <TouchableOpacity
-                          onPress={() => {
-                            triggerHaptic();
-                            setActiveModal(null);
-                          }}
-                          activeOpacity={0.7}
-                          className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                        >
-                          <Text
-                            className="text-[17px] text-[#007AFF]"
-                            style={{ fontFamily: "Outfit_400Regular" }}
-                          >
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          onPress={() => {
-                            triggerHaptic();
-                            setActiveModal(null);
-                            setTimeout(() => {
-                              handleToggleBiometrics(true);
-                            }, 100);
-                          }}
-                          activeOpacity={0.7}
-                          className="flex-1 items-center justify-center active:bg-black/5"
-                        >
-                          <Text
-                            className="text-[17px] text-[#007AFF]"
-                            style={{ fontFamily: "Outfit_600SemiBold" }}
-                          >
-                            Enable
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </>
-                )}
-
-                {activeModal === "sign_out" && (
-                  <>
-                    <View className="pt-5 px-4 pb-4 items-center">
-                      <Text
-                        className="text-[17px] text-[#000000] text-center mb-1.5"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Log out
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#3C3C43] text-center leading-5"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        Are you sure you want to log out of Mark-X? You will need to sign in again to access your account.
-                      </Text>
-                    </View>
-
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                    <View className="flex-row h-[44px]">
-                      <TouchableOpacity
-                        onPress={() => {
-                          triggerHaptic();
-                          setActiveModal(null);
-                        }}
-                        activeOpacity={0.7}
-                        className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                      >
-                        <Text
-                          className="text-[17px] text-[#007AFF]"
-                          style={{ fontFamily: "Outfit_400Regular" }}
-                        >
-                          Cancel
+                          {opt.label}
                         </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={handleSignOut}
-                        activeOpacity={0.7}
-                        className="flex-1 items-center justify-center active:bg-black/5"
-                      >
-                        <Text
-                          className="text-[17px] text-[#FF3B30]"
-                          style={{ fontFamily: "Outfit_600SemiBold" }}
-                        >
-                          Log out
-                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={18} color="#007AFF" />
+                        )}
                       </TouchableOpacity>
                     </View>
-                  </>
-                )}
+                  );
+                })}
 
-                {activeModal === "deactivate" && (
-                  <>
-                    <View className="pt-5 px-4 pb-4 items-center">
-                      <Text
-                        className="text-[17px] text-[#000000] text-center mb-1.5"
-                        style={{ fontFamily: "Outfit_600SemiBold" }}
-                      >
-                        Deactivate Account
-                      </Text>
-                      <Text
-                        className="text-[13px] text-[#3C3C43] text-center leading-5"
-                        style={{ fontFamily: "Outfit_400Regular" }}
-                      >
-                        Are you sure you want to deactivate your account? All active sessions will be terminated and your local vault will be locked.
-                      </Text>
-                    </View>
+                <View className="h-[0.5px] bg-[#3C3C43]/20" />
 
-                    <View className="h-[0.5px] bg-[#3C3C43]/20" />
-
-                    <View className="flex-row h-[44px]">
-                      <TouchableOpacity
-                        onPress={() => {
-                          triggerHaptic();
-                          setActiveModal(null);
-                        }}
-                        activeOpacity={0.7}
-                        className="flex-1 items-center justify-center border-r border-[#3C3C43]/20 active:bg-black/5"
-                      >
-                        <Text
-                          className="text-[17px] text-[#007AFF]"
-                          style={{ fontFamily: "Outfit_400Regular" }}
-                        >
-                          Cancel
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={handleDeactivate}
-                        activeOpacity={0.7}
-                        className="flex-1 items-center justify-center active:bg-black/5"
-                      >
-                        <Text
-                          className="text-[17px] text-[#FF3B30]"
-                          style={{ fontFamily: "Outfit_600SemiBold" }}
-                        >
-                          Deactivate
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerHaptic();
+                    setActiveModal(null);
+                  }}
+                  activeOpacity={0.7}
+                  className="h-[44px] items-center justify-center active:bg-black/5"
+                >
+                  <Text
+                    className="text-[17px] text-[#007AFF]"
+                    style={{ fontFamily: "Outfit_600SemiBold" }}
+                  >
+                    Done
+                  </Text>
+                </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>

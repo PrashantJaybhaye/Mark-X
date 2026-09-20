@@ -7,7 +7,6 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Animated,
-  Alert,
   Platform,
   Modal,
   TouchableWithoutFeedback,
@@ -21,6 +20,9 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as Haptics from "expo-haptics";
+
+import { IosDialog } from "../../components/common/IosDialog";
+import { exportMediaToDevice } from "../../services/mediaExportService";
 
 import { GalleryPin, formatBytes, normalizeGalleryPin } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
@@ -337,9 +339,12 @@ export default function GalleryDetailPage() {
   const [loading, setLoading] = useState(!pin);
   const [infoVisible, setInfoVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessageDialog, setExportMessageDialog] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-
-  const heartScale = useRef(new Animated.Value(1)).current;
+  const bookmarkScale = useRef(new Animated.Value(1)).current;
   const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
@@ -363,43 +368,41 @@ export default function GalleryDetailPage() {
       }
 
       // 2. Fresh path: query server to confirm media still exists
-      try {
-        const remote = await fetchGalleryPinsFromServer();
-        const foundRemote = remote.find((p: GalleryPin) => p.id === id);
-        if (isMounted) {
-          if (foundRemote) {
-            setPin(normalizeGalleryPin(foundRemote));
-          } else {
-            setPin(null); // Deleted remotely
-          }
-        }
-      } catch (err) {
-        console.warn("[GalleryDetailPage] Remote fetch error:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+      const serverPins = await fetchGalleryPinsFromServer();
+      if (!isMounted) return;
+
+      if (!serverPins) {
+        setLoading(false);
+        return;
       }
+
+      const remotePin = serverPins.find((p) => p.id === id);
+      if (remotePin) {
+        setPin(remotePin);
+      } else if (!foundCached) {
+        setPin(null);
+      }
+      setLoading(false);
     };
 
     resolvePin();
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, router]);
 
   // Helper to persist updates to state, cache, and Firestore
   const updatePin = useCallback(async (updates: Partial<GalleryPin>) => {
     if (!pin) return;
-    const updated = { ...pin, ...updates };
-    setPin(updated);
-
+    setPin((prev) => (prev ? { ...prev, ...updates } : null));
     await updateGalleryPinInServer(pin.id, updates).catch(console.warn);
     const cached = await loadCachedGalleryPins();
     await saveCachedGalleryPins(cached.map((p) => (p.id === pin.id ? { ...p, ...updates } : p)));
   }, [pin]);
 
-  const animateHeartBounce = () => {
-    heartScale.setValue(0.7);
-    Animated.spring(heartScale, {
+  const animateBookmarkBounce = () => {
+    bookmarkScale.setValue(0.7);
+    Animated.spring(bookmarkScale, {
       toValue: 1,
       friction: 3,
       tension: 140,
@@ -407,19 +410,10 @@ export default function GalleryDetailPage() {
     }).start();
   };
 
-  const handleLikeToggle = async () => {
-    if (!pin) return;
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    animateHeartBounce();
-
-    const newLiked = !pin.isLiked;
-    const newLikes = Math.max(0, (pin.likes || 0) + (newLiked ? 1 : -1));
-    await updatePin({ isLiked: newLiked, likes: newLikes });
-  };
-
   const handleSaveToggle = async () => {
     if (!pin) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    animateBookmarkBounce();
     await updatePin({ saved: !pin.saved });
   };
 
@@ -427,42 +421,48 @@ export default function GalleryDetailPage() {
     const now = Date.now();
     const DOUBLE_PRESS_DELAY = 280;
     if (now - lastTapRef.current < DOUBLE_PRESS_DELAY) {
-      handleLikeToggle();
+      handleSaveToggle();
     }
     lastTapRef.current = now;
   };
 
-  const handleShare = async () => {
-    if (!pin) return;
+  const handleExport = async () => {
+    if (!pin || isExporting) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    const displayTitle = pin.fileName || `${Date.now()}${pin.mediaType === "video" ? ".mp4" : ".jpg"}`;
+    setIsExporting(true);
     try {
-      await Share.share({ title: displayTitle, message: `${displayTitle}\n${pin.imageUrl}` });
-    } catch {}
+      const result = await exportMediaToDevice(pin.imageUrl, pin.fileName);
+      if (result.success && result.savedToGallery) {
+        triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+        setExportMessageDialog("Media saved directly to your device Photos.");
+      } else if (!result.success && result.message) {
+        setExportMessageDialog(result.message);
+      }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleDeleteConfirm = () => {
     if (!pin) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      "Delete Media",
-      "This item will be permanently deleted from your Mark-X vault.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await deleteGalleryPinFromServer(pin.id);
-            const cached = await loadCachedGalleryPins();
-            const filtered = cached.filter((p) => p.id !== pin.id);
-            await saveCachedGalleryPins(filtered);
-            await syncGalleryStats(filtered.length);
-            router.back();
-          },
-        },
-      ]
-    );
+    setDeleteDialogVisible(true);
+  };
+
+  const handlePerformDelete = async () => {
+    if (!pin || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteGalleryPinFromServer(pin.id);
+      const cached = await loadCachedGalleryPins();
+      const filtered = cached.filter((p) => p.id !== pin.id);
+      await saveCachedGalleryPins(filtered);
+      await syncGalleryStats(filtered.length);
+      setDeleteDialogVisible(false);
+      router.back();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (loading && !pin) {
@@ -502,7 +502,39 @@ export default function GalleryDetailPage() {
     imgWidth = maxImgHeight * ratio;
   }
 
-  const fileNameDisplay = pin.fileName || `${Date.now()}${isVideo ? ".mp4" : ".jpg"}`;
+  const formattedDateHeader = useMemo(() => {
+    if (!pin) return { date: "", time: "" };
+    let dateObj: Date | null = null;
+    if (pin.createdAt) {
+      if (typeof pin.createdAt === "object" && (pin.createdAt as any).seconds) {
+        dateObj = new Date((pin.createdAt as any).seconds * 1000);
+      } else if (typeof pin.createdAt === "string" || typeof pin.createdAt === "number") {
+        const parsed = new Date(pin.createdAt);
+        if (!isNaN(parsed.getTime())) dateObj = parsed;
+      }
+    }
+    if (!dateObj) {
+      const match = pin.id.match(/\d{10,13}/) || (pin.fileName && pin.fileName.match(/\d{10,13}/));
+      if (match) {
+        const num = parseInt(match[0], 10);
+        dateObj = new Date(num > 100000000000 ? num : num * 1000);
+      } else {
+        dateObj = new Date();
+      }
+    }
+
+    const dateStr = dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const timeStr = dateObj.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    return { date: dateStr, time: timeStr };
+  }, [pin]);
 
   return (
     <View className="flex-1 bg-white">
@@ -514,7 +546,7 @@ export default function GalleryDetailPage() {
           <View
             style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
           >
-            <InlineVideoPlayer sourceUrl={pin.imageUrl} isMuted={isMuted} onDoubleTap={handleLikeToggle} />
+            <InlineVideoPlayer sourceUrl={pin.imageUrl} isMuted={isMuted} onDoubleTap={handleSaveToggle} />
           </View>
         ) : (
           <TouchableOpacity activeOpacity={1} onPress={handlePhotoPress} className="w-full h-full items-center justify-center">
@@ -548,14 +580,31 @@ export default function GalleryDetailPage() {
               <Ionicons name="chevron-back" size={22} color="#1C1C1E" />
             </TouchableOpacity>
 
-            <View className="items-center px-3 py-1 rounded-full bg-white/75 border border-black/[0.06] backdrop-blur-xl max-w-[60%]">
-              <Text numberOfLines={1} className="text-[14px] font-outfit-bold text-[#1C1C1E] text-center">
-                {fileNameDisplay}
+            {/* Middle: Clean Apple Photos Style Date & Time Header Button */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setInfoVisible(true);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 14, right: 14 }}
+              className="items-center justify-center max-w-[55%]"
+            >
+              <Text
+                numberOfLines={1}
+                className="text-[14px] text-[#1C1C1E] text-center"
+                style={{ fontFamily: "Outfit_600SemiBold" }}
+              >
+                {formattedDateHeader.date}
               </Text>
-              <Text numberOfLines={1} className="text-[10px] font-outfit text-[#8E8E93] text-center tracking-wide">
-                {pin.author} • Mark HD
+              <Text
+                numberOfLines={1}
+                className="text-[11px] text-[#8E8E93] text-center mt-0.5"
+                style={{ fontFamily: "Outfit_400Regular" }}
+              >
+                {formattedDateHeader.time} {pin.fileSizeFormatted ? `· ${pin.fileSizeFormatted}` : ""}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             <View className="flex-row items-center gap-2">
               {isVideo && (
@@ -594,22 +643,16 @@ export default function GalleryDetailPage() {
           <View className="flex-row items-center justify-around py-3 px-2">
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={handleShare}
+              onPress={handleExport}
+              disabled={isExporting}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               className="w-12 h-10 items-center justify-center"
             >
-              <Ionicons name="share-outline" size={24} color="#1C1C1E" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleLikeToggle}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              className="w-12 h-10 items-center justify-center"
-            >
-              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                <Ionicons name={pin.isLiked ? "heart" : "heart-outline"} size={25} color={pin.isLiked ? "#FF2D55" : "#1C1C1E"} />
-              </Animated.View>
+              {isExporting ? (
+                <ActivityIndicator size="small" color="#1C1C1E" />
+              ) : (
+                <Ionicons name="download-outline" size={24} color="#1C1C1E" />
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -618,7 +661,13 @@ export default function GalleryDetailPage() {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               className="w-12 h-10 items-center justify-center"
             >
-              <Ionicons name={pin.saved ? "bookmark" : "bookmark-outline"} size={23} color={pin.saved ? "#FF9500" : "#1C1C1E"} />
+              <Animated.View style={{ transform: [{ scale: bookmarkScale }] }}>
+                <Ionicons
+                  name={pin.saved ? "bookmark" : "bookmark-outline"}
+                  size={24}
+                  color={pin.saved ? "#FF9500" : "#1C1C1E"}
+                />
+              </Animated.View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -655,6 +704,44 @@ export default function GalleryDetailPage() {
         onClose={() => setOptionsVisible(false)}
         onSaveToggle={handleSaveToggle}
         onHidePin={handleDeleteConfirm}
+      />
+
+      {/* 6. Delete Confirmation Dialog */}
+      <IosDialog
+        visible={deleteDialogVisible}
+        onClose={() => setDeleteDialogVisible(false)}
+        title="Delete Media"
+        message="This item will be permanently deleted from your Mark-X vault."
+        actions={[
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setDeleteDialogVisible(false),
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            bold: true,
+            loading: isDeleting,
+            onPress: handlePerformDelete,
+          },
+        ]}
+      />
+
+      {/* 7. Export Status Dialog */}
+      <IosDialog
+        visible={exportMessageDialog !== null}
+        onClose={() => setExportMessageDialog(null)}
+        title="Export"
+        message={exportMessageDialog || ""}
+        actions={[
+          {
+            text: "OK",
+            style: "default",
+            bold: true,
+            onPress: () => setExportMessageDialog(null),
+          },
+        ]}
       />
     </View>
   );

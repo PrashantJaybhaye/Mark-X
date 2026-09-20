@@ -43,30 +43,42 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
 }
 
 export async function safePickImage(): Promise<PickedImageResult | null> {
+  const results = await safePickMultipleImages(1);
+  return results[0] || null;
+}
+
+export async function safePickMultipleImages(limit = 5): Promise<PickedImageResult[]> {
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: limit > 1,
+      selectionLimit: limit,
       allowsEditing: false,
       quality: 0.9,
     });
 
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      const isVideo = asset.type === "video";
-      return {
-        fileName: asset.fileName || undefined,
-        uri: asset.uri,
-        width: asset.width || 800,
-        height: asset.height || 1000,
-        fileSize: asset.fileSize,
-        mimeType: asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
-        type: isVideo ? "video" : "image",
-        duration: asset.duration ? (asset.duration > 1000 ? Math.round(asset.duration / 1000) : Math.round(asset.duration)) : undefined,
-      };
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      return result.assets.slice(0, limit).map((asset) => {
+        const isVideo = asset.type === "video";
+        return {
+          fileName: asset.fileName || undefined,
+          uri: asset.uri,
+          width: asset.width || 800,
+          height: asset.height || 1000,
+          fileSize: asset.fileSize,
+          mimeType: asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
+          type: isVideo ? "video" : "image",
+          duration: asset.duration
+            ? asset.duration > 1000
+              ? Math.round(asset.duration / 1000)
+              : Math.round(asset.duration)
+            : undefined,
+        };
+      });
     }
-    return null;
+    return [];
   } catch (err) {
     console.warn("[SafePicker] Error during media picking:", err);
-    return null;
+    return [];
   }
 }

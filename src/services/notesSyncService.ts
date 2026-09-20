@@ -7,7 +7,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
-import { NoteItem } from "../components/notes/NoteItemCard";
+import { NoteItem } from "../types/note";
 import { loadNotes, saveNotes } from "./storageService";
 
 function notesCollection() {

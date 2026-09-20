@@ -4,15 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { triggerHaptic } from "../../utils/haptics";
 
-export interface NoteItem {
-  id: string;
-  title: string;
-  body?: string;
-  iconName?: keyof typeof Ionicons.glyphMap;
-  createdAt: string;
-  updatedAt?: string;
-  isPinned?: boolean;
-}
+import { NoteItem } from "../../types/note";
+export type { NoteItem };
 
 interface NoteItemCardProps {
   note: NoteItem;

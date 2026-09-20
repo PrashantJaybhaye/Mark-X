@@ -6,10 +6,14 @@ import {
   getDocs,
   query,
   orderBy,
+  limit,
+  startAfter,
   serverTimestamp,
   updateDoc,
   deleteField,
   onSnapshot,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import { GalleryPin, normalizeGalleryPin } from "../utils/galleryData";
@@ -19,6 +23,14 @@ import {
   saveCachedGalleryPins, 
   loadCachedGalleryPins 
 } from "./storageService";
+
+export const GALLERY_PAGE_LIMIT = 12;
+
+export interface PaginatedPinsResult {
+  pins: GalleryPin[];
+  lastVisibleDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
+}
 
 /**
  * Gets a reference to the user's isolated gallery subcollection on the server
@@ -44,6 +56,79 @@ function sanitizeForServer(obj: Record<string, any>): Record<string, any> {
 }
 
 /**
+ * Migrates a legacy pin document to the current schema if legacy fields or missing metadata are detected.
+ * Returns the update Promise if migration is needed, or null if already up to date.
+ */
+function migratePinDocumentIfNeeded(docSnap: QueryDocumentSnapshot<DocumentData>): Promise<any> | null {
+  const rawData = docSnap.data();
+  const normalized = normalizeGalleryPin({ id: docSnap.id, ...rawData });
+
+  const hasLegacyFields =
+    rawData.title !== undefined ||
+    rawData.domain !== undefined ||
+    rawData.category !== undefined ||
+    rawData.tags !== undefined ||
+    rawData.description !== undefined ||
+    rawData.storageEngine !== undefined;
+
+  const isInvalidOrOldFileName =
+    !rawData.fileName ||
+    !/^\d{12,14}\.(jpe?g|png|webp|mp4|mov)$/i.test(rawData.fileName);
+
+  const isMissingMetadata =
+    isInvalidOrOldFileName ||
+    !rawData.fileSizeFormatted ||
+    !rawData.width ||
+    !rawData.height ||
+    !rawData.mimeType;
+
+  if (!hasLegacyFields && !isMissingMetadata) {
+    return null;
+  }
+
+  const updatePayload: Record<string, any> = {
+    title: deleteField(),
+    domain: deleteField(),
+    category: deleteField(),
+    tags: deleteField(),
+    description: deleteField(),
+    storageEngine: deleteField(),
+    fileName: normalized.fileName,
+    width: normalized.width,
+    height: normalized.height,
+    fileSize: normalized.fileSize,
+    fileSizeFormatted: normalized.fileSizeFormatted,
+    mimeType: normalized.mimeType,
+    author: rawData.author || "You",
+    updatedAt: serverTimestamp(),
+    ...(normalized.duration ? { duration: normalized.duration } : {}),
+  };
+
+  const cleanDoc = sanitizeForServer({
+    id: docSnap.id,
+    imageUrl: rawData.imageUrl || normalized.imageUrl,
+    fileName: normalized.fileName,
+    mediaType: rawData.mediaType || normalized.mediaType || "image",
+    aspectRatio: rawData.aspectRatio || normalized.aspectRatio || 0.75,
+    width: normalized.width,
+    height: normalized.height,
+    fileSize: normalized.fileSize,
+    fileSizeFormatted: normalized.fileSizeFormatted,
+    mimeType: normalized.mimeType,
+    author: rawData.author || "You",
+    likes: typeof rawData.likes === "number" ? rawData.likes : 0,
+    isLiked: !!rawData.isLiked,
+    saved: !!rawData.saved,
+    createdAt: rawData.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...(normalized.duration ? { duration: normalized.duration } : {}),
+  });
+
+  const cleanUpdatePayload = sanitizeForServer(updatePayload);
+  return updateDoc(docSnap.ref, cleanUpdatePayload).catch(() => setDoc(docSnap.ref, cleanDoc));
+}
+
+/**
  * Purges obsolete fields (title, domain, category, tags, description, storageEngine)
  * from all gallery pins in the user's Firestore database collection.
  */
@@ -52,90 +137,20 @@ export async function purgeLegacyFieldsFromDatabase(): Promise<number> {
     const colRef = getGalleryCollectionRef();
     const snapshot = await getDocs(colRef);
     const updates: Promise<any>[] = [];
-    let count = 0;
 
     for (const docSnap of snapshot.docs) {
-      const rawData = docSnap.data();
-      const normalized = normalizeGalleryPin({ id: docSnap.id, ...rawData });
-
-      const hasLegacyFields =
-        rawData.title !== undefined ||
-        rawData.domain !== undefined ||
-        rawData.category !== undefined ||
-        rawData.tags !== undefined ||
-        rawData.description !== undefined ||
-        rawData.storageEngine !== undefined;
-
-      const isInvalidOrOldFileName =
-        !rawData.fileName ||
-        !/^\d{12,14}\.(jpe?g|png|webp|mp4|mov)$/i.test(rawData.fileName);
-
-      const isMissingMetadata =
-        isInvalidOrOldFileName ||
-        !rawData.fileSizeFormatted ||
-        !rawData.width ||
-        !rawData.height ||
-        !rawData.mimeType;
-
-      if (hasLegacyFields || isMissingMetadata) {
-        count++;
-        const updatePayload: Record<string, any> = {
-          title: deleteField(),
-          domain: deleteField(),
-          category: deleteField(),
-          tags: deleteField(),
-          description: deleteField(),
-          storageEngine: deleteField(),
-          fileName: normalized.fileName,
-          width: normalized.width,
-          height: normalized.height,
-          fileSize: normalized.fileSize,
-          fileSizeFormatted: normalized.fileSizeFormatted,
-          mimeType: normalized.mimeType,
-          author: rawData.author || "You",
-          updatedAt: serverTimestamp(),
-        };
-
-        if (normalized.duration) {
-          updatePayload.duration = normalized.duration;
-        }
-
-        const cleanDoc = sanitizeForServer({
-          id: docSnap.id,
-          imageUrl: rawData.imageUrl || normalized.imageUrl,
-          fileName: normalized.fileName,
-          mediaType: rawData.mediaType || normalized.mediaType || "image",
-          aspectRatio: rawData.aspectRatio || normalized.aspectRatio || 0.75,
-          width: normalized.width,
-          height: normalized.height,
-          fileSize: normalized.fileSize,
-          fileSizeFormatted: normalized.fileSizeFormatted,
-          mimeType: normalized.mimeType,
-          author: rawData.author || "You",
-          likes: typeof rawData.likes === "number" ? rawData.likes : 1,
-          isLiked: !!rawData.isLiked,
-          saved: !!rawData.saved,
-          createdAt: rawData.createdAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          ...(normalized.duration ? { duration: normalized.duration } : {}),
-        });
-
-        const cleanUpdatePayload = sanitizeForServer(updatePayload);
-        updates.push(
-          updateDoc(docSnap.ref, cleanUpdatePayload).catch(() => {
-            // Overwrite cleanly if updateDoc fails
-            return setDoc(docSnap.ref, cleanDoc);
-          })
-        );
+      const migrationPromise = migratePinDocumentIfNeeded(docSnap);
+      if (migrationPromise) {
+        updates.push(migrationPromise);
       }
     }
 
     if (updates.length > 0) {
       await Promise.all(updates);
-      console.log(`[GalleryServerService] Successfully updated ${count} documents in DB to new filename format.`);
+      console.log(`[GalleryServerService] Successfully updated ${updates.length} legacy documents in DB.`);
     }
 
-    return count;
+    return updates.length;
   } catch (err) {
     console.warn("[GalleryServerService] Error updating legacy fields in DB:", err);
     return 0;
@@ -161,92 +176,98 @@ export async function fetchGalleryPinsFromServer(): Promise<GalleryPin[]> {
       const normalized = normalizeGalleryPin({ id: docSnap.id, ...rawData });
       pins.push(normalized);
 
-      // Check if this document contains legacy fields or has old filename format
-      const hasLegacyFields =
-        rawData.title !== undefined ||
-        rawData.domain !== undefined ||
-        rawData.category !== undefined ||
-        rawData.tags !== undefined ||
-        rawData.description !== undefined ||
-        rawData.storageEngine !== undefined;
-
-      const isInvalidOrOldFileName =
-        !rawData.fileName ||
-        !/^\d{12,14}\.(jpe?g|png|webp|mp4|mov)$/i.test(rawData.fileName);
-
-      const isMissingMetadata =
-        isInvalidOrOldFileName ||
-        !rawData.fileSizeFormatted ||
-        !rawData.width ||
-        !rawData.height ||
-        !rawData.mimeType;
-
-      if (hasLegacyFields || isMissingMetadata) {
-        const updatePayload: Record<string, any> = {
-          title: deleteField(),
-          domain: deleteField(),
-          category: deleteField(),
-          tags: deleteField(),
-          description: deleteField(),
-          storageEngine: deleteField(),
-          fileName: normalized.fileName,
-          width: normalized.width,
-          height: normalized.height,
-          fileSize: normalized.fileSize,
-          fileSizeFormatted: normalized.fileSizeFormatted,
-          mimeType: normalized.mimeType,
-          author: rawData.author || "You",
-          updatedAt: serverTimestamp(),
-        };
-
-        if (normalized.duration) {
-          updatePayload.duration = normalized.duration;
-        }
-
-        const cleanDoc = sanitizeForServer({
-          id: docSnap.id,
-          imageUrl: rawData.imageUrl || normalized.imageUrl,
-          fileName: normalized.fileName,
-          mediaType: rawData.mediaType || normalized.mediaType || "image",
-          aspectRatio: rawData.aspectRatio || normalized.aspectRatio || 0.75,
-          width: normalized.width,
-          height: normalized.height,
-          fileSize: normalized.fileSize,
-          fileSizeFormatted: normalized.fileSizeFormatted,
-          mimeType: normalized.mimeType,
-          author: rawData.author || "You",
-          likes: typeof rawData.likes === "number" ? rawData.likes : 1,
-          isLiked: !!rawData.isLiked,
-          saved: !!rawData.saved,
-          createdAt: rawData.createdAt || serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          ...(normalized.duration ? { duration: normalized.duration } : {}),
-        });
-
-        const cleanUpdatePayload = sanitizeForServer(updatePayload);
-        migrationUpdates.push(
-          updateDoc(docSnap.ref, cleanUpdatePayload).catch(() => {
-            return setDoc(docSnap.ref, cleanDoc);
-          })
-        );
+      const migrationPromise = migratePinDocumentIfNeeded(docSnap);
+      if (migrationPromise) {
+        migrationUpdates.push(migrationPromise);
       }
     }
 
-    // Await migrations so Firestore reflects changes immediately
+    // Await migrations in background without blocking pin delivery
     if (migrationUpdates.length > 0) {
-      await Promise.all(migrationUpdates);
-      console.log(`[GalleryServerService] Successfully purged legacy fields from ${migrationUpdates.length} pins in database.`);
+      Promise.all(migrationUpdates).catch(console.warn);
     }
 
-    // Always update local cache & stats with the full fresh list from the server (remote is source of truth)
+    // Always update local cache & stats with the full fresh list from the server
     await saveCachedGalleryPins(pins);
     await syncGalleryStats(pins.length);
 
     return pins;
   } catch (error) {
     console.error("[GalleryServerService] Fetch failed:", error);
-    // On network failure or offline, return local cache
     return await loadCachedGalleryPins();
+  }
+}
+
+/**
+ * Fetches a paginated batch of gallery pins (default limit: 12) from Firestore.
+ */
+export async function fetchGalleryPinsPage(
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  pageSize = GALLERY_PAGE_LIMIT
+): Promise<PaginatedPinsResult> {
+  try {
+    const colRef = getGalleryCollectionRef();
+    let q = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
+    if (lastDoc) {
+      q = query(colRef, orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize));
+    }
+    const snapshot = await getDocs(q);
+    const pins: GalleryPin[] = [];
+
+    for (const docSnap of snapshot.docs) {
+      const rawData = docSnap.data();
+      pins.push(normalizeGalleryPin({ id: docSnap.id, ...rawData }));
+    }
+
+    const lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1] || null;
+    const hasMore = snapshot.docs.length === pageSize;
+
+    return {
+      pins,
+      lastVisibleDoc,
+      hasMore,
+    };
+  } catch (error) {
+    console.warn("[GalleryServerService] Paginated fetch failed:", error);
+    return { pins: [], lastVisibleDoc: null, hasMore: false };
+  }
+}
+
+/**
+ * Subscribes to real-time gallery updates for the latest pins (default limit: 12) from Firestore.
+ */
+export function subscribeLatestGalleryPins(
+  onUpdate: (pins: GalleryPin[]) => void,
+  pageSize = GALLERY_PAGE_LIMIT,
+  onError?: (error: Error) => void
+): () => void {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  try {
+    const colRef = collection(db, "users", uid, "gallery");
+    const q = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
+
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const pins: GalleryPin[] = [];
+        snapshot.forEach((docSnap) => {
+          pins.push(normalizeGalleryPin({ id: docSnap.id, ...docSnap.data() }));
+        });
+        onUpdate(pins);
+      },
+      (error) => {
+        console.warn("[GalleryServerService] Subscription error:", error);
+        if (onError) onError(error);
+      }
+    );
+  } catch (err) {
+    console.warn("[GalleryServerService] Exception setting up gallery listener:", err);
+    return () => {};
   }
 }
 
@@ -260,38 +281,7 @@ export function subscribeGalleryPins(
   onUpdate: (pins: GalleryPin[]) => void,
   onError?: (error: Error) => void
 ): () => void {
-  const uid = auth.currentUser?.uid;
-  if (!uid) {
-    onUpdate([]);
-    return () => {};
-  }
-
-  try {
-    const colRef = collection(db, "users", uid, "gallery");
-    const q = query(colRef, orderBy("createdAt", "desc"));
-
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const pins: GalleryPin[] = [];
-        snapshot.forEach((docSnap) => {
-          pins.push(normalizeGalleryPin({ id: docSnap.id, ...docSnap.data() }));
-        });
-
-        // Remote database is the source of truth: replace local cache & sync stats
-        saveCachedGalleryPins(pins).catch(console.warn);
-        syncGalleryStats(pins.length).catch(console.warn);
-        onUpdate(pins);
-      },
-      (error) => {
-        console.warn("[GalleryServerService] Subscription error:", error);
-        if (onError) onError(error);
-      }
-    );
-  } catch (err) {
-    console.warn("[GalleryServerService] Exception setting up gallery listener:", err);
-    return () => {};
-  }
+  return subscribeLatestGalleryPins(onUpdate, GALLERY_PAGE_LIMIT, onError);
 }
 
 /**

@@ -43,13 +43,15 @@ export interface FormatRange {
   length: number;
 }
 
-function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
-  if (!formats || formats.length === 0) return <Text allowFontScaling={false} style={baseStyle}>{text}</Text>;
-  
+function splitIntoFormattedChunks(text: string, formats?: FormatRange[]) {
+  if (!formats || formats.length === 0) {
+    return text ? [{ text, formats: new Set<string>() }] : [];
+  }
+
   const charFormats = Array.from({ length: text.length }, () => new Set<string>());
   for (const f of formats) {
-    for (let i = f.start; i < f.start + f.length; i++) {
-      if (i < text.length) charFormats[i].add(f.type);
+    for (let i = f.start; i < Math.min(f.start + f.length, text.length); i++) {
+      charFormats[i].add(f.type);
     }
   }
 
@@ -59,12 +61,16 @@ function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
 
   for (let i = 0; i <= text.length; i++) {
     const formatsAtI = i < text.length ? charFormats[i] : new Set<string>();
-    
+
     let changed = false;
-    if (formatsAtI.size !== currentFormats.size) changed = true;
-    else {
+    if (formatsAtI.size !== currentFormats.size) {
+      changed = true;
+    } else {
       for (const f of currentFormats) {
-        if (!formatsAtI.has(f)) { changed = true; break; }
+        if (!formatsAtI.has(f)) {
+          changed = true;
+          break;
+        }
       }
     }
 
@@ -79,6 +85,13 @@ function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
     }
   }
 
+  return chunks;
+}
+
+function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
+  if (!formats || formats.length === 0) return <Text allowFontScaling={false} style={baseStyle}>{text}</Text>;
+
+  const chunks = splitIntoFormattedChunks(text, formats);
   return chunks.map((chunk, i) => {
     const style: any = { ...baseStyle };
     if (chunk.formats.has("bold")) { style.fontFamily = "Outfit_700Bold"; style.fontWeight = "bold"; }
@@ -127,39 +140,8 @@ function parseFormattedText(rawText: string) {
 
 function formatBlockText(block: NoteBlock): string {
   if (!block.formats || block.formats.length === 0) return block.text;
-  
-  const charFormats = Array.from({ length: block.text.length }, () => new Set<string>());
-  for (const f of block.formats) {
-    for (let i = f.start; i < f.start + f.length; i++) {
-      if (i < block.text.length) charFormats[i].add(f.type);
-    }
-  }
 
-  const chunks: { text: string; formats: Set<string> }[] = [];
-  let currentText = "";
-  let currentFormats = new Set<string>();
-
-  for (let i = 0; i <= block.text.length; i++) {
-    const formatsAtI = i < block.text.length ? charFormats[i] : new Set<string>();
-    let changed = false;
-    if (formatsAtI.size !== currentFormats.size) changed = true;
-    else {
-      for (const f of currentFormats) {
-        if (!formatsAtI.has(f)) { changed = true; break; }
-      }
-    }
-
-    if (changed || i === block.text.length) {
-      if (currentText.length > 0) chunks.push({ text: currentText, formats: currentFormats });
-      if (i < block.text.length) {
-        currentText = block.text[i];
-        currentFormats = formatsAtI;
-      }
-    } else {
-      if (i < block.text.length) currentText += block.text[i];
-    }
-  }
-
+  const chunks = splitIntoFormattedChunks(block.text, block.formats);
   let result = "";
   for (const chunk of chunks) {
     let chunkStr = chunk.text;

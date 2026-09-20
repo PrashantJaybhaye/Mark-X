@@ -125,7 +125,7 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
     fileSize,
     fileSizeFormatted,
     author: pin.author || "You",
-    likes: typeof pin.likes === "number" ? pin.likes : 1,
+    likes: typeof pin.likes === "number" ? pin.likes : 0,
     isLiked: !!pin.isLiked,
     saved: !!pin.saved,
     uploadStatus,

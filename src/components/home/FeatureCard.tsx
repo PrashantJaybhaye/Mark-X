@@ -1,11 +1,12 @@
+import React, { useState, useEffect } from "react";
+import { Text, TouchableOpacity, View, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
 
 interface FeatureCardProps {
   title: string;
   count: number | string;
   subtitle: string;
+  isLoading?: boolean;
   children: React.ReactNode;
   onPress: () => void;
 }
@@ -14,9 +15,33 @@ export function FeatureCard({
   title,
   count,
   subtitle,
+  isLoading = false,
   children,
   onPress,
 }: FeatureCardProps) {
+  const [pulseAnim] = useState(() => new Animated.Value(0.35));
+
+  useEffect(() => {
+    if (isLoading) {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.8,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.35,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+      return () => animation.stop();
+    }
+  }, [isLoading, pulseAnim]);
+
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -38,13 +63,20 @@ export function FeatureCard({
       <View className="my-1 w-full">{children}</View>
 
       <View className="mt-1">
-        <Text
-          allowFontScaling={false}
-          className="text-[20px] text-[#111111] leading-tight"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          {count}
-        </Text>
+        {isLoading ? (
+          <Animated.View
+            style={{ opacity: pulseAnim }}
+            className="w-10 h-6 bg-black/10 rounded-md my-0.5"
+          />
+        ) : (
+          <Text
+            allowFontScaling={false}
+            className="text-[20px] text-[#111111] leading-tight"
+            style={{ fontFamily: "Outfit_700Bold" }}
+          >
+            {count}
+          </Text>
+        )}
         <Text
           allowFontScaling={false}
           className="text-[11px] text-[#8E8E93] mt-0.5"
@@ -57,3 +89,4 @@ export function FeatureCard({
     </TouchableOpacity>
   );
 }
+

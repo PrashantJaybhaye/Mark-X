@@ -9,6 +9,7 @@ interface StorageHeroCardProps {
   userName?: string;
   tagline?: string;
   isLoading?: boolean;
+  isStatsLoading?: boolean;
   onManageStorage?: () => void;
   onUploadFile?: () => void;
   onAddPhoto?: () => void;
@@ -108,11 +109,34 @@ export function StorageHeroCard({
   userName,
   tagline = "Beyond All Limits",
   isLoading,
+  isStatsLoading = false,
   onManageStorage,
   onUploadFile,
   onAddPhoto,
 }: StorageHeroCardProps) {
   const { user, loading } = useAuth();
+  const [pulseAnim] = useState(() => new Animated.Value(0.35));
+
+  useEffect(() => {
+    if (isStatsLoading) {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.85,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.35,
+            duration: 750,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animation.start();
+      return () => animation.stop();
+    }
+  }, [isStatsLoading, pulseAnim]);
 
   if (isLoading || (loading && !userName)) {
     return <StorageHeroCardSkeleton />;
@@ -185,29 +209,36 @@ export function StorageHeroCard({
               Used Storage
             </Text>
 
-            <View className="flex-row items-baseline">
-              <Text
-                allowFontScaling={false}
-                className="text-[36px] text-white tracking-tight leading-none"
-                style={{ fontFamily: "Outfit_700Bold" }}
-              >
-                {whole}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                className="text-[22px] text-white/95 leading-none"
-                style={{ fontFamily: "Outfit_700Bold" }}
-              >
-                .{decimal}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                className="text-[14px] text-white/85 ml-1.5 leading-none"
-                style={{ fontFamily: "Outfit_600SemiBold" }}
-              >
-                GB
-              </Text>
-            </View>
+            {isStatsLoading ? (
+              <Animated.View
+                style={{ opacity: pulseAnim }}
+                className="w-24 h-8 bg-white/30 rounded-lg my-1"
+              />
+            ) : (
+              <View className="flex-row items-baseline">
+                <Text
+                  allowFontScaling={false}
+                  className="text-[36px] text-white tracking-tight leading-none"
+                  style={{ fontFamily: "Outfit_700Bold" }}
+                >
+                  {whole}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  className="text-[22px] text-white/95 leading-none"
+                  style={{ fontFamily: "Outfit_700Bold" }}
+                >
+                  .{decimal}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  className="text-[14px] text-white/85 ml-1.5 leading-none"
+                  style={{ fontFamily: "Outfit_600SemiBold" }}
+                >
+                  GB
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Right Status Capsule */}

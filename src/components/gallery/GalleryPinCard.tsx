@@ -134,6 +134,22 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
             ) : null}
           </View>
         )}
+
+        {/* Bookmarked Badge (Top-Left, No Round Border) */}
+        {pin.saved && !isUploading && !isFailed && (
+          <View
+            className="absolute top-2.5 left-2.5"
+            style={{
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 1.5 },
+              shadowOpacity: 0.65,
+              shadowRadius: 3,
+              elevation: 4,
+            }}
+          >
+            <Ionicons name="bookmark" size={20} color="#FF9500" />
+          </View>
+        )}
       </TouchableOpacity>
 
       {/* 2. Pin Sub-Row: Options menu action */}

@@ -12,12 +12,15 @@ import * as Haptics from "expo-haptics";
 import { GalleryPin } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
 
+import { exportMediaToDevice } from "../../services/mediaExportService";
+
 interface GalleryPinOptionsSheetProps {
   pin: GalleryPin | null;
   visible: boolean;
   onClose: () => void;
   onSaveToggle: (pinId: string) => void;
   onHidePin?: (pinId: string) => void;
+  onExport?: (pin: GalleryPin) => void;
 }
 
 export function GalleryPinOptionsSheet({
@@ -26,23 +29,20 @@ export function GalleryPinOptionsSheet({
   onClose,
   onSaveToggle,
   onHidePin,
+  onExport,
 }: GalleryPinOptionsSheetProps) {
   const insets = useSafeAreaInsets();
 
   if (!pin) return null;
 
-  const handleShare = async () => {
+  const handleExport = async () => {
     onClose();
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    const fileName = pin.fileName || (pin.mediaType === "video" ? "8646565.mp4" : "8646565.jpg");
-    try {
-      await Share.share({
-        title: fileName,
-        message: `${fileName}\n${pin.imageUrl}`,
-      });
-    } catch {
-      // ignore
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    if (onExport) {
+      onExport(pin);
+      return;
     }
+    await exportMediaToDevice(pin.imageUrl, pin.fileName);
   };
 
   const handleSave = () => {
@@ -103,17 +103,17 @@ export function GalleryPinOptionsSheet({
               </Text>
             </TouchableOpacity>
 
-            {/* Share */}
+            {/* Export */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={handleShare}
+              onPress={handleExport}
               className="flex-row items-center py-3.5"
             >
               <View className="w-9 h-9 rounded-full bg-[#F0F2F4] items-center justify-center mr-3.5">
-                <Ionicons name="share-social-outline" size={20} color="#111111" />
+                <Ionicons name="download-outline" size={20} color="#111111" />
               </View>
               <Text className="text-[15px] font-outfit-medium text-[#111111]">
-                Share Pin
+                Export Media
               </Text>
             </TouchableOpacity>
 

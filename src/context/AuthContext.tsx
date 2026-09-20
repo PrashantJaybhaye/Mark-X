@@ -27,6 +27,7 @@ import {
 } from "@react-native-google-signin/google-signin";
 import { auth } from "../services/firebase";
 import { syncUserMetadata } from "../services/userService";
+import { forceSyncAllStats } from "../services/storageService";
 import {
   syncCurrentDevice,
   listenCurrentDeviceRevocation,
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (currentUser) {
         syncUserMetadata(currentUser);
+        forceSyncAllStats().catch(console.warn);
 
         // Snapchat-style real-time device sync & remote revocation listener
         try {
