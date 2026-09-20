@@ -1,0 +1,8 @@
+name = "mark-x-storage"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# Bind R2 bucket for Mark-X gallery files
+[[r2_buckets]]
+binding = "MARK_X_BUCKET"
+bucket_name = "mark-x-gallery"

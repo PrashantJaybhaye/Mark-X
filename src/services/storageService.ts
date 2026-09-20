@@ -2,11 +2,11 @@ import '../utils/cryptoPolyfill';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./firebase";
 import { DriveItem } from "../utils/driveFileTypes";
-import { GalleryPin } from "../utils/galleryData";
 import { NoteItem } from "../components/notes/NoteItemCard";
 import * as SecureStore from "expo-secure-store";
 import CryptoJS from "crypto-js";
 import { generateUUID } from "../utils/uuid";
+import { updateUserMetadata } from "./userService";
 
 const STORAGE_KEYS = {
   DRIVE_ITEMS: "@markx_drive_items_v1",
@@ -97,8 +97,6 @@ async function saveItem<T>(baseKey: string, value: T): Promise<void> {
 
 // Drive Items
 
-import { updateUserMetadata } from "./userService";
-
 async function updateStats(updates: Partial<UserPreferences["stats"]>) {
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
@@ -175,7 +173,11 @@ export const getNoteById = async (id: string): Promise<NoteItem | null> => {
 export const saveSingleNote = async (note: NoteItem): Promise<void> => {
   const notes = await loadNotes();
   const idx = notes.findIndex((n) => n.id === note.id);
-  idx >= 0 ? (notes[idx] = note) : notes.unshift(note);
+  if (idx >= 0) {
+    notes[idx] = note;
+  } else {
+    notes.unshift(note);
+  }
   await saveNotes(notes);
 };
 

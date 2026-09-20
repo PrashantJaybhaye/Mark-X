@@ -1,5 +1,4 @@
 import * as Haptics from "expo-haptics";
-import { Platform, Vibration } from "react-native";
 
 /**
  * Triggers light/medium/heavy haptic feedback with platform vibration fallback.

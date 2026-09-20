@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, Animated } from "react-native";
-import { getTelegramFileUrl } from "../../services/telegramStorage";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -44,20 +43,6 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     }
   }, [isLoaded, pulseAnim]);
 
-  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (pin.telegramFileId) {
-      getTelegramFileUrl(pin.telegramFileId).then((url) => {
-        if (isMounted && url) setRemoteUrl(url);
-      });
-    }
-    return () => { isMounted = false; };
-  }, [pin.telegramFileId]);
-
-  const displayUrl = remoteUrl || pin.imageUrl;
-
   // Compute dynamic height based on aspect ratio (e.g. 0.58 -> tall, 1.1 -> wide)
   const imageHeight = Math.min(Math.max(cardWidth / pin.aspectRatio, 120), 320);
 
@@ -88,13 +73,25 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         )}
 
         <Image
-          source={{ uri: displayUrl }}
+          source={{ uri: pin.imageUrl }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           transition={250}
           cachePolicy="memory-disk"
           onLoad={() => setIsLoaded(true)}
         />
+
+        {/* Video Indicator Pill */}
+        {pin.mediaType === "video" && (
+          <View className="absolute top-2.5 right-2.5 bg-black/60 px-2 py-1 rounded-full flex-row items-center gap-1">
+            <Ionicons name="play" size={10} color="#FFFFFF" />
+            {pin.duration ? (
+              <Text className="text-[10px] font-outfit text-white">
+                {Math.floor(pin.duration / 60)}:{String(Math.floor(pin.duration % 60)).padStart(2, "0")}
+              </Text>
+            ) : null}
+          </View>
+        )}
       </TouchableOpacity>
 
       {/* 2. Pin Sub-Row: Domain / Title snippet + 3 dots menu on the right */}

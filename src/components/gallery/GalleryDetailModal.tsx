@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { GalleryPin } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
+import { InAppVideoFrame } from "./InAppVideoFrame";
 
 interface GalleryDetailModalProps {
   pin: GalleryPin | null;
@@ -115,19 +116,28 @@ export function GalleryDetailModal({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24 }}
           >
-            {/* Main Rounded Image */}
-            <View
-              className="w-full rounded-3xl overflow-hidden bg-[#ECEEEF]"
-              style={{ height: previewHeight }}
-            >
-              <Image
-                source={{ uri: pin.imageUrl }}
-                style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
-                transition={200}
-                cachePolicy="memory-disk"
+            {/* Main Rounded Media Container (Image or In-App Video) */}
+            {pin.mediaType === "video" ? (
+              <InAppVideoFrame
+                sourceUrl={pin.imageUrl}
+                posterUrl={pin.imageUrl}
+                aspectRatio={pin.aspectRatio}
+                height={previewHeight}
               />
-            </View>
+            ) : (
+              <View
+                className="w-full rounded-3xl overflow-hidden bg-[#ECEEEF]"
+                style={{ height: previewHeight }}
+              >
+                <Image
+                  source={{ uri: pin.imageUrl }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="cover"
+                  transition={200}
+                  cachePolicy="memory-disk"
+                />
+              </View>
+            )}
 
             {/* Author Row */}
             <View className="flex-row items-center justify-between mt-4 py-2 border-b border-[#F0F2F4]">

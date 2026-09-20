@@ -13,6 +13,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DeviceType, HardwareInfo } from "../types/device";
+import { generateUUID } from "../utils/uuid";
 
 const INSTALLATION_ID_KEY = "@markx_installation_device_id";
 
@@ -20,7 +21,7 @@ export async function getPersistentDeviceId(): Promise<string> {
   try {
     const existingId = await AsyncStorage.getItem(INSTALLATION_ID_KEY);
     if (existingId) return existingId;
-    const newId = crypto.randomUUID();
+    const newId = generateUUID();
     await AsyncStorage.setItem(INSTALLATION_ID_KEY, newId);
     return newId;
   } catch (err) {

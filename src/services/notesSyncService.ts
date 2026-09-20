@@ -5,7 +5,6 @@ import {
   getDocs,
   collection,
   serverTimestamp,
-  Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import { NoteItem } from "../components/notes/NoteItemCard";

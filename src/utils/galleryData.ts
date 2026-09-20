@@ -5,7 +5,8 @@ export interface GalleryPin {
   author: string;
   authorAvatar?: string;
   imageUrl: string;
-  telegramFileId?: string;
+  mediaType?: "image" | "video";
+  duration?: number;
   aspectRatio: number; // width / height (e.g. 0.65 to 1.3)
   category: string;
   likes: number;
@@ -25,5 +26,3 @@ export const GALLERY_CATEGORIES = [
   "Minimal",
   "Architecture",
 ] as const;
-
-export const INITIAL_GALLERY_PINS: GalleryPin[] = [];

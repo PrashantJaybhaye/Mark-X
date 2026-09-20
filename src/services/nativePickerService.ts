@@ -15,6 +15,8 @@ export interface PickedImageResult {
   height: number;
   fileSize?: number;
   mimeType?: string;
+  type?: "image" | "video";
+  duration?: number;
 }
 
 export async function safePickDocument(): Promise<PickedFileResult | null> {
@@ -43,25 +45,28 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
 export async function safePickImage(): Promise<PickedImageResult | null> {
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       allowsEditing: false,
       quality: 0.9,
     });
 
     if (!result.canceled && result.assets?.[0]) {
       const asset = result.assets[0];
+      const isVideo = asset.type === "video";
       return {
         fileName: asset.fileName || undefined,
         uri: asset.uri,
         width: asset.width || 800,
         height: asset.height || 1000,
         fileSize: asset.fileSize,
-        mimeType: asset.mimeType || undefined,
+        mimeType: asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
+        type: isVideo ? "video" : "image",
+        duration: asset.duration ? (asset.duration > 1000 ? Math.round(asset.duration / 1000) : Math.round(asset.duration)) : undefined,
       };
     }
     return null;
   } catch (err) {
-    console.warn("[SafePicker] Error during image picking:", err);
+    console.warn("[SafePicker] Error during media picking:", err);
     return null;
   }
 }

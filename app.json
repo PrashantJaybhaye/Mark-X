@@ -44,7 +44,8 @@
           "faceIDPermission": "Allow Mark-X to use Face ID to secure your confidential vault, notes, and session."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 
-import { GalleryPin, INITIAL_GALLERY_PINS } from "../../utils/galleryData";
+import { GalleryPin } from "../../utils/galleryData";
 import { MarkXLogo } from "../../components/common/MarkXLogo";
 import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
 import { GalleryDetailModal } from "../../components/gallery/GalleryDetailModal";
@@ -31,7 +31,7 @@ import {
   deleteGalleryPinFromFirestore, 
   updateGalleryPinInFirestore 
 } from "../../services/galleryFirebaseService";
-import { uploadFileToTelegram } from "../../services/telegramStorage";
+import { uploadFileToCloudflare } from "../../services/cloudflareStorage";
 
 export default function GalleryScreen() {
   const { width: windowWidth } = useWindowDimensions();
@@ -40,7 +40,7 @@ export default function GalleryScreen() {
   const columnWidth = (windowWidth - 24 - 10) / 2;
 
   // Gallery state loaded from persistence
-  const [pins, setPins] = useState<GalleryPin[]>(INITIAL_GALLERY_PINS);
+  const [pins, setPins] = useState<GalleryPin[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useFocusEffect(
@@ -171,19 +171,22 @@ export default function GalleryScreen() {
           ? Math.max(Math.min(result.width / result.height, 1.4), 0.6)
           : 0.75;
 
+      const isVideo = result.type === "video";
       const newPin: GalleryPin = {
         id: `pin-${generateUUID()}`,
-        title: result.fileName || "New Inspiration",
-        domain: "my-uploads",
+        title: result.fileName || (isVideo ? "Video Inspiration" : "New Inspiration"),
+        domain: isVideo ? "video" : "my-uploads",
         author: "You",
         imageUrl: result.uri,
+        mediaType: isVideo ? "video" : "image",
+        duration: result.duration,
         aspectRatio: calculatedRatio,
         category: "Aesthetic",
         likes: 1,
         isLiked: true,
         saved: true,
-        tags: ["MyUploads", "Inspiration"],
-        description: "Added to your inspiration collection.",
+        tags: isVideo ? ["Video", "Inspiration"] : ["MyUploads", "Inspiration"],
+        description: isVideo ? "Video added to your collection." : "Added to your inspiration collection.",
       };
       
       // Update local state immediately
@@ -192,13 +195,15 @@ export default function GalleryScreen() {
       // Use Firestore for metadata instead of local array rewrite
       await addGalleryPinToFirestore(newPin);
 
-      // Upload to Telegram in background
-      uploadFileToTelegram(result.uri, result.mimeType || "image/jpeg", result.fileName || "photo.jpg", true).then(async res => {
-        if (res.success && res.fileId) {
+      // Upload to Cloudflare in background
+      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+      const defaultFilename = isVideo ? "video.mp4" : "photo.jpg";
+      uploadFileToCloudflare(result.uri, result.mimeType || defaultMime, result.fileName || defaultFilename).then(async res => {
+        if (res.success && res.url) {
           setPins((prev) => 
-            prev.map(p => p.id === newPin.id ? { ...p, telegramFileId: res.fileId } : p)
+            prev.map(p => p.id === newPin.id ? { ...p, imageUrl: res.url! } : p)
           );
-          await updateGalleryPinInFirestore(newPin.id, { telegramFileId: res.fileId });
+          await updateGalleryPinInFirestore(newPin.id, { imageUrl: res.url });
         }
       });
     }
@@ -267,7 +272,7 @@ export default function GalleryScreen() {
             <View className="flex-row w-full justify-between">
               {/* Left Column */}
               <View style={{ width: columnWidth }}>
-                {leftPins.map((pin) => (
+                {leftPins.map((pin: GalleryPin) => (
                   <GalleryPinCard
                     key={pin.id}
                     pin={pin}
@@ -280,7 +285,7 @@ export default function GalleryScreen() {
 
               {/* Right Column */}
               <View style={{ width: columnWidth }}>
-                {rightPins.map((pin) => (
+                {rightPins.map((pin: GalleryPin) => (
                   <GalleryPinCard
                     key={pin.id}
                     pin={pin}

@@ -35,8 +35,11 @@ import {
   saveDriveItems,
   loadUserPreferences,
 } from "../../services/storageService";
-import { addGalleryPinToFirestore } from "../../services/galleryFirebaseService";
-import { uploadFileToTelegram } from "../../services/telegramStorage";
+import { 
+  addGalleryPinToFirestore, 
+  updateGalleryPinInFirestore 
+} from "../../services/galleryFirebaseService";
+import { uploadFileToCloudflare } from "../../services/cloudflareStorage";
 import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
 import { GalleryPin } from "../../utils/galleryData";
 import { generateUUID } from "../../utils/uuid";
@@ -123,11 +126,14 @@ export default function HomeScreen() {
     triggerHaptic();
     const img = await safePickImage();
     if (img && img.uri) {
+      const isVideo = img.type === "video";
       const newPin: GalleryPin = {
         id: `pin-${generateUUID()}`,
-        title: img.fileName || "Captured photo",
+        title: img.fileName || (isVideo ? "Captured video" : "Captured photo"),
         author: "You",
         imageUrl: img.uri,
+        mediaType: isVideo ? "video" : "image",
+        duration: img.duration,
         aspectRatio: img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75,
         category: "Aesthetic",
         likes: 1,
@@ -138,13 +144,12 @@ export default function HomeScreen() {
       // Save metadata to Firestore
       await addGalleryPinToFirestore(newPin);
       
-      // Upload physical file to Telegram in background
-      uploadFileToTelegram(img.uri, img.mimeType || "image/jpeg", img.fileName || "photo.jpg", true).then(res => {
-        if (res.success && res.fileId) {
-          // Update Firestore doc with the telegram file ID
-          import("../../services/galleryFirebaseService").then(m => {
-            m.updateGalleryPinInFirestore(newPin.id, { telegramFileId: res.fileId });
-          });
+      // Upload physical file to Cloudflare in background
+      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+      const defaultFilename = isVideo ? "video.mp4" : "photo.jpg";
+      uploadFileToCloudflare(img.uri, img.mimeType || defaultMime, img.fileName || defaultFilename).then(res => {
+        if (res.success && res.url) {
+          updateGalleryPinInFirestore(newPin.id, { imageUrl: res.url });
         }
       });
       
