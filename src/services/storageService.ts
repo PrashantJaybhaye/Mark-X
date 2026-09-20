@@ -2,6 +2,7 @@ import '../utils/cryptoPolyfill';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "./firebase";
 import { DriveItem } from "../utils/driveFileTypes";
+import { GalleryPin } from "../utils/galleryData";
 import { NoteItem } from "../components/notes/NoteItemCard";
 import * as SecureStore from "expo-secure-store";
 import CryptoJS from "crypto-js";
@@ -148,6 +149,20 @@ export const saveDriveItems = async (items: DriveItem[]) => {
 };
 
 // Gallery Pins
+export const loadCachedGalleryPins = (): Promise<GalleryPin[]> =>
+  loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
+
+export const saveCachedGalleryPins = (pins: GalleryPin[]): Promise<void> =>
+  saveItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, pins);
+
+export const syncGalleryStats = async (count: number) => {
+  const current = await loadUserPreferences();
+  const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
+  const driveItems = await loadDriveItems();
+  const totalGB = await recalculateTotalStorage(count, driveItems);
+  await updateStats({ galleryCount: count, usedStorageGB: totalGB });
+};
+
 export const updateGalleryStats = async (delta: number) => {
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };

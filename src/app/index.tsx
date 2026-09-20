@@ -72,7 +72,7 @@ export default function OnboardingScreen() {
               className="text-[28px] text-white tracking-[2px] text-center leading-[34px] mt-1"
               style={{ fontFamily: "Outfit_900Black" }}
             >
-              WHAT&apos;S POSSIBLE
+              WHAT'S POSSIBLE
             </Text>
           </View>
 

@@ -63,26 +63,34 @@ export async function pullAndMergeNotesFromFirestore(): Promise<NoteItem[] | nul
     const snapshot = await getDocs(col);
     if (snapshot.empty) return null;
 
-    const remoteMap = new Map<string, NoteItem>();
+    const localNotes = await loadNotes();
+    const mergedMap = new Map(localNotes.map((n) => [n.id, n]));
+
     snapshot.forEach((d) => {
       const data = d.data();
-      remoteMap.set(data.id, {
+      const remote: NoteItem = {
         id: data.id,
         title: data.title ?? "",
         body: data.body ?? "",
         isPinned: data.isPinned ?? false,
         createdAt: data.createdAt ?? "",
-      });
+      };
+
+      const local = mergedMap.get(data.id);
+
+      // Keep whichever version was updated most recently.
+      // If updatedAt is missing, prefer remote (it's the authoritative source).
+      const remoteTime = data.updatedAt?.toMillis?.() ?? 0;
+      const localTime = local?.updatedAt
+        ? new Date(local.updatedAt as string).getTime() || 0
+        : 0;
+
+      if (!local || remoteTime >= localTime) {
+        mergedMap.set(data.id, remote);
+      }
     });
 
-    const localNotes = await loadNotes();
-    const localMap = new Map(localNotes.map((n) => [n.id, n]));
-
-    remoteMap.forEach((remote, id) => {
-      localMap.set(id, remote);
-    });
-
-    const merged = Array.from(localMap.values());
+    const merged = Array.from(mergedMap.values());
     await saveNotes(merged);
     return merged;
   } catch (err) {

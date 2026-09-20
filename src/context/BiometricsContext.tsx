@@ -46,7 +46,10 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
   const lastBackgroundTime = useRef<number | null>(null);
   const isAuthenticatingRef = useRef<boolean>(false);
 
-
+  // Clears the authenticating flag with a brief delay so an AppState
+  // change on biometric dialog dismiss doesn't re-lock the app.
+  const clearAuthFlag = () =>
+    setTimeout(() => { isAuthenticatingRef.current = false; }, 500);
 
   const refreshCapability = async () => {
     const cap = await checkBiometricsCapability();
@@ -114,6 +117,11 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Reset stale background timestamp when user logs out
+    if (!user) {
+      lastBackgroundTime.current = null;
+    }
+
     const subscription = AppState.addEventListener("change", handleAppStateChange);
     return () => {
       subscription.remove();
@@ -140,10 +148,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       }
       return result;
     } finally {
-      // Short delay before clearing so AppState change on dialog dismiss doesn't re-lock
-      setTimeout(() => {
-        isAuthenticatingRef.current = false;
-      }, 500);
+      clearAuthFlag();
     }
   };
 
@@ -204,9 +209,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
 
       return { success: true };
     } finally {
-      setTimeout(() => {
-        isAuthenticatingRef.current = false;
-      }, 500);
+      clearAuthFlag();
     }
   };
 

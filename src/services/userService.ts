@@ -40,7 +40,6 @@ export async function syncUserMetadata(
 
   try {
     const userDocRef = doc(db, "users", user.uid);
-    const existingDoc = await getDoc(userDocRef);
 
     const providerList = user.providerData?.map((p) => p.providerId) || [];
     const primaryProvider =
@@ -62,9 +61,8 @@ export async function syncUserMetadata(
       updatedAt: serverTimestamp(),
     };
 
-    if (!existingDoc.exists() || isNewUser) {
-      baseData.createdAt =
-        user.metadata?.creationTime || serverTimestamp();
+    if (isNewUser) {
+      baseData.createdAt = user.metadata?.creationTime || serverTimestamp();
     }
 
     await setDoc(userDocRef, baseData, { merge: true });

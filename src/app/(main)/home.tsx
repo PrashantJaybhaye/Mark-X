@@ -25,7 +25,7 @@ import {
   DriveCardArt,
   GalleryCardArt,
   NotesCardArt,
-  RemindersCardArt,
+  SecurityCardArt,
 } from "../../components/home/HomeVisuals";
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
@@ -34,15 +34,13 @@ import {
   loadDriveItems,
   saveDriveItems,
   loadUserPreferences,
+  loadCachedGalleryPins,
+  saveCachedGalleryPins,
 } from "../../services/storageService";
-import { 
-  addGalleryPinToFirestore, 
-  updateGalleryPinInFirestore 
-} from "../../services/galleryFirebaseService";
-import { uploadFileToCloudflare } from "../../services/cloudflareStorage";
+import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/galleryFirebaseService";
+import { uploadFileToMarkx } from "../../services/cloudflareStorage";
 import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
-import { GalleryPin } from "../../utils/galleryData";
-import { generateUUID } from "../../utils/uuid";
+import { GalleryPin, formatBytes } from "../../utils/galleryData";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -63,7 +61,6 @@ export default function HomeScreen() {
         driveCount: 0,
         usedStorageGB: 0,
       };
-
       setDocsCount(stats.driveCount);
       setGalleryCount(stats.galleryCount);
       setNotesCount(stats.notesCount);
@@ -79,26 +76,7 @@ export default function HomeScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-
-      let isMounted = true;
-      let idleId: number | undefined;
-
-      if (typeof requestIdleCallback !== "undefined") {
-        idleId = requestIdleCallback(() => {
-          if (isMounted) {
-            refreshCounts();
-          }
-        });
-      } else {
-        refreshCounts();
-      }
-
-      return () => {
-        isMounted = false;
-        if (idleId !== undefined && typeof cancelIdleCallback !== "undefined") {
-          cancelIdleCallback(idleId);
-        }
-      };
+      refreshCounts();
     }, [refreshCounts])
   );
 
@@ -111,7 +89,7 @@ export default function HomeScreen() {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: file.name || "Uploaded Document",
         category,
-        size: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB",
+        size: formatBytes(file.size),
         updatedAt: "Just now",
         uri: file.uri,
         mimeType: file.mimeType,
@@ -127,31 +105,74 @@ export default function HomeScreen() {
     const img = await safePickImage();
     if (img && img.uri) {
       const isVideo = img.type === "video";
+      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+      const timestampNow = Date.now();
+      const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
+      const newPinId = `pin-${timestampNow}`;
+      const calculatedRatio = img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75;
+      const fileSize = img.fileSize || (isVideo ? 14800000 : 2800000);
+
       const newPin: GalleryPin = {
-        id: `pin-${generateUUID()}`,
-        title: img.fileName || (isVideo ? "Captured video" : "Captured photo"),
+        id: newPinId,
+        fileName: shortFileName,
         author: "You",
         imageUrl: img.uri,
         mediaType: isVideo ? "video" : "image",
         duration: img.duration,
-        aspectRatio: img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75,
-        category: "Aesthetic",
+        aspectRatio: calculatedRatio,
+        width: img.width || (calculatedRatio >= 1 ? 1920 : 1080),
+        height: img.height || Math.round((img.width || 1080) / calculatedRatio),
+        fileSize,
+        fileSizeFormatted: formatBytes(fileSize),
+        mimeType: img.mimeType || defaultMime,
         likes: 1,
         isLiked: true,
         saved: true,
+        uploadStatus: "uploading",
       };
       
-      // Save metadata to Firestore
-      await addGalleryPinToFirestore(newPin);
+      // Save metadata to server (gallery screen manages its own cache on focus)
+      await addGalleryPinToServer(newPin);
       
-      // Upload physical file to Cloudflare in background
-      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
-      const defaultFilename = isVideo ? "video.mp4" : "photo.jpg";
-      uploadFileToCloudflare(img.uri, img.mimeType || defaultMime, img.fileName || defaultFilename).then(res => {
-        if (res.success && res.url) {
-          updateGalleryPinInFirestore(newPin.id, { imageUrl: res.url });
-        }
-      });
+      // Upload physical file to Mark-X Storage in background with shortFileName
+      uploadFileToMarkx(img.uri, img.mimeType || defaultMime, shortFileName)
+        .then(async (res) => {
+          if (res.success && res.url) {
+            await updateGalleryPinInServer(newPin.id, {
+              imageUrl: res.url,
+              uploadStatus: "synced",
+            });
+            const currentCached = await loadCachedGalleryPins();
+            await saveCachedGalleryPins(
+              currentCached.map((p) =>
+                p.id === newPin.id
+                  ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const }
+                  : p
+              )
+            );
+          } else {
+            console.warn("[HomeUpload] Upload failed:", res.error);
+            const currentCached = await loadCachedGalleryPins();
+            await saveCachedGalleryPins(
+              currentCached.map((p) =>
+                p.id === newPin.id
+                  ? { ...p, uploadStatus: "failed" as const }
+                  : p
+              )
+            );
+          }
+        })
+        .catch(async (err) => {
+          console.error("[HomeUpload] Error:", err);
+          const currentCached = await loadCachedGalleryPins();
+          await saveCachedGalleryPins(
+            currentCached.map((p) =>
+              p.id === newPin.id
+                ? { ...p, uploadStatus: "failed" as const }
+                : p
+            )
+          );
+        });
       
       await refreshCounts();
     }
@@ -232,7 +253,7 @@ export default function HomeScreen() {
         <View className="px-4 pt-3 pb-1">
           <StorageHeroCard
             usedStorage={usedStorage}
-            onManageStorage={() => triggerHaptic()}
+
             onUploadFile={handleUploadFile}
             onAddPhoto={handleAddPhoto}
           />
@@ -267,15 +288,15 @@ export default function HomeScreen() {
               </FeatureCard>
 
               <FeatureCard
-                title="Reminders"
-                count={notesCount}
-                subtitle="Tasks & Due Alerts"
+                title="Security Vault"
+                count="Active"
+                subtitle="Biometric & AES Protected"
                 onPress={() => {
                   triggerHaptic();
-                  router.navigate("/(main)/notes");
+                  router.navigate("/profile/security");
                 }}
               >
-                <RemindersCardArt />
+                <SecurityCardArt />
               </FeatureCard>
             </View>
 

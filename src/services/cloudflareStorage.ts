@@ -1,33 +1,35 @@
 import * as FileSystem from "expo-file-system/legacy";
 
-const WORKER_URL = process.env.EXPO_PUBLIC_CLOUDFLARE_WORKER_URL?.replace(/\/+$/, "");
+const SERVER_URL = process.env.EXPO_PUBLIC_CLOUDFLARE_WORKER_URL?.replace(/\/+$/, "");
 const UPLOAD_SECRET = process.env.EXPO_PUBLIC_CLOUDFLARE_UPLOAD_SECRET;
 
-export interface CloudflareUploadResponse {
+export interface MarkxUploadResponse {
   success: boolean;
   url?: string;
   key?: string;
   error?: string;
 }
 
+export type CloudflareUploadResponse = MarkxUploadResponse;
+
 /**
- * Uploads a local file to the Cloudflare Worker which saves to R2.
+ * Uploads a local file to the Mark-X Storage Server.
  */
-export async function uploadFileToCloudflare(
+export async function uploadFileToMarkx(
   localUri: string,
   mimeType: string = "image/jpeg",
   filename: string = "upload.jpg"
-): Promise<CloudflareUploadResponse> {
-  if (!WORKER_URL) {
-    console.warn("[CloudflareStorage] EXPO_PUBLIC_CLOUDFLARE_WORKER_URL is not configured in .env");
+): Promise<MarkxUploadResponse> {
+  if (!SERVER_URL) {
+    console.warn("[MarkxStorage] Storage server URL is not configured in .env");
     return {
       success: false,
-      error: "Cloudflare Worker URL is not configured. Please set EXPO_PUBLIC_CLOUDFLARE_WORKER_URL.",
+      error: "Mark-X Storage server is not configured.",
     };
   }
 
   try {
-    const uploadEndpoint = `${WORKER_URL}/upload`;
+    const uploadEndpoint = `${SERVER_URL}/upload`;
     const headers: Record<string, string> = {};
     if (UPLOAD_SECRET) {
       headers["X-Auth-Key"] = UPLOAD_SECRET;
@@ -55,7 +57,11 @@ export async function uploadFileToCloudflare(
       error: result.error || `Upload failed with status ${response.status}`,
     };
   } catch (error: any) {
-    console.error("[CloudflareStorage] Upload Error:", error);
-    return { success: false, error: error?.message || "Failed to upload file to Cloudflare" };
+    console.error("[MarkxStorage] Upload Error:", error);
+    return { success: false, error: error?.message || "Failed to upload file to Mark-X Storage" };
   }
 }
+
+// Backward-compatible alias
+export const uploadFileToCloudflare = uploadFileToMarkx;
+

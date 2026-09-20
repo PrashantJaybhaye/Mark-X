@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -11,20 +11,62 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import * as Clipboard from "expo-clipboard";
-import { IosDialog, IosDialogAction } from "../../components/common/IosDialog";
+
+import { IosDialog } from "../../components/common/IosDialog";
+import type { IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type DialogState = {
+  title: string;
+  message: string;
+  actions?: IosDialogAction[];
+} | null;
+
+// ─── Section helper ───────────────────────────────────────────────────────────
+
+function Section({
+  title,
+  children,
+  last = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  last?: boolean;
+}) {
+  return (
+    <>
+      <Text
+        className="text-[16px] text-[#000000] mb-2"
+        style={{ fontFamily: "Outfit_700Bold" }}
+      >
+        {title}
+      </Text>
+      <Text
+        className={`text-[15px] text-[#1F2937] leading-[25px] ${last ? "mb-8" : "mb-6"}`}
+        style={{ fontFamily: "Outfit_400Regular" }}
+      >
+        {children}
+      </Text>
+    </>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TermsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [dialog, setDialog] = useState<{ title: string; message: string; actions?: IosDialogAction[] } | null>(null);
+  const [dialog, setDialog] = useState<DialogState>(null);
 
-  const topInset = Math.max(
-    insets.top,
-    Platform.OS === "android" ? (RNStatusBar.currentHeight || 24) : 16
-  );
+  const topInset =
+    Platform.OS === "android"
+      ? Math.max(insets.top, RNStatusBar.currentHeight ?? 24)
+      : Math.max(insets.top, 16);
+
+  const closeDialog = useCallback(() => setDialog(null), []);
 
   const handleDismiss = () => {
     triggerHaptic();
@@ -41,7 +83,7 @@ export default function TermsScreen() {
     setDialog({
       title: "Link Copied",
       message: "The official terms link has been copied to your clipboard.",
-      actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
+      actions: [{ text: "OK", style: "default", bold: true, onPress: closeDialog }],
     });
   };
 
@@ -49,9 +91,10 @@ export default function TermsScreen() {
     triggerHaptic();
     setDialog({
       title: "Contact Team",
-      message: "Have questions about your data, privacy, or security? Reach out directly to support@mark-x.app.",
+      message:
+        "Have questions about your data, privacy, or security? Reach out directly to support@mark-x.app.",
       actions: [
-        { text: "Cancel", style: "cancel", onPress: () => setDialog(null) },
+        { text: "Cancel", style: "cancel", onPress: closeDialog },
         {
           text: "Copy Email",
           style: "default",
@@ -61,7 +104,7 @@ export default function TermsScreen() {
             setDialog({
               title: "Email Copied",
               message: "support@mark-x.app copied to clipboard.",
-              actions: [{ text: "OK", style: "default", bold: true, onPress: () => setDialog(null) }],
+              actions: [{ text: "OK", style: "default", bold: true, onPress: closeDialog }],
             });
           },
         },
@@ -73,6 +116,7 @@ export default function TermsScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
+      {/* Nav header */}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
@@ -87,7 +131,12 @@ export default function TermsScreen() {
             <Ionicons name="chevron-back" size={24} color="#111111" />
           </TouchableOpacity>
 
-          <View className="absolute inset-0 items-center justify-center pointer-events-none">
+          {/* Centered title — absolutely positioned so it never shifts with the back button */}
+          <View
+            style={{ position: "absolute", left: 0, right: 0 }}
+            className="items-center justify-center"
+            pointerEvents="none"
+          >
             <Text
               className="text-[17px] text-[#111111]"
               style={{ fontFamily: "Outfit_600SemiBold" }}
@@ -96,11 +145,11 @@ export default function TermsScreen() {
             </Text>
           </View>
 
+          {/* Spacer to balance the back button */}
           <View className="w-10 h-10" />
         </View>
       </View>
 
-      {/* Editorial Document Body */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -109,15 +158,13 @@ export default function TermsScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* Brand Header */}
+        {/* Brand + document title */}
         <Text
           className="text-[24px] text-[#000000] text-center tracking-[0.18em] mb-3"
           style={{ fontFamily: "Outfit_700Bold" }}
         >
           MARK-X
         </Text>
-
-        {/* Document Title */}
         <Text
           className="text-[28px] text-[#000000] text-center tracking-tight mb-7"
           style={{ fontFamily: "Outfit_700Bold" }}
@@ -125,7 +172,7 @@ export default function TermsScreen() {
           TERMS OF SERVICE
         </Text>
 
-        {/* Source Link */}
+        {/* Source link */}
         <View className="flex-row items-center flex-wrap mb-2">
           <Text
             className="text-[14px] text-[#111111]"
@@ -143,26 +190,24 @@ export default function TermsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Last Updated */}
         <Text
           className="text-[14px] text-[#111111] mb-6"
           style={{ fontFamily: "Outfit_600SemiBold", fontStyle: "italic" }}
         >
-          Last Updated: September 14, 2026
+          Last Updated: September 20, 2026
         </Text>
 
-        {/* Humanized Welcome & Core Philosophy */}
+        {/* Intro */}
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-5"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
           Welcome to Mark-X. We built this application to give you a private,
-          fast, and reliable personal vault for your files, gallery pins, and
-          smart notes. We believe software terms should be straightforward,
-          transparent, and written for real humans—not hidden behind convoluted
-          corporate jargon.
+          fast, and reliable personal vault for your media gallery, documents,
+          and secure smart notes. We believe software terms should be
+          straightforward, transparent, and written for real humans—not hidden
+          behind convoluted corporate jargon.
         </Text>
-
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
           style={{ fontFamily: "Outfit_400Regular" }}
@@ -171,145 +216,82 @@ export default function TermsScreen() {
           exist to protect both your privacy and the stability of our platform.
         </Text>
 
-        {/* Prominent Core Commitment Highlight */}
+        {/* Core commitment */}
         <Text
           className="text-[14px] text-[#000000] leading-[22px] mb-7"
           style={{ fontFamily: "Outfit_700Bold" }}
         >
-          YOU RETAIN 100% OWNERSHIP OF YOUR FILES, PHOTOS, AND NOTES. WE DO NOT
-          MONETIZE YOUR PRIVATE CONTENT, WE DO NOT SELL YOUR PERSONAL DATA, AND
-          WE WILL NEVER USE YOUR PERSONAL VAULT TO TRAIN ARTIFICIAL INTELLIGENCE
-          MODELS.
+          YOU RETAIN 100% OWNERSHIP OF YOUR FILES, PHOTOS, VIDEOS, AND NOTES.
+          WE DO NOT MONETIZE YOUR PRIVATE CONTENT, WE DO NOT SELL YOUR PERSONAL
+          DATA, AND WE WILL NEVER USE YOUR PERSONAL VAULT TO TRAIN ARTIFICIAL
+          INTELLIGENCE MODELS.
         </Text>
 
-        {/* Section 1 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          1. YOUR CONTENT & COMPLETE OWNERSHIP
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
+        <Section title="1. YOUR CONTENT & COMPLETE OWNERSHIP">
           Everything you create, upload, or organize inside Mark-X belongs
           exclusively to you. This includes documents saved in your Drive,
-          visuals saved to your Gallery pins, and thoughts written in your Smart
-          Notes. Mark-X claims zero ownership or intellectual property rights
-          over your creative assets. When you delete a file or note, it is
-          permanently expunged from your vault.
-        </Text>
+          high-resolution visual and video assets saved to your Media Gallery,
+          and thoughts written in your Secure Notes. Mark-X claims zero
+          ownership or intellectual property rights over your personal assets.
+          When you delete an item, it is permanently purged from your vault.
+        </Section>
 
-        {/* Section 2 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          2. ZERO SURVEILLANCE & AD-FREE PRIVACY
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
+        <Section title="2. ZERO SURVEILLANCE & AD-FREE PRIVACY">
           We do not sell user data to data brokers, advertising networks, or
-          third-party marketing firms. Mark-X operates without third-party
-          behavioral ad trackers. Your personal files, photos, and notes are
-          accessed only by your authenticated session and are never analyzed or
-          scanned for promotional purposes.
-        </Text>
+          third-party marketing firms. Mark-X operates without behavioral ad
+          trackers. Your personal files, photos, videos, and notes are accessed
+          only by your authenticated session and are never analyzed or scanned
+          for commercial or promotional purposes.
+        </Section>
 
-        {/* Section 3 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          3. HARDWARE-LEVEL BIOMETRIC SECURITY
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
-          When you enable Biometric Lock (Face ID, Touch ID, or native
+        <Section title="3. HARDWARE-LEVEL BIOMETRIC SECURITY">
+          When you enable Biometric Lock (Face ID, Fingerprint, or native
           biometrics) within your Profile, authentication is handled entirely
-          within your device&apos;s native hardware Secure Enclave. Mark-X never
+          within your device's native hardware Secure Enclave. Mark-X never
           transmits, records, or stores your biometric information on external
           servers.
-        </Text>
+        </Section>
 
-        {/* Section 4 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          4. CLOUD SYNC & OFFLINE RESILIENCE
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
-          Mark-X synchronizes your encrypted data using enterprise-grade cloud
-          infrastructure (TLS 1.3 in transit and AES-256 at rest). To give you
-          uninterrupted access without mobile connectivity, your recent files and
-          notes are safely cached on your local device. Local caching ensures
-          rapid responsiveness while keeping your data confined to your verified
-          hardware.
-        </Text>
+        <Section title="4. HIGH-PERFORMANCE CLOUD VAULT & RESILIENT SYNC">
+          Mark-X synchronizes your encrypted data using enterprise-grade Mark-X
+          cloud storage infrastructure (TLS 1.3 in transit and AES-256 at
+          rest). High-resolution photos and HD/4K videos are delivered with zero
+          loss and accurate aspect ratios. To give you uninterrupted access
+          without network connectivity, your recent files and media are safely
+          cached on your local device.
+        </Section>
 
-        {/* Section 5 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          5. RESPONSIBLE USAGE & ACCOUNT INTEGRITY
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
-          Mark-X is designed for lawful personal organization, creative curation,
-          and secure productivity. You agree not to use our cloud systems to
-          distribute malware, engage in unauthorized penetration attacks against
-          our servers, or host unlawful content. You are responsible for
-          maintaining the secrecy of your login credentials.
-        </Text>
+        <Section title="5. MULTI-DEVICE SESSION MANAGEMENT">
+          Mark-X allows you to view all active hardware sessions logged into
+          your account in real time. You retain the ability to remotely revoke
+          and terminate any session instantly from your Security & Devices
+          panel, ensuring complete control over who accesses your vault.
+        </Section>
 
-        {/* Section 6 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          6. DATA PORTABILITY & ACCOUNT TERMINATION
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
+        <Section title="6. RESPONSIBLE USAGE & ACCOUNT INTEGRITY">
+          Mark-X is designed for lawful personal organization, creative
+          curation, and secure productivity. You agree not to use our cloud
+          systems to distribute malware, engage in unauthorized penetration
+          attacks against our servers, or host unlawful content. You are
+          responsible for maintaining the secrecy of your login credentials.
+        </Section>
+
+        <Section title="7. DATA PORTABILITY & ACCOUNT TERMINATION">
           You are never locked into Mark-X. You can export your documents,
-          gallery photos, and notes at any time. If you decide to stop using
-          Mark-X, you can delete your account from your Profile settings, which
-          permanently wipes your user records and storage files from our cloud
-          vault.
-        </Text>
+          gallery photos, videos, and notes at any time. If you decide to stop
+          using Mark-X, you can delete your account from your Profile settings,
+          which permanently wipes your user records and storage files from our
+          cloud vault.
+        </Section>
 
-        {/* Section 7 */}
-        <Text
-          className="text-[16px] text-[#000000] mb-2"
-          style={{ fontFamily: "Outfit_700Bold" }}
-        >
-          7. TRANSPARENT UPDATES
-        </Text>
-        <Text
-          className="text-[15px] text-[#1F2937] leading-[25px] mb-8"
-          style={{ fontFamily: "Outfit_400Regular" }}
-        >
+        <Section title="8. TRANSPARENT UPDATES" last>
           As we release new features and improvements to Mark-X, we may revise
           these terms. Whenever meaningful modifications occur, we will post a
           clear in-app notice so you are always aware of how your rights and
           data are handled.
-        </Text>
+        </Section>
 
-        {/* Contact Footer */}
+        {/* Contact footer */}
         <View className="border-t border-[#E5E7EB] pt-6 items-center">
           <TouchableOpacity
             onPress={handleContactSupport}
@@ -334,10 +316,10 @@ export default function TermsScreen() {
 
       <IosDialog
         visible={dialog !== null}
-        title={dialog?.title || ""}
+        title={dialog?.title ?? ""}
         message={dialog?.message}
         actions={dialog?.actions}
-        onClose={() => setDialog(null)}
+        onClose={closeDialog}
       />
     </View>
   );

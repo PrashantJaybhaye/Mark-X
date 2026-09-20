@@ -34,9 +34,11 @@ export function GalleryPinOptionsSheet({
   const handleShare = async () => {
     onClose();
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    const fileName = pin.fileName || (pin.mediaType === "video" ? "8646565.mp4" : "8646565.jpg");
     try {
       await Share.share({
-        message: `${pin.title || "Check out this pin on Mark-X Gallery"}\n${pin.imageUrl}`,
+        title: fileName,
+        message: `${fileName}\n${pin.imageUrl}`,
       });
     } catch {
       // ignore

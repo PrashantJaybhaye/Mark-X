@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
+  Text,
   TouchableOpacity,
   ScrollView,
   Animated,
@@ -11,13 +12,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 
-import { GalleryPin } from "../../utils/galleryData";
+import { GalleryPin, formatBytes, normalizeGalleryPin, generateShortFileName } from "../../utils/galleryData";
+import { auth } from "../../services/firebase";
 import { MarkXLogo } from "../../components/common/MarkXLogo";
 import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
-import { GalleryDetailModal } from "../../components/gallery/GalleryDetailModal";
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
 import { GalleryMasonrySkeleton } from "../../components/gallery/GallerySkeleton";
 import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
@@ -26,43 +27,83 @@ import { triggerHaptic } from "../../utils/haptics";
 import { generateUUID } from "../../utils/uuid";
 
 import { 
-  fetchGalleryPinsFromFirestore, 
-  addGalleryPinToFirestore, 
-  deleteGalleryPinFromFirestore, 
-  updateGalleryPinInFirestore 
+  fetchGalleryPinsFromServer, 
+  addGalleryPinToServer, 
+  deleteGalleryPinFromServer, 
+  updateGalleryPinInServer,
+  purgeLegacyFieldsFromDatabase,
+  subscribeGalleryPins,
 } from "../../services/galleryFirebaseService";
-import { uploadFileToCloudflare } from "../../services/cloudflareStorage";
+import { uploadFileToMarkx } from "../../services/cloudflareStorage";
+import { 
+  loadCachedGalleryPins, 
+  saveCachedGalleryPins 
+} from "../../services/storageService";
 
 export default function GalleryScreen() {
+  const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
 
-  // 2-column masonry spacing (12px side margin, 10px gutter between columns)
-  const columnWidth = (windowWidth - 24 - 10) / 2;
+  // 2-column masonry spacing (8px side margin, 6px gutter between columns)
+  const gutter = 6;
+  const sideMargin = 8;
+  const columnWidth = (windowWidth - (sideMargin * 2) - gutter) / 2;
 
   // Gallery state loaded from persistence
   const [pins, setPins] = useState<GalleryPin[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Navigation debounce lock to prevent duplicate screens on multi-taps
+  const isNavigatingRef = useRef(false);
 
   useFocusEffect(
     React.useCallback(() => {
+      isNavigatingRef.current = false;
       setStatusBarStyle("dark");
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
+      // Re-hydrate cached pins on screen focus and sync with server
+      loadCachedGalleryPins().then((cached) => {
+        setPins(cached.map(normalizeGalleryPin));
+      });
+      fetchGalleryPinsFromServer().then((fetched) => {
+        setPins(fetched);
+      }).catch(console.warn);
     }, [])
   );
 
   useEffect(() => {
     let isMounted = true;
-    const fetchPins = async () => {
-      const fetched = await fetchGalleryPinsFromFirestore();
-      if (isMounted) {
-        setPins(fetched);
+
+    // 1. Fast path: load local cache immediately (0ms flash-free!)
+    loadCachedGalleryPins().then((cached) => {
+      if (isMounted && cached.length > 0) {
+        setPins(cached.map(normalizeGalleryPin));
+        setIsLoading(false);
       }
-    };
-    fetchPins();
+    });
+
+    // 2. Real-time Firestore sync: updates instantly when images are added, edited, or deleted in DB
+    const unsubscribe = subscribeGalleryPins(
+      (updatedPins) => {
+        if (isMounted) {
+          setPins(updatedPins);
+          setIsLoading(false);
+        }
+      },
+      () => {
+        if (isMounted) setIsLoading(false);
+      }
+    );
+
+    // 3. Background purge and backfill to guarantee database has latest filename format
+    purgeLegacyFieldsFromDatabase().catch(console.warn);
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -70,12 +111,102 @@ export default function GalleryScreen() {
   const [spinAnim] = useState(() => new Animated.Value(0));
 
   // Active Pin Modals
-  const [selectedPin, setSelectedPin] = useState<GalleryPin | null>(null);
   const [optionsPin, setOptionsPin] = useState<GalleryPin | null>(null);
 
+  // Failed Uploads Retry Logic
+  const failedPins = useMemo(() => pins.filter((p) => p.uploadStatus === "failed"), [pins]);
+
+  const handleRetryFailedUploads = React.useCallback(async () => {
+    if (failedPins.length === 0) return;
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
+    for (const pin of failedPins) {
+      // Mark as uploading in state
+      setPins((prev) =>
+        prev.map((p) => (p.id === pin.id ? { ...p, uploadStatus: "uploading" as const } : p))
+      );
+
+      // If it's a test/mock pin (starts with test-failed- or http)
+      if (pin.id.startsWith("test-failed-") || pin.imageUrl.startsWith("http")) {
+        setTimeout(() => {
+          setPins((prev) =>
+            prev.map((p) =>
+              p.id === pin.id ? { ...p, uploadStatus: "synced" as const } : p
+            )
+          );
+          triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+        }, 1200);
+        continue;
+      }
+
+      const isVideo = pin.mediaType === "video";
+      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+      const fileName = pin.fileName || `${Date.now()}${isVideo ? ".mp4" : ".jpg"}`;
+
+      uploadFileToMarkx(pin.imageUrl, pin.mimeType || defaultMime, fileName)
+        .then(async (res) => {
+          if (res.success && res.url) {
+            setPins((prev) => {
+              const updated = prev.map((p) =>
+                p.id === pin.id
+                  ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const }
+                  : p
+              );
+              saveCachedGalleryPins(updated);
+              return updated;
+            });
+            await updateGalleryPinInServer(pin.id, {
+              imageUrl: res.url,
+              uploadStatus: "synced",
+            });
+          } else {
+            setPins((prev) => {
+              const updated = prev.map((p) =>
+                p.id === pin.id
+                  ? { ...p, uploadStatus: "failed" as const }
+                  : p
+              );
+              saveCachedGalleryPins(updated);
+              return updated;
+            });
+          }
+        })
+        .catch((err) => {
+          console.error("[RetryUpload] Failed:", err);
+          setPins((prev) => {
+            const updated = prev.map((p) =>
+              p.id === pin.id
+                ? { ...p, uploadStatus: "failed" as const }
+                : p
+            );
+            saveCachedGalleryPins(updated);
+            return updated;
+          });
+        });
+    }
+  }, [failedPins]);
+
   const handleSelectPin = React.useCallback((p: GalleryPin) => {
-    setSelectedPin(p);
-  }, []);
+    if (p.uploadStatus === "failed") {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      handleRetryFailedUploads();
+      return;
+    }
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
+
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: "/gallery/[id]",
+      params: {
+        id: p.id,
+        initialPin: JSON.stringify(p),
+      },
+    });
+  }, [router, handleRetryFailedUploads]);
 
   const handleOptionsPin = React.useCallback((p: GalleryPin) => {
     setOptionsPin(p);
@@ -90,7 +221,7 @@ export default function GalleryScreen() {
 
     pins.forEach((pin) => {
       const estimatedHeight =
-        Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 26;
+        Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 16;
       if (leftHeight <= rightHeight) {
         left.push(pin);
         leftHeight += estimatedHeight;
@@ -115,7 +246,7 @@ export default function GalleryScreen() {
         p.id === pinId ? { ...p, isLiked: newIsLiked, likes: newLikes } : p
       )
     );
-    await updateGalleryPinInFirestore(pinId, { isLiked: newIsLiked, likes: newLikes });
+    await updateGalleryPinInServer(pinId, { isLiked: newIsLiked, likes: newLikes });
   };
 
   // Save Toggle
@@ -129,13 +260,17 @@ export default function GalleryScreen() {
         p.id === pinId ? { ...p, saved: newSaved } : p
       )
     );
-    await updateGalleryPinInFirestore(pinId, { saved: newSaved });
+    await updateGalleryPinInServer(pinId, { saved: newSaved });
   };
 
   // Hide Pin
   const handleHidePin = async (pinId: string) => {
-    setPins((prev) => prev.filter((p) => p.id !== pinId));
-    await deleteGalleryPinFromFirestore(pinId);
+    setPins((prev) => {
+      const updated = prev.filter((p) => p.id !== pinId);
+      saveCachedGalleryPins(updated);
+      return updated;
+    });
+    await deleteGalleryPinFromServer(pinId);
   };
 
   // Manual Refresh Button Press
@@ -152,13 +287,16 @@ export default function GalleryScreen() {
     }).start();
 
     setIsRefreshing(true);
-
-    const fetched = await fetchGalleryPinsFromFirestore();
-    if (fetched.length > 0) {
+    try {
+      const fetched = await fetchGalleryPinsFromServer();
       setPins(fetched);
+      await saveCachedGalleryPins(fetched);
+    } catch (e) {
+      console.warn("[GalleryScreen] Refresh error:", e);
+    } finally {
+      setIsRefreshing(false);
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     }
-    setIsRefreshing(false);
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
   };
 
   // Pick photo to add to user's inspiration pins
@@ -172,40 +310,82 @@ export default function GalleryScreen() {
           : 0.75;
 
       const isVideo = result.type === "video";
+      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
+      const timestampNow = Date.now();
+      const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
+      const newPinId = `pin-${timestampNow}`;
+      const fileSize = result.fileSize || (isVideo ? 14800000 : 2800000);
       const newPin: GalleryPin = {
-        id: `pin-${generateUUID()}`,
-        title: result.fileName || (isVideo ? "Video Inspiration" : "New Inspiration"),
-        domain: isVideo ? "video" : "my-uploads",
-        author: "You",
+        id: newPinId,
+        fileName: shortFileName,
+        author: auth.currentUser?.displayName || "You",
         imageUrl: result.uri,
         mediaType: isVideo ? "video" : "image",
-        duration: result.duration,
+        ...(isVideo && typeof result.duration === "number" ? { duration: result.duration } : {}),
         aspectRatio: calculatedRatio,
-        category: "Aesthetic",
+        width: result.width || (calculatedRatio >= 1 ? 1920 : 1080),
+        height: result.height || Math.round((result.width || 1080) / calculatedRatio),
+        fileSize,
+        fileSizeFormatted: formatBytes(fileSize),
+        mimeType: result.mimeType || defaultMime,
         likes: 1,
         isLiked: true,
         saved: true,
-        tags: isVideo ? ["Video", "Inspiration"] : ["MyUploads", "Inspiration"],
-        description: isVideo ? "Video added to your collection." : "Added to your inspiration collection.",
+        uploadStatus: "uploading",
       };
       
-      // Update local state immediately
-      setPins((prev) => [newPin, ...prev]);
-
-      // Use Firestore for metadata instead of local array rewrite
-      await addGalleryPinToFirestore(newPin);
-
-      // Upload to Cloudflare in background
-      const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
-      const defaultFilename = isVideo ? "video.mp4" : "photo.jpg";
-      uploadFileToCloudflare(result.uri, result.mimeType || defaultMime, result.fileName || defaultFilename).then(async res => {
-        if (res.success && res.url) {
-          setPins((prev) => 
-            prev.map(p => p.id === newPin.id ? { ...p, imageUrl: res.url! } : p)
-          );
-          await updateGalleryPinInFirestore(newPin.id, { imageUrl: res.url });
-        }
+      // Update local state and cache immediately
+      setPins((prev) => {
+        const updated = [newPin, ...prev];
+        saveCachedGalleryPins(updated);
+        return updated;
       });
+
+      // Use Server for metadata instead of local array rewrite
+      await addGalleryPinToServer(newPin);
+
+      // Upload to Mark-X Storage in background with shortFileName
+      uploadFileToMarkx(result.uri, result.mimeType || defaultMime, shortFileName)
+        .then(async (res) => {
+          if (res.success && res.url) {
+            setPins((prev) => {
+              const updated = prev.map((p) =>
+                p.id === newPin.id
+                  ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const }
+                  : p
+              );
+              saveCachedGalleryPins(updated);
+              return updated;
+            });
+            await updateGalleryPinInServer(newPin.id, {
+              imageUrl: res.url,
+              uploadStatus: "synced",
+            });
+          } else {
+            console.warn("[GalleryUpload] Failed:", res.error);
+            setPins((prev) => {
+              const updated = prev.map((p) =>
+                p.id === newPin.id
+                  ? { ...p, uploadStatus: "failed" as const }
+                  : p
+              );
+              saveCachedGalleryPins(updated);
+              return updated;
+            });
+          }
+        })
+        .catch((err) => {
+          console.error("[GalleryUpload] Error:", err);
+          setPins((prev) => {
+            const updated = prev.map((p) =>
+              p.id === newPin.id
+                ? { ...p, uploadStatus: "failed" as const }
+                : p
+            );
+            saveCachedGalleryPins(updated);
+            return updated;
+          });
+        });
     }
   };
 
@@ -219,7 +399,7 @@ export default function GalleryScreen() {
       <StatusBar style="dark" />
 
       <SafeAreaView edges={["top"]} className="flex-1 bg-white">
-        {/* Simple & Clean Header: Mark-X Logo + Refresh & Add Buttons */}
+        {/* Simple & Clean Header: Mark-X Logo + Action Pill */}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#F2F2F2]">
           <View className="justify-center">
             <MarkXLogo width={115} height={16} color="#111111" />
@@ -256,12 +436,12 @@ export default function GalleryScreen() {
           bounces={true}
           contentContainerStyle={{
             flexGrow: 1,
-            paddingHorizontal: 12,
-            paddingTop: 12,
-            paddingBottom: 30,
+            paddingHorizontal: sideMargin,
+            paddingTop: 8,
+            paddingBottom: 40,
           }}
         >
-          {isRefreshing ? (
+          {isLoading || isRefreshing ? (
             <GalleryMasonrySkeleton cardWidth={columnWidth} />
           ) : pins.length === 0 ? (
             <GalleryEmptyState
@@ -269,7 +449,7 @@ export default function GalleryScreen() {
               onAddPhoto={handleAddPhoto}
             />
           ) : (
-            <View className="flex-row w-full justify-between">
+            <View className="flex-row w-full" style={{ gap: gutter }}>
               {/* Left Column */}
               <View style={{ width: columnWidth }}>
                 {leftPins.map((pin: GalleryPin) => (
@@ -299,15 +479,6 @@ export default function GalleryScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
-
-      {/* Pin Detail Modal */}
-      <GalleryDetailModal
-        pin={selectedPin}
-        visible={!!selectedPin}
-        onClose={() => setSelectedPin(null)}
-        onLikeToggle={handleLikeToggle}
-        onSaveToggle={handleSaveToggle}
-      />
 
       {/* 3 Dots Options Sheet */}
       <GalleryPinOptionsSheet

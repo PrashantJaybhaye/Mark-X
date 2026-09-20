@@ -63,11 +63,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Normalizes username or email input for Firebase Auth
+ * Normalizes an email identifier: trims whitespace and lowercases.
  */
 export function normalizeEmail(identifier: string): string {
-  const trimmed = identifier.trim().toLowerCase();
-  return trimmed;
+  return identifier.trim().toLowerCase();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -224,11 +223,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (identifier: string) => {
-    const trimmed = identifier.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes("@")) {
+    const email = normalizeEmail(identifier);
+    if (!email || !email.includes("@")) {
       throw new Error("Please enter your full registered email address (e.g. yourname@gmail.com).");
     }
-    await sendPasswordResetEmail(auth, trimmed);
+    await sendPasswordResetEmail(auth, email);
   };
 
   const sendVerificationEmail = async () => {

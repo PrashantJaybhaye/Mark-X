@@ -16,7 +16,6 @@ import {
   Outfit_500Medium,
   Outfit_600SemiBold,
   Outfit_700Bold,
-  Outfit_800ExtraBold,
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
 import { Anton_400Regular } from "@expo-google-fonts/anton";
@@ -54,6 +53,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
     const inMainGroup = segments[0] === "(main)";
     const isProfileGroup = segments[0] === "profile";
     const isNoteGroup = segments[0] === "note";
+    const isGalleryGroup = segments[0] === "gallery";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
     const isOnboarding = !segments[0];
 
@@ -61,7 +61,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
       if (!isMounted) return;
 
       if (!user) {
-        if (inMainGroup || isProfileGroup || isNoteGroup || isVerifyScreen) {
+        if (inMainGroup || isProfileGroup || isNoteGroup || isGalleryGroup || isVerifyScreen) {
           router.replace("/(auth)/login");
         } else {
           markDecisionComplete();
@@ -99,13 +99,10 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
 function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
   const [isDecisionComplete, setIsDecisionComplete] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsDecisionComplete(true);
-    }, 3500);
-    return () => clearTimeout(timer);
-  }, []);
-
+  // isAppReady becomes true once:
+  // 1. Fonts have loaded (or failed gracefully)
+  // 2. NavigationGuard has resolved the auth state and routed the user
+  // No arbitrary timer — the guard is the single source of truth.
   const isAppReady = isFontsReady && isDecisionComplete;
 
   return (
@@ -113,23 +110,13 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
       <ThemeProvider value={DefaultTheme}>
         <StatusBar style="dark" />
         <NavigationGuard onDecisionComplete={() => setIsDecisionComplete(true)} />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            headerStyle: {
-              backgroundColor: "#FFFFFF",
-            },
-            headerTintColor: "#000000",
-            contentStyle: {
-              backgroundColor: "#FFFFFF",
-            },
-          }}
-        >
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(main)" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="note" />
+          <Stack.Screen name="gallery" />
         </Stack>
         <BiometricLockGate />
       </ThemeProvider>
@@ -143,7 +130,6 @@ export default function RootLayout() {
     Outfit_500Medium,
     Outfit_600SemiBold,
     Outfit_700Bold,
-    Outfit_800ExtraBold,
     Outfit_900Black,
     Anton_400Regular,
   });

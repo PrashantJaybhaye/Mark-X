@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Animated } from "react-native";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { GalleryPin } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -21,6 +21,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
 }: GalleryPinCardProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [pulseAnim] = useState(() => new Animated.Value(0.35));
+  const spinAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!isLoaded) {
@@ -43,6 +44,25 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     }
   }, [isLoaded, pulseAnim]);
 
+  useEffect(() => {
+    if (pin.uploadStatus === "uploading") {
+      const spin = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      );
+      spin.start();
+      return () => spin.stop();
+    }
+  }, [pin.uploadStatus, spinAnim]);
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
   // Compute dynamic height based on aspect ratio (e.g. 0.58 -> tall, 1.1 -> wide)
   const imageHeight = Math.min(Math.max(cardWidth / pin.aspectRatio, 120), 320);
 
@@ -52,8 +72,11 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     onOptionsPress(pin);
   };
 
+  const isUploading = pin.uploadStatus === "uploading";
+  const isFailed = pin.uploadStatus === "failed";
+
   return (
-    <View className="mb-4" style={{ width: cardWidth }}>
+    <View className="mb-2" style={{ width: cardWidth }}>
       {/* 1. Main Pin Image with Skeleton Loader */}
       <TouchableOpacity
         activeOpacity={0.88}
@@ -81,7 +104,26 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
           onLoad={() => setIsLoaded(true)}
         />
 
-        {/* Video Indicator Pill */}
+        {/* Upload Status Indicator: Shown only while uploading or on failure */}
+        {isUploading ? (
+          <View
+            style={{ backgroundColor: "rgba(0,0,0,0.65)", borderColor: "rgba(255,255,255,0.25)", borderWidth: 1 }}
+            className="absolute top-2.5 left-2.5 px-2 py-1 rounded-full flex-row items-center gap-1.5 shadow-md backdrop-blur-md"
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Ionicons name="sync" size={11} color="#FFFFFF" />
+            </Animated.View>
+            <Text className="text-[9px] font-outfit-bold text-white tracking-tight">
+              Syncing
+            </Text>
+          </View>
+        ) : isFailed ? (
+          <View className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md w-6 h-6 rounded-full items-center justify-center border border-white/30 shadow-md">
+            <Ionicons name="alert" size={11} color="#FFFFFF" />
+          </View>
+        ) : null}
+
+        {/* Video Indicator Pill (Top-Right) */}
         {pin.mediaType === "video" && (
           <View className="absolute top-2.5 right-2.5 bg-black/60 px-2 py-1 rounded-full flex-row items-center gap-1">
             <Ionicons name="play" size={10} color="#FFFFFF" />
@@ -94,26 +136,15 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         )}
       </TouchableOpacity>
 
-      {/* 2. Pin Sub-Row: Domain / Title snippet + 3 dots menu on the right */}
-      <View className="flex-row items-center justify-between mt-1.5 px-0.5 min-h-[22px]">
-        {pin.domain || pin.title ? (
-          <Text
-            className="text-[11px] font-outfit text-[#484848] flex-1 mr-1"
-            numberOfLines={1}
-          >
-            {pin.domain || pin.title}
-          </Text>
-        ) : (
-          <View className="flex-1" />
-        )}
-
+      {/* 2. Pin Sub-Row: Options menu action */}
+      <View className="flex-row items-center justify-end mt-1 px-1 min-h-[20px]">
         <TouchableOpacity
           activeOpacity={0.6}
           onPress={handleOptions}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className="p-0.5 items-center justify-center"
         >
-          <Ionicons name="ellipsis-horizontal" size={15} color="#111111" />
+          <Ionicons name="ellipsis-horizontal" size={15} color="#484848" />
         </TouchableOpacity>
       </View>
     </View>
