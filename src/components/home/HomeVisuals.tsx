@@ -323,11 +323,11 @@ export function NotesCardArt() {
 }
 
 /**
- * Security Vault / Biometric & Encryption Art
+ * Camera Capture Art (Sleek DSLR)
  */
-export function SecurityCardArt() {
+export function CameraCardArt() {
   return (
-    <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#F0FDF4] border border-emerald-100/70 items-center justify-center">
+    <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#F8FAFC] border border-slate-200/80 items-center justify-center">
       <Svg
         width="100%"
         height="100%"
@@ -335,83 +335,56 @@ export function SecurityCardArt() {
         preserveAspectRatio="xMidYMid meet"
       >
         <Defs>
-          <LinearGradient id="shieldGrad" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#34D399" />
-            <Stop offset="50%" stopColor="#10B981" />
-            <Stop offset="100%" stopColor="#047857" />
+          <LinearGradient id="dslrBody" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#334155" />
+            <Stop offset="100%" stopColor="#0F172A" />
           </LinearGradient>
-          <LinearGradient id="shieldGlowGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#A7F3D0" stopOpacity="0.8" />
-            <Stop offset="100%" stopColor="#34D399" stopOpacity="0.2" />
+          <LinearGradient id="silverRim" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#E2E8F0" />
+            <Stop offset="50%" stopColor="#94A3B8" />
+            <Stop offset="100%" stopColor="#475569" />
           </LinearGradient>
-          <RadialGradient id="coreLight" cx="50%" cy="40%" r="50%">
-            <Stop offset="0%" stopColor="#ECFDF5" stopOpacity="0.9" />
-            <Stop offset="100%" stopColor="#A7F3D0" stopOpacity="0" />
+          <LinearGradient id="dslrLens" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#1E293B" />
+            <Stop offset="100%" stopColor="#020617" />
+          </LinearGradient>
+          <RadialGradient id="lensCoating" cx="60%" cy="40%" r="50%">
+            <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.4" />
+            <Stop offset="100%" stopColor="#A855F7" stopOpacity="0.1" />
           </RadialGradient>
         </Defs>
 
-        {/* Drop shadow underneath */}
-        <Ellipse
-          cx="80"
-          cy="56"
-          rx="44"
-          ry="5.5"
-          fill="#064E3B"
-          fillOpacity="0.1"
-        />
+        {/* Drop shadow */}
+        <Ellipse cx="80" cy="56" rx="44" ry="4" fill="#94A3B8" fillOpacity="0.15" />
 
-        {/* Outer biometric concentric aura rings */}
-        <Circle cx="80" cy="31" r="26" stroke="#D1FAE5" strokeWidth="1.5" strokeDasharray="6,4" fill="none" />
-        <Circle cx="80" cy="31" r="20" stroke="#A7F3D0" strokeWidth="1" strokeDasharray="4,4" fill="none" opacity="0.7" />
+        {/* Camera Body (Sleek minimalist rectangle) */}
+        <Rect x="40" y="16" width="80" height="36" rx="4" fill="url(#dslrBody)" />
+        
+        {/* Top prism bump */}
+        <Path d="M66,16 L70,8 L90,8 L94,16 Z" fill="#334155" />
 
-        {/* Main Vault Shield Path */}
-        <Path
-          d="M80,11 L98,18 C98,32 89,45 80,49 C71,45 62,32 62,18 Z"
-          fill="url(#shieldGrad)"
-        />
+        {/* The iconic Red Dot (Leica style) */}
+        <Circle cx="106" cy="24" r="3" fill="#EF4444" />
 
-        {/* Shield Right Bevel Reflection */}
-        <Path
-          d="M80,11 L98,18 C98,32 89,45 80,49 L80,11 Z"
-          fill="#065F46"
-          opacity="0.22"
-        />
+        {/* Shutter Button */}
+        <Rect x="46" y="12" width="10" height="4" rx="1" fill="#CBD5E1" />
 
-        {/* Shield Inner Border Shimmer */}
-        <Path
-          d="M80,13.5 L95.5,19.5 C95.5,31.5 87.5,43 80,46.5 C72.5,43 64.5,31.5 64.5,19.5 Z"
-          stroke="url(#shieldGlowGrad)"
-          strokeWidth="1.2"
-          fill="none"
-        />
+        {/* Big Silver Lens Ring */}
+        <Circle cx="80" cy="34" r="18" fill="url(#silverRim)" />
+        <Circle cx="80" cy="34" r="16" fill="#0F172A" />
+        
+        {/* Inner Lens Elements */}
+        <Circle cx="80" cy="34" r="12" fill="url(#dslrLens)" />
+        <Circle cx="80" cy="34" r="12" fill="url(#lensCoating)" />
+        
+        {/* Glare/Reflection on Lens */}
+        <Path d="M72,25 A12,12 0 0,1 87,23" stroke="#F8FAFC" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.6" />
+        <Circle cx="80" cy="34" r="4" fill="#020617" />
+        <Circle cx="83" cy="31" r="1.5" fill="#FFFFFF" opacity="0.8" />
 
-        {/* Padlock Shackle */}
-        <Path
-          d="M75,27 L75,23 C75,20.2 77.2,18 80,18 C82.8,18 85,20.2 85,23 L85,27"
-          stroke="#FFFFFF"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          fill="none"
-        />
-
-        {/* Padlock Body */}
-        <Rect
-          x="72.5"
-          y="26"
-          width="15"
-          height="12"
-          rx="3"
-          fill="#FFFFFF"
-        />
-
-        {/* Keyhole Dot & Bar */}
-        <Circle cx="80" cy="30.5" r="1.5" fill="#047857" />
-        <Rect x="79.2" y="31.5" width="1.6" height="3" rx="0.8" fill="#047857" />
       </Svg>
     </View>
   );
 }
 
-// Backward-compatible alias
-export const RemindersCardArt = SecurityCardArt;
-
+// Removed backward-compatible alias because SecurityCardArt was deleted.

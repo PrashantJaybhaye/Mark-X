@@ -25,10 +25,10 @@ import {
   DriveCardArt,
   GalleryCardArt,
   NotesCardArt,
-  SecurityCardArt,
+  CameraCardArt,
 } from "../../components/home/HomeVisuals";
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
-import { safePickDocument, safePickImage } from "../../services/nativePickerService";
+import { safePickDocument, safePickImage, safeCaptureImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -167,6 +167,19 @@ export default function HomeScreen() {
     triggerHaptic();
     const img = await safePickImage();
     if (!img?.uri) return;
+
+    await _uploadMediaToGallery(img);
+  };
+
+  const handleCapturePhoto = async () => {
+    triggerHaptic();
+    const img = await safeCaptureImage();
+    if (!img?.uri) return;
+
+    await _uploadMediaToGallery(img);
+  };
+
+  const _uploadMediaToGallery = async (img: any) => {
 
     const isVideo = img.type === "video";
     const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
@@ -331,15 +344,12 @@ export default function HomeScreen() {
               </FeatureCard>
 
               <FeatureCard
-                title="Security Vault"
-                count="Active"
-                subtitle="Biometric & AES Protected"
-                onPress={() => {
-                  triggerHaptic();
-                  router.navigate("/profile/security");
-                }}
+                title="Quick Camera"
+                count="Ready"
+                subtitle="Snap & Upload"
+                onPress={handleCapturePhoto}
               >
-                <SecurityCardArt />
+                <CameraCardArt />
               </FeatureCard>
             </View>
 

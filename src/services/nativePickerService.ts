@@ -47,6 +47,39 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
   return results[0] || null;
 }
 
+export async function safeCaptureImage(): Promise<PickedImageResult | null> {
+  try {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images", "videos"],
+      allowsEditing: false,
+      quality: 0.9,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const asset = result.assets[0];
+      const isVideo = asset.type === "video";
+      return {
+        fileName: asset.fileName || undefined,
+        uri: asset.uri,
+        width: asset.width || 800,
+        height: asset.height || 1000,
+        fileSize: asset.fileSize,
+        mimeType: asset.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
+        type: isVideo ? "video" : "image",
+        duration: asset.duration
+          ? asset.duration > 1000
+            ? Math.round(asset.duration / 1000)
+            : Math.round(asset.duration)
+          : undefined,
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn("[SafePicker] Error during camera capture:", err);
+    return null;
+  }
+}
+
 export async function safePickMultipleImages(limit = 5): Promise<PickedImageResult[]> {
   try {
     const result = await ImagePicker.launchImageLibraryAsync({
