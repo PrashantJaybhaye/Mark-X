@@ -506,13 +506,30 @@ export default function GalleryDetailPage() {
     };
   }, [id, router]);
 
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Helper to persist updates to state, cache, and Firestore
-  const updatePin = useCallback(async (updates: Partial<GalleryPin>) => {
+  const updatePin = useCallback((updates: Partial<GalleryPin>) => {
     if (!pin) return;
+    
+    // 1. Optimistic UI update immediately
     setPin((prev) => (prev ? { ...prev, ...updates } : null));
-    await updateGalleryPinInServer(pin.id, updates).catch(console.warn);
-    const cached = await loadCachedGalleryPins();
-    await saveCachedGalleryPins(cached.map((p) => (p.id === pin.id ? { ...p, ...updates } : p)));
+    
+    // 2. Clear any pending sync
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    // 3. Schedule the background sync
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        await updateGalleryPinInServer(pin.id, updates);
+        const cached = await loadCachedGalleryPins();
+        await saveCachedGalleryPins(cached.map((p) => (p.id === pin.id ? { ...p, ...updates } : p)));
+      } catch (err) {
+        console.warn(err);
+      }
+    }, 800); // 800ms debounce
   }, [pin]);
 
   const animateBookmarkBounce = () => {

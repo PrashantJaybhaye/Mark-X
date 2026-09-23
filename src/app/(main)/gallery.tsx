@@ -10,7 +10,26 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  LayoutAnimation,
 } from "react-native";
+
+const iOSSpringAnimation = {
+  duration: 400,
+  create: {
+    type: LayoutAnimation.Types.spring,
+    property: LayoutAnimation.Properties.opacity,
+    springDamping: 0.8,
+  },
+  update: {
+    type: LayoutAnimation.Types.spring,
+    springDamping: 0.8,
+  },
+  delete: {
+    type: LayoutAnimation.Types.spring,
+    property: LayoutAnimation.Properties.opacity,
+    springDamping: 0.8,
+  },
+};
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -62,6 +81,7 @@ export default function GalleryScreen() {
 
   // Helper: update a single pin across state and local storage cache
   const updatePinState = useCallback((id: string, updates: Partial<GalleryPin>) => {
+    LayoutAnimation.configureNext(iOSSpringAnimation);
     setPins((prev) => {
       const updated = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
       saveCachedGalleryPins(updated);
@@ -157,6 +177,7 @@ export default function GalleryScreen() {
     // 1. Instant cached load
     loadCachedGalleryPins().then((cached) => {
       if (isMounted && cached.length > 0) {
+        LayoutAnimation.configureNext(iOSSpringAnimation);
         setPins(cached.map(normalizeGalleryPin));
         setIsLoading(false);
       }
@@ -169,6 +190,7 @@ export default function GalleryScreen() {
     const unsubscribe = subscribeLatestGalleryPins(
       (latestPins) => {
         if (!isMounted) return;
+        LayoutAnimation.configureNext(iOSSpringAnimation);
         setPins((prev) => {
           const map = new Map(prev.map((p) => [p.id, p]));
           latestPins.forEach((item) => map.set(item.id, { ...(map.get(item.id) || {}), ...item }));
@@ -225,7 +247,13 @@ export default function GalleryScreen() {
     let leftHeight = 0;
     let rightHeight = 0;
 
-    pins.forEach((pin) => {
+    // Sort pins so saved (bookmarked) ones appear at the top
+    const sortedPins = [...pins].sort((a, b) => {
+      if (a.saved === b.saved) return 0;
+      return a.saved ? -1 : 1;
+    });
+
+    sortedPins.forEach((pin) => {
       const estimatedHeight = Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 16;
       if (leftHeight <= rightHeight) {
         left.push(pin);
