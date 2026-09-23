@@ -13,6 +13,7 @@ import {
   authenticateWithBiometrics,
   BiometricCapability,
   BiometricAuthResult,
+  isSystemBypassActive,
 } from "../services/biometricsService";
 import {
   loadUserPreferences,
@@ -98,7 +99,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       // Don't trigger background lock while the system biometric dialog is active
-      if (isAuthenticatingRef.current) return;
+      if (isAuthenticatingRef.current || isSystemBypassActive) return;
 
       if (nextAppState === "background") {
         lastBackgroundTime.current = Date.now();

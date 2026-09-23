@@ -1,5 +1,6 @@
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { setSystemBypassActive } from "./biometricsService";
 
 export interface PickedFileResult {
   name: string;
@@ -21,6 +22,7 @@ export interface PickedImageResult {
 
 export async function safePickDocument(): Promise<PickedFileResult | null> {
   try {
+    setSystemBypassActive(true);
     const result = await DocumentPicker.getDocumentAsync({
       type: ["*/*"],
       copyToCacheDirectory: true,
@@ -39,6 +41,8 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
   } catch (err) {
     console.warn("[SafePicker] Error during document picking:", err);
     return null;
+  } finally {
+    setSystemBypassActive(false);
   }
 }
 
@@ -49,6 +53,7 @@ export async function safePickImage(): Promise<PickedImageResult | null> {
 
 export async function safeCaptureImage(): Promise<PickedImageResult | null> {
   try {
+    setSystemBypassActive(true);
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images", "videos"],
       allowsEditing: false,
@@ -77,11 +82,14 @@ export async function safeCaptureImage(): Promise<PickedImageResult | null> {
   } catch (err) {
     console.warn("[SafePicker] Error during camera capture:", err);
     return null;
+  } finally {
+    setSystemBypassActive(false);
   }
 }
 
 export async function safePickMultipleImages(limit = 5): Promise<PickedImageResult[]> {
   try {
+    setSystemBypassActive(true);
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images", "videos"],
       allowsMultipleSelection: limit > 1,
@@ -113,5 +121,7 @@ export async function safePickMultipleImages(limit = 5): Promise<PickedImageResu
   } catch (err) {
     console.warn("[SafePicker] Error during media picking:", err);
     return [];
+  } finally {
+    setSystemBypassActive(false);
   }
 }

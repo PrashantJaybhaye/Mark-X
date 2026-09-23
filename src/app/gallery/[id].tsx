@@ -42,15 +42,20 @@ import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptio
  * High-performance video player with custom tap-to-play/pause overlay
  * and timeline progress indicator.
  */
+import { File, Paths } from "expo-file-system";
+
 function InlineVideoPlayer({
   sourceUrl,
+  fileName,
   isMuted,
   onDoubleTap,
 }: {
   sourceUrl: string;
+  fileName: string;
   isMuted: boolean;
   onDoubleTap: () => void;
 }) {
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -60,7 +65,40 @@ function InlineVideoPlayer({
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const player = useVideoPlayer(sourceUrl, (p) => {
+  useEffect(() => {
+    let isMounted = true;
+    const checkCache = async () => {
+      // If it's already a local file, just use it
+      if (!sourceUrl.startsWith("http")) {
+        if (isMounted) setResolvedUrl(sourceUrl);
+        return;
+      }
+      try {
+        const targetFile = new File(Paths.cache, fileName);
+        if (targetFile.exists) {
+          // If cached, use local file to play offline
+          if (isMounted) setResolvedUrl(targetFile.uri);
+        } else {
+          // Play from network right away
+          if (isMounted) setResolvedUrl(sourceUrl);
+          // And download to cache in background for future offline plays
+          try {
+            await File.downloadFileAsync(sourceUrl, targetFile, { idempotent: true });
+          } catch (e) {
+            // ignore background download errors
+          }
+        }
+      } catch (err) {
+        if (isMounted) setResolvedUrl(sourceUrl);
+      }
+    };
+    checkCache();
+    return () => {
+      isMounted = false;
+    };
+  }, [sourceUrl, fileName]);
+
+  const player = useVideoPlayer(resolvedUrl || sourceUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
     p.play();
@@ -546,7 +584,12 @@ export default function GalleryDetailPage() {
           <View
             style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
           >
-            <InlineVideoPlayer sourceUrl={pin.imageUrl} isMuted={isMuted} onDoubleTap={handleSaveToggle} />
+            <InlineVideoPlayer 
+              sourceUrl={pin.imageUrl} 
+              fileName={pin.fileName || "temp.mp4"}
+              isMuted={isMuted} 
+              onDoubleTap={handleSaveToggle} 
+            />
           </View>
         ) : (
           <TouchableOpacity activeOpacity={1} onPress={handlePhotoPress} className="w-full h-full items-center justify-center">

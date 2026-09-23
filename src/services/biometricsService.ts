@@ -168,3 +168,12 @@ export async function cancelBiometrics(): Promise<void> {
     console.warn("[BiometricsService] Cancel error:", error);
   }
 }
+
+/**
+ * Global flag to temporarily bypass biometric lock (e.g. when opening an image picker)
+ */
+export let isSystemBypassActive = false;
+
+export function setSystemBypassActive(active: boolean) {
+  isSystemBypassActive = active;
+}

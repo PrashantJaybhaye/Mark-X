@@ -1,6 +1,7 @@
 import { File, Paths } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
+import { setSystemBypassActive } from "./biometricsService";
 
 export interface ExportResult {
   success: boolean;
@@ -23,6 +24,7 @@ export async function exportMediaToDevice(
   let localUri = mediaUrl;
 
   try {
+    setSystemBypassActive(true);
     // 1. If remote URL, download directly to cache directory using SDK 57 File API
     if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
       const ext = mediaUrl.includes(".mp4") ? "mp4" : "jpg";
@@ -71,5 +73,7 @@ export async function exportMediaToDevice(
       success: false,
       message: error?.message || "Failed to export media.",
     };
+  } finally {
+    setSystemBypassActive(false);
   }
 }
