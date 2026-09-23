@@ -63,6 +63,9 @@ function InlineVideoPlayer({
   const [duration, setDuration] = useState(0);
 
   const playIconAnim = useRef(new Animated.Value(0)).current;
+  const skeletonAnim = useRef(new Animated.Value(0.2)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -143,6 +146,28 @@ function InlineVideoPlayer({
     p.play();
   });
 
+  // Apple-style smooth skeleton breathing animation
+  useEffect(() => {
+    if (!resolvedUrl) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(skeletonAnim, { toValue: 0.7, duration: 900, useNativeDriver: true }),
+          Animated.timing(skeletonAnim, { toValue: 0.2, duration: 900, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      // Smoothly fade out the entire skeleton over 400ms when the video is ready!
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowSkeleton(false);
+        skeletonAnim.stopAnimation();
+      });
+    }
+  }, [resolvedUrl]);
+
   useEffect(() => {
     if (!player) return;
     player.muted = isMuted;
@@ -207,6 +232,19 @@ function InlineVideoPlayer({
         contentFit="cover"
         nativeControls={false}
       />
+
+      {showSkeleton && (
+        <Animated.View 
+          className="absolute inset-0 z-10 bg-[#E5E5EA]" 
+          style={{ opacity: fadeAnim }}
+          pointerEvents="none"
+        >
+          <Animated.View 
+            className="w-full h-full bg-[#C7C7CC]" 
+            style={{ opacity: skeletonAnim }}
+          />
+        </Animated.View>
+      )}
 
       <TouchableOpacity
         activeOpacity={1}
