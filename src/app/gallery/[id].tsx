@@ -43,6 +43,7 @@ import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptio
  * and timeline progress indicator.
  */
 import { File, Paths } from "expo-file-system";
+import { encryptFile, decryptFile } from "../../services/cryptoService";
 
 function InlineVideoPlayer({
   sourceUrl,
@@ -65,36 +66,74 @@ function InlineVideoPlayer({
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Track the decrypted temp file so we can delete it when unmounting
+  const tempDecryptedFileRef = useRef<string | null>(null);
+
   useEffect(() => {
     let isMounted = true;
     const checkCache = async () => {
-      // If it's already a local file, just use it
+      // If it's already a local file (e.g. from picker), just use it
       if (!sourceUrl.startsWith("http")) {
         if (isMounted) setResolvedUrl(sourceUrl);
         return;
       }
+      
       try {
-        const targetFile = new File(Paths.cache, fileName);
-        if (targetFile.exists) {
-          // If cached, use local file to play offline
-          if (isMounted) setResolvedUrl(targetFile.uri);
+        const encryptedFileName = fileName + ".enc";
+        const encryptedFile = new File(Paths.cache, encryptedFileName);
+        
+        if (encryptedFile.exists) {
+          // It's in the secure cache! Decrypt it Just-In-Time to a temp file
+          const tempFileName = `temp_${Date.now()}_${fileName}`;
+          const tempFile = new File(Paths.cache, tempFileName);
+          
+          await decryptFile(encryptedFile.uri, tempFile.uri);
+          
+          if (isMounted) {
+            tempDecryptedFileRef.current = tempFile.uri;
+            setResolvedUrl(tempFile.uri);
+          } else {
+            // Unmounted during decryption, clean up immediately
+            try { tempFile.delete(); } catch (e) {}
+          }
         } else {
           // Play from network right away
           if (isMounted) setResolvedUrl(sourceUrl);
-          // And download to cache in background for future offline plays
+          
+          // And download & encrypt to secure cache in background
           try {
-            await File.downloadFileAsync(sourceUrl, targetFile, { idempotent: true });
+            const rawTempFile = new File(Paths.cache, `raw_${fileName}`);
+            await File.downloadFileAsync(sourceUrl, rawTempFile, { idempotent: true });
+            
+            // Encrypt the raw file to the secure cache
+            await encryptFile(rawTempFile.uri, encryptedFile.uri);
+            
+            // Delete the unencrypted raw download
+            try { rawTempFile.delete(); } catch (e) {}
           } catch (e) {
-            // ignore background download errors
+            // ignore background download/encrypt errors
+            console.warn("[VideoCache] Background encrypt failed:", e);
           }
         }
       } catch (err) {
         if (isMounted) setResolvedUrl(sourceUrl);
       }
     };
+    
     checkCache();
+    
     return () => {
       isMounted = false;
+      // CRITICAL: Delete the unencrypted temporary file as soon as the video is closed!
+      if (tempDecryptedFileRef.current) {
+        try {
+          const fileToWipe = new File(tempDecryptedFileRef.current.replace("file://", ""));
+          fileToWipe.delete();
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
     };
   }, [sourceUrl, fileName]);
 
