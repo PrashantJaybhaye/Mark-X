@@ -292,7 +292,8 @@ This project is licensed under the MIT License - see the [LICENSE](file:///d:/Ma
 ---
 
 <div align="left">
-  # Release APK
+
+# Release APK
 cd android; .\gradlew.bat assembleRelease
 
 # Debug APK
