@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Modal,
   Platform,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";

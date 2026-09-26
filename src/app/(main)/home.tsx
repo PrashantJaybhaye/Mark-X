@@ -28,7 +28,7 @@ import {
   CameraCardArt,
 } from "../../components/home/HomeVisuals";
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
-import { safePickDocument, safePickImage, safeCaptureImage } from "../../services/nativePickerService";
+import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { useAuth } from "../../context/AuthContext";
 import {

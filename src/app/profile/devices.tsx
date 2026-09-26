@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
-  RefreshControl,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,

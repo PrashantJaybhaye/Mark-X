@@ -31,8 +31,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
     onOptionsPress?.(note);
   };
 
-  const iconName = note.iconName || "document-text-outline";
-
   // --- 1. Row / List View Mode (Premium Light Card) ---
   if (viewMode === "list") {
     return (

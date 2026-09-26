@@ -23,6 +23,7 @@ import { auth } from "../../services/firebase";
 import { MarkXLogo } from "../../components/common/MarkXLogo";
 import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
+import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
 import { GalleryMasonrySkeleton } from "../../components/gallery/GallerySkeleton";
 import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import { safePickMultipleImages } from "../../services/nativePickerService";
@@ -62,6 +63,7 @@ export default function GalleryScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [optionsPin, setOptionsPin] = useState<GalleryPin | null>(null);
+  const [infoPin, setInfoPin] = useState<GalleryPin | null>(null);
 
   // References & animations
   const lastDocRef = useRef<any>(null);
@@ -458,6 +460,14 @@ export default function GalleryScreen() {
         onClose={() => setOptionsPin(null)}
         onSaveToggle={handleSaveToggle}
         onHidePin={handleHidePin}
+        onInfo={(pin) => setInfoPin(pin)}
+      />
+
+      {/* Pin Media Info Sheet */}
+      <GalleryPinInfoSheet
+        visible={!!infoPin}
+        pin={infoPin}
+        onClose={() => setInfoPin(null)}
       />
     </View>
   );

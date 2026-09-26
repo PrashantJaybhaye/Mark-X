@@ -37,6 +37,7 @@ import {
   fetchGalleryPinsFromServer,
 } from "../../services/galleryFirebaseService";
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
+import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
 
 /**
  * High-performance video player with custom tap-to-play/pause overlay
@@ -832,7 +833,7 @@ export default function GalleryDetailPage() {
       </View>
 
       {/* 4. Inspector Sheet */}
-      <ApplePhotoInspector visible={infoVisible} pin={pin} onClose={() => setInfoVisible(false)} />
+      <GalleryPinInfoSheet visible={infoVisible} pin={pin} onClose={() => setInfoVisible(false)} />
 
       {/* 5. Options Sheet */}
       <GalleryPinOptionsSheet
@@ -841,6 +842,7 @@ export default function GalleryDetailPage() {
         onClose={() => setOptionsVisible(false)}
         onSaveToggle={handleSaveToggle}
         onHidePin={handleDeleteConfirm}
+        onInfo={() => setInfoVisible(true)}
       />
 
       {/* 6. Delete Confirmation Dialog */}
