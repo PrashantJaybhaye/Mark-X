@@ -52,6 +52,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
   const [pendingMedia, setPendingMedia] = useState<{ uri: string; width: number; height: number } | null>(null);
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // AppState & Camera Lifecycle management
   const [appIsActive, setAppIsActive] = useState(true);
@@ -412,12 +413,20 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
 
   const composedGestures = Gesture.Race(longPress, tap);
 
-  const handleUsePhoto = () => {
+  const handleUsePhoto = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
     if (pendingMedia) {
       handleMediaCaptured(pendingMedia, "image");
     }
-    setPreviewUri(null);
-    setPendingMedia(null);
+
+    setTimeout(() => {
+      setPreviewUri(null);
+      setPendingMedia(null);
+      setIsSaving(false);
+    }, 1250);
   };
 
   const handleDiscardDirect = () => {
@@ -503,8 +512,9 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             {/* Left Dark Button: Retake */}
             <TouchableOpacity 
               onPress={handleRetake} 
+              disabled={isSaving}
               activeOpacity={0.75} 
-              className="bg-[#222222] px-7 py-3 rounded-full items-center justify-center"
+              className={`bg-[#222222] px-7 py-3 rounded-full items-center justify-center ${isSaving ? "opacity-40" : ""}`}
             >
               <Text className="text-white font-outfit-bold text-base">Retake</Text>
             </TouchableOpacity>
@@ -512,11 +522,21 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             {/* Right White Button: Use Photo > */}
             <TouchableOpacity 
               onPress={handleUsePhoto} 
+              disabled={isSaving}
               activeOpacity={0.8} 
-              className="bg-white px-7 py-3 rounded-full flex-row items-center gap-1.5 shadow-lg"
+              className={`bg-white px-7 py-3 rounded-full flex-row items-center gap-2 shadow-lg ${isSaving ? "opacity-90" : ""}`}
             >
-              <Text className="text-black font-outfit-bold text-base">Use Photo</Text>
-              <Ionicons name="chevron-forward" size={18} color="black" />
+              {isSaving ? (
+                <>
+                  <ActivityIndicator size="small" color="#111111" />
+                  <Text className="text-black font-outfit-bold text-base">Saving...</Text>
+                </>
+              ) : (
+                <>
+                  <Text className="text-black font-outfit-bold text-base">Use Photo</Text>
+                  <Ionicons name="chevron-forward" size={18} color="black" />
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </SafeAreaView>

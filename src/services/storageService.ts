@@ -98,6 +98,56 @@ async function saveItem<T>(baseKey: string, value: T): Promise<void> {
 
 // Drive Items
 
+function parseSizeToBytes(sizeStr?: string): number {
+  if (!sizeStr) return 0;
+  const match = sizeStr.trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)?$/i);
+  if (!match) return 0;
+  const num = parseFloat(match[1]);
+  const unit = (match[2] || "B").toUpperCase();
+  switch (unit) {
+    case "KB": return num * 1024;
+    case "MB": return num * 1024 * 1024;
+    case "GB": return num * 1024 * 1024 * 1024;
+    case "TB": return num * 1024 * 1024 * 1024 * 1024;
+    default: return num;
+  }
+}
+
+export async function recalculateTotalUsedStorageGB(): Promise<number> {
+  try {
+    let totalBytes = 0;
+
+    // 1. Gallery pins (image/video file sizes)
+    const pins = await loadCachedGalleryPins();
+    for (const pin of pins) {
+      totalBytes += pin.fileSize || (pin.mediaType === "video" ? 14800000 : 2800000);
+    }
+
+    // 2. Drive items
+    const driveItems = await loadDriveItems();
+    for (const item of driveItems) {
+      if (item.size) {
+        totalBytes += parseSizeToBytes(item.size);
+      }
+    }
+
+    // 3. Notes
+    const notes = await loadNotes();
+    for (const note of notes) {
+      totalBytes += (note.title?.length || 0) + (note.body?.length || 0);
+    }
+
+    const rawGB = totalBytes / (1024 * 1024 * 1024);
+    // If files/notes exist, guarantee at least 0.01 GB so small items don't round down to 0.00 GB
+    const usedGB = totalBytes > 0 ? Math.max(0.01, parseFloat(rawGB.toFixed(3))) : 0;
+    await updateStats({ usedStorageGB: usedGB });
+    return usedGB;
+  } catch (err) {
+    console.warn("[StorageService] Failed to calculate total storage:", err);
+    return 0;
+  }
+}
+
 async function updateStats(updates: Partial<NonNullable<UserPreferences["stats"]>>) {
   const current = await loadUserPreferences();
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
@@ -132,17 +182,21 @@ export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITE
 export const saveDriveItems = async (items: DriveItem[]) => {
   await saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
   await updateStats({ driveCount: items.length });
+  await recalculateTotalUsedStorageGB();
 };
 
 // Gallery Pins
 export const loadCachedGalleryPins = (): Promise<GalleryPin[]> =>
   loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
 
-export const saveCachedGalleryPins = (pins: GalleryPin[]): Promise<void> =>
-  saveItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, pins);
+export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
+  await saveItem(STORAGE_KEYS.GALLERY_PINS, pins);
+  await recalculateTotalUsedStorageGB();
+};
 
 export const syncGalleryStats = async (count: number) => {
   await updateStats({ galleryCount: count });
+  await recalculateTotalUsedStorageGB();
 };
 
 export const updateGalleryStats = async (delta: number) => {
@@ -150,6 +204,7 @@ export const updateGalleryStats = async (delta: number) => {
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
   const newCount = Math.max(0, currentStats.galleryCount + delta);
   await updateStats({ galleryCount: newCount });
+  await recalculateTotalUsedStorageGB();
 };
 
 // Notes
@@ -157,6 +212,7 @@ export const loadNotes = () => loadItem<NoteItem[]>(STORAGE_KEYS.NOTES, []);
 export const saveNotes = async (notes: NoteItem[]) => {
   await saveItem(STORAGE_KEYS.NOTES, notes);
   await updateStats({ notesCount: notes.length });
+  await recalculateTotalUsedStorageGB();
 };
 
 export const getNoteById = async (id: string): Promise<NoteItem | null> => {

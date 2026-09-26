@@ -14,12 +14,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IosDialog } from "../../components/common/IosDialog";
+import { IosDialog, IosDialogAction } from "../../components/common/IosDialog";
 import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
-import { clearAppCache } from "../../services/cacheCleaner";
+import { clearAppCache, getAppCacheSize } from "../../services/cacheCleaner";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -32,6 +32,7 @@ export default function ProfileScreen() {
     visible: boolean;
     title: string;
     message?: string;
+    actions?: IosDialogAction[];
   }>({ visible: false, title: "" });
 
   const [isFocused, setIsFocused] = useState(false);
@@ -117,19 +118,61 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleClearCache = async () => {
+  const performClearCache = async () => {
+    setDialogState((prev) => ({ ...prev, visible: false }));
     triggerHaptic();
+
     const { clearedMB } = await clearAppCache();
     const formattedSize = clearedMB >= 1024
       ? `${(clearedMB / 1024).toFixed(2)} GB`
       : `${clearedMB} MB`;
 
+    setTimeout(() => {
+      setDialogState({
+        visible: true,
+        title: "Cache Cleared",
+        message: clearedMB > 0
+          ? `Successfully freed up ${formattedSize} of cached images and temporary files.`
+          : "Your app cache is already clean!",
+        actions: [
+          {
+            text: "OK",
+            bold: true,
+            onPress: () => setDialogState((prev) => ({ ...prev, visible: false })),
+          },
+        ],
+      });
+    }, 250);
+  };
+
+  const handleClearCache = async () => {
+    triggerHaptic();
+    const { sizeMB } = await getAppCacheSize();
+    const formattedSize = sizeMB >= 1024
+      ? `${(sizeMB / 1024).toFixed(2)} GB`
+      : `${sizeMB} MB`;
+
+    const promptText = sizeMB > 0
+      ? `Your current app cache is ${formattedSize}. Are you sure you want to clear temporary photos and cached images to free up storage space?`
+      : "Your app cache is currently clean (0 MB). Would you still like to run cache optimization?";
+
     setDialogState({
       visible: true,
-      title: "Cache Cleared",
-      message: clearedMB > 0
-        ? `Freed up ${formattedSize} of cached images and temporary files.`
-        : "Cache is already clean!"
+      title: "Clear Cache & Temp Files",
+      message: promptText,
+      actions: [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => setDialogState((prev) => ({ ...prev, visible: false })),
+        },
+        {
+          text: "Clear Cache",
+          style: "destructive",
+          bold: true,
+          onPress: performClearCache,
+        },
+      ],
     });
   };
 
@@ -276,7 +319,7 @@ export default function ProfileScreen() {
             />
             <ProfileCardRow
               icon="trash-outline"
-              title="Clear App Cache"
+              title="Clear Cache"
               onPress={handleClearCache}
             />
           </View>
@@ -301,6 +344,11 @@ export default function ProfileScreen() {
               onPress={() => navigateSafely("/profile/terms")}
             />
             <ProfileCardRow
+              icon="shield-checkmark-outline"
+              title="Privacy Policy"
+              onPress={() => navigateSafely("/profile/privacy")}
+            />
+            <ProfileCardRow
               icon="information-circle-outline"
               title="About"
               showDivider={false}
@@ -317,13 +365,15 @@ export default function ProfileScreen() {
         title={dialogState.title}
         message={dialogState.message}
         onClose={() => setDialogState(prev => ({ ...prev, visible: false }))}
-        actions={[
-          {
-            text: "OK",
-            bold: true,
-            onPress: () => setDialogState(prev => ({ ...prev, visible: false })),
-          }
-        ]}
+        actions={
+          dialogState.actions || [
+            {
+              text: "OK",
+              bold: true,
+              onPress: () => setDialogState(prev => ({ ...prev, visible: false })),
+            },
+          ]
+        }
       />
     </View>
   );

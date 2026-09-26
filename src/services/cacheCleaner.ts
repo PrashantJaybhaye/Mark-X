@@ -17,6 +17,50 @@ export async function deleteTempFile(fileUri: string | null | undefined): Promis
 }
 
 /**
+ * Recursively measures total file size in bytes without deleting.
+ */
+async function recursiveMeasureDirectory(dirUri: string): Promise<number> {
+  let totalBytes = 0;
+  try {
+    const formattedDir = dirUri.endsWith("/") ? dirUri : `${dirUri}/`;
+    const contents = await FileSystem.readDirectoryAsync(formattedDir);
+
+    for (const name of contents) {
+      const itemUri = `${formattedDir}${name}`;
+      const info = await FileSystem.getInfoAsync(itemUri);
+
+      if (!info.exists) continue;
+
+      if (info.isDirectory) {
+        totalBytes += await recursiveMeasureDirectory(itemUri);
+      } else {
+        totalBytes += info.size || 0;
+      }
+    }
+  } catch (error) {
+    // Suppress permission errors on OS-protected system folders
+  }
+  return totalBytes;
+}
+
+/**
+ * Calculates current total cached bytes across all subdirectories without deleting anything.
+ */
+export async function getAppCacheSize(): Promise<{ sizeMB: number; sizeBytes: number }> {
+  let totalBytes = 0;
+  try {
+    const cacheDir = FileSystem.cacheDirectory;
+    if (cacheDir) {
+      totalBytes = await recursiveMeasureDirectory(cacheDir);
+    }
+  } catch (error) {
+    console.warn("[CacheCleaner] Error measuring cache size:", error);
+  }
+  const sizeMB = parseFloat((totalBytes / (1024 * 1024)).toFixed(2));
+  return { sizeMB, sizeBytes: totalBytes };
+}
+
+/**
  * Recursively measures total file size in bytes and deletes all contents of a directory.
  */
 async function recursiveCleanDirectory(dirUri: string): Promise<number> {

@@ -38,6 +38,7 @@ import {
   saveUserPreferences,
   loadCachedGalleryPins,
   saveCachedGalleryPins,
+  recalculateTotalUsedStorageGB,
 } from "../../services/storageService";
 import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/galleryFirebaseService";
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
@@ -68,10 +69,13 @@ export default function HomeScreen() {
 
   const refreshCounts = React.useCallback(async (explicitUid?: string) => {
     try {
-      // 1. Fast local cache path for immediate 0ms rendering
+      // 0. Recalculate local storage GB based on actual stored items
+      const recalculatedGB = await recalculateTotalUsedStorageGB();
+
+      // 1. Fast local cache path for immediate rendering
       const prefs = await loadUserPreferences();
       if (prefs.stats) {
-        applyStats(prefs.stats);
+        applyStats({ ...prefs.stats, usedStorageGB: Math.max(recalculatedGB, prefs.stats.usedStorageGB || 0) });
       }
 
       // 2. Fetch fresh user stats from Firestore user metadata
@@ -79,8 +83,10 @@ export default function HomeScreen() {
       if (uid) {
         const metadata = await getUserMetadata(uid);
         if (metadata && metadata.stats) {
-          applyStats(metadata.stats);
-          await saveUserPreferences({ ...prefs, stats: metadata.stats });
+          const finalGB = Math.max(recalculatedGB, metadata.stats.usedStorageGB || 0);
+          const mergedStats = { ...metadata.stats, usedStorageGB: finalGB };
+          applyStats(mergedStats);
+          await saveUserPreferences({ ...prefs, stats: mergedStats });
         } else if (!prefs.stats) {
           setIsStatsLoading(false);
         }

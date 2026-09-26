@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
+  RefreshControl,
   ScrollView,
   StatusBar as RNStatusBar,
   Text,
@@ -9,7 +11,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../context/AuthContext";
@@ -148,6 +150,8 @@ export default function DevicesScreen() {
   const [currentDeviceId, setCurrentDeviceId] = useState<string>("");
   const [allDevices, setAllDevices] = useState<FirestoreDevice[]>([]);
   const [logoutTarget, setLogoutTarget] = useState<FirestoreDevice | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const isDismissingRef = useRef(false);
 
@@ -162,28 +166,48 @@ export default function DevicesScreen() {
     [hardwareInfo]
   );
 
-  // Sync heartbeat & persistent ID
-  useEffect(() => {
-    let isMounted = true;
-    getPersistentDeviceId().then((id) => {
-      if (isMounted) {
+  // Focus effect: Sync heartbeat, resolve device ID & subscribe to real-time active devices whenever focused
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+
+      getPersistentDeviceId().then((id) => {
+        if (!isMounted) return;
         setCurrentDeviceId(id);
         if (userId && userId !== "guest") {
           syncCurrentDevice(userId, id, hardwareInfo);
         }
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, [userId, hardwareInfo]);
+      });
 
-  // Subscribe to real-time active devices
-  useEffect(() => {
-    if (!userId || userId === "guest") return;
-    const unsubscribe = subscribeActiveDevices(userId, setAllDevices);
-    return () => unsubscribe();
-  }, [userId]);
+      if (!userId || userId === "guest") {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      const unsubscribe = subscribeActiveDevices(userId, (devices) => {
+        if (isMounted) {
+          setAllDevices(devices);
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
+    }, [userId, hardwareInfo])
+  );
+
+  const handleRefresh = React.useCallback(async () => {
+    setIsRefreshing(true);
+    triggerHaptic();
+    if (userId && userId !== "guest" && currentDeviceId) {
+      await syncCurrentDevice(userId, currentDeviceId, hardwareInfo);
+    }
+    setTimeout(() => setIsRefreshing(false), 1000);
+  }, [userId, currentDeviceId, hardwareInfo]);
 
   const otherDevices = useMemo(
     () => allDevices.filter((d) => d.deviceId !== currentDeviceId),
@@ -257,7 +281,19 @@ export default function DevicesScreen() {
             </Text>
           </View>
 
-          <View className="w-10 h-10" />
+          <TouchableOpacity
+            onPress={handleRefresh}
+            disabled={isRefreshing}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="w-10 h-10 items-center justify-center z-10"
+          >
+            <Ionicons
+              name={isRefreshing ? "sync" : "refresh-outline"}
+              size={20}
+              color="#222222"
+            />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -303,7 +339,7 @@ export default function DevicesScreen() {
             >
               Other active devices
             </Text>
-            {otherDevices.length > 0 && (
+            {!isLoading && otherDevices.length > 0 && (
               <Text
                 className="text-[13px] text-[#717171]"
                 style={{ fontFamily: "Outfit_400Regular" }}
@@ -313,7 +349,11 @@ export default function DevicesScreen() {
             )}
           </View>
 
-          {otherDevices.length > 0 ? (
+          {isLoading ? (
+            <View className="py-6 items-center justify-center border-b border-[#EBEBEB]">
+              <ActivityIndicator size="small" color="#222222" />
+            </View>
+          ) : otherDevices.length > 0 ? (
             <>
               {otherDevices.map((device, idx) => (
                 <DeviceRow
