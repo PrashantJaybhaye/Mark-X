@@ -173,10 +173,7 @@ export default function HomeScreen() {
 
   const handleCapturePhoto = async () => {
     triggerHaptic();
-    const img = await safeCaptureImage();
-    if (!img?.uri) return;
-
-    await _uploadMediaToGallery(img);
+    router.push('/camera');
   };
 
   const _uploadMediaToGallery = async (img: any) => {
@@ -344,7 +341,7 @@ export default function HomeScreen() {
               </FeatureCard>
 
               <FeatureCard
-                title="Quick Camera"
+                title="Camera"
                 count="Ready"
                 subtitle="Snap & Upload"
                 onPress={handleCapturePhoto}

@@ -162,6 +162,12 @@ export function GalleryCardArt() {
 /**
  * Document Drive / Storage Cylinder Art
  */
+const DRIVE_DISCS = [
+  { y: 40, grad: "discBottomGrad", topFill: "#0EA5E9", innerStroke: "#BAE6FD" },
+  { y: 28, grad: "discMiddleGrad", topFill: "#38BDF8", innerStroke: "#E0F2FE" },
+  { y: 16, grad: "discTopGrad", topFill: "#7DD3FC", innerStroke: null },
+];
+
 export function DriveCardArt() {
   return (
     <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#F0F9FF] border border-sky-100/60 items-center justify-center">
@@ -187,102 +193,38 @@ export function DriveCardArt() {
         </Defs>
 
         {/* Ground Drop Shadow */}
-        <Ellipse
-          cx="80"
-          cy="56"
-          rx="42"
-          ry="6"
-          fill="#64748B"
-          fillOpacity="0.12"
-        />
+        <Ellipse cx="80" cy="56" rx="42" ry="6" fill="#64748B" fillOpacity="0.12" />
 
-        {/* Bottom Cylinder Disc */}
-        <Path
-          d="M44,40 L44,48 A36,9 0 0,0 116,48 L116,40 Z"
-          fill="url(#discBottomGrad)"
-        />
-        <Ellipse
-          cx="80"
-          cy="40"
-          rx="36"
-          ry="8.5"
-          fill="#0EA5E9"
-          stroke="#E0F2FE"
-          strokeWidth="0.8"
-        />
-        <Ellipse
-          cx="80"
-          cy="40"
-          rx="26"
-          ry="5.5"
-          stroke="#BAE6FD"
-          strokeWidth="0.8"
-          strokeDasharray="16,8"
-          fill="none"
-          opacity="0.6"
-        />
-
-        {/* Middle Cylinder Disc */}
-        <Path
-          d="M44,28 L44,36 A36,9 0 0,0 116,36 L116,28 Z"
-          fill="url(#discMiddleGrad)"
-        />
-        <Ellipse
-          cx="80"
-          cy="28"
-          rx="36"
-          ry="8.5"
-          fill="#38BDF8"
-          stroke="#FFFFFF"
-          strokeWidth="0.8"
-        />
-        <Ellipse
-          cx="80"
-          cy="28"
-          rx="26"
-          ry="5.5"
-          stroke="#E0F2FE"
-          strokeWidth="0.8"
-          strokeDasharray="16,8"
-          fill="none"
-          opacity="0.6"
-        />
-
-        {/* Top Cylinder Disc */}
-        <Path
-          d="M44,16 L44,24 A36,9 0 0,0 116,24 L116,16 Z"
-          fill="url(#discTopGrad)"
-        />
-        <Ellipse
-          cx="80"
-          cy="16"
-          rx="36"
-          ry="8.5"
-          fill="#7DD3FC"
-          stroke="#FFFFFF"
-          strokeWidth="1"
-        />
+        {/* Stacked Cylinder Discs */}
+        {DRIVE_DISCS.map(({ y, grad, topFill, innerStroke }) => (
+          <React.Fragment key={y}>
+            <Path
+              d={`M44,${y} L44,${y + 8} A36,9 0 0,0 116,${y + 8} L116,${y} Z`}
+              fill={`url(#${grad})`}
+            />
+            <Ellipse cx="80" cy={y} rx="36" ry="8.5" fill={topFill} stroke="#FFFFFF" strokeWidth="0.8" />
+            {innerStroke && (
+              <Ellipse
+                cx="80"
+                cy={y}
+                rx="26"
+                ry="5.5"
+                stroke={innerStroke}
+                strokeWidth="0.8"
+                strokeDasharray="16,8"
+                fill="none"
+                opacity="0.6"
+              />
+            )}
+          </React.Fragment>
+        ))}
 
         {/* Center Spindle Core */}
-        <Ellipse
-          cx="80"
-          cy="16"
-          rx="14"
-          ry="4.5"
-          fill="#0284C7"
-          stroke="#BAE6FD"
-          strokeWidth="1"
-        />
+        <Ellipse cx="80" cy="16" rx="14" ry="4.5" fill="#0284C7" stroke="#BAE6FD" strokeWidth="1" />
         <Circle cx="80" cy="16" r="3.5" fill="#FFFFFF" />
 
         {/* Light Surface Glint */}
-        <Path
-          d="M52,14 A32,7 0 0,1 92,10"
-          stroke="#FFFFFF"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          opacity="0.7"
-        />
+        <Path d="M52,14 A32,7 0 0,1 92,10" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
       </Svg>
     </View>
   );
@@ -291,6 +233,13 @@ export function DriveCardArt() {
 /**
  * Notes / Waves Art
  */
+const NOTE_WAVES = [
+  { d: "M0,28 C60,14 110,16 160,28 C215,42 260,42 310,24 C350,10 380,12 400,20 L400,64 L0,64 Z", fill: "#EDE9FE" },
+  { d: "M0,36 C60,22 110,24 160,36 C215,49 260,48 310,32 C350,20 380,22 400,28 L400,64 L0,64 Z", fill: "#DDD6FE" },
+  { d: "M0,45 C60,33 110,35 160,45 C215,57 260,57 310,42 C350,32 380,34 400,40 L400,64 L0,64 Z", fill: "#A78BFA" },
+  { d: "M0,54 C60,44 110,45 160,54 C215,64 260,63 310,53 C350,45 380,47 400,51 L400,64 L0,64 Z", fill: "#7C3AED" },
+];
+
 export function NotesCardArt() {
   return (
     <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#F8F7FC] border border-violet-100/50">
@@ -301,33 +250,20 @@ export function NotesCardArt() {
         preserveAspectRatio="none"
         style={{ width: "100%", height: "100%" }}
       >
-        <Path
-          d="M0,28 C60,14 110,16 160,28 C215,42 260,42 310,24 C350,10 380,12 400,20 L400,64 L0,64 Z"
-          fill="#EDE9FE"
-        />
-        <Path
-          d="M0,36 C60,22 110,24 160,36 C215,49 260,48 310,32 C350,20 380,22 400,28 L400,64 L0,64 Z"
-          fill="#DDD6FE"
-        />
-        <Path
-          d="M0,45 C60,33 110,35 160,45 C215,57 260,57 310,42 C350,32 380,34 400,40 L400,64 L0,64 Z"
-          fill="#A78BFA"
-        />
-        <Path
-          d="M0,54 C60,44 110,45 160,54 C215,64 260,63 310,53 C350,45 380,47 400,51 L400,64 L0,64 Z"
-          fill="#7C3AED"
-        />
+        {NOTE_WAVES.map((wave, idx) => (
+          <Path key={idx} d={wave.d} fill={wave.fill} />
+        ))}
       </Svg>
     </View>
   );
 }
 
 /**
- * Camera Capture Art (Sleek DSLR)
+ * Camera Capture Art — Golden Amber & Honey Polaroid & Lens Composition
  */
 export function CameraCardArt() {
   return (
-    <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#F8FAFC] border border-slate-200/80 items-center justify-center">
+    <View className="h-16 w-full overflow-hidden rounded-2xl bg-[#FFFBEB]">
       <Svg
         width="100%"
         height="100%"
@@ -335,56 +271,118 @@ export function CameraCardArt() {
         preserveAspectRatio="xMidYMid meet"
       >
         <Defs>
-          <LinearGradient id="dslrBody" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor="#334155" />
-            <Stop offset="100%" stopColor="#0F172A" />
+          <LinearGradient id="amberBg" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#FFFDF5" />
+            <Stop offset="100%" stopColor="#FEF3C7" />
           </LinearGradient>
-          <LinearGradient id="silverRim" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#E2E8F0" />
-            <Stop offset="50%" stopColor="#94A3B8" />
-            <Stop offset="100%" stopColor="#475569" />
+
+          <LinearGradient id="amberPhotoGrad1" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FDE68A" />
+            <Stop offset="100%" stopColor="#F59E0B" />
           </LinearGradient>
-          <LinearGradient id="dslrLens" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0%" stopColor="#1E293B" />
-            <Stop offset="100%" stopColor="#020617" />
+
+          <LinearGradient id="amberPhotoGrad2" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FBBF24" />
+            <Stop offset="100%" stopColor="#D97706" />
           </LinearGradient>
-          <RadialGradient id="lensCoating" cx="60%" cy="40%" r="50%">
-            <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.4" />
-            <Stop offset="100%" stopColor="#A855F7" stopOpacity="0.1" />
+
+          <LinearGradient id="amberLensRingGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#F59E0B" />
+            <Stop offset="100%" stopColor="#B45309" />
+          </LinearGradient>
+
+          <LinearGradient id="amberLensCoreGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#D97706" />
+            <Stop offset="100%" stopColor="#78350F" />
+          </LinearGradient>
+
+          <RadialGradient id="amberCenterGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#F59E0B" stopOpacity="0.35" />
+            <Stop offset="100%" stopColor="#F59E0B" stopOpacity="0" />
           </RadialGradient>
         </Defs>
 
-        {/* Drop shadow */}
-        <Ellipse cx="80" cy="56" rx="44" ry="4" fill="#94A3B8" fillOpacity="0.15" />
+        {/* Base Light Background */}
+        <Rect x="0" y="0" width="160" height="64" fill="url(#amberBg)" />
 
-        {/* Camera Body (Sleek minimalist rectangle) */}
-        <Rect x="40" y="16" width="80" height="36" rx="4" fill="url(#dslrBody)" />
-        
-        {/* Top prism bump */}
-        <Path d="M66,16 L70,8 L90,8 L94,16 Z" fill="#334155" />
+        {/* Ambient Center Glow */}
+        <Circle cx="80" cy="32" r="32" fill="url(#amberCenterGlow)" />
 
-        {/* The iconic Red Dot (Leica style) */}
-        <Circle cx="106" cy="24" r="3" fill="#EF4444" />
+        {/* Left Tilted Photo Card */}
+        <Rect
+          x="22"
+          y="12"
+          width="46"
+          height="34"
+          rx="6"
+          fill="#FFFFFF"
+          stroke="#FDE68A"
+          strokeWidth="1.2"
+          transform="rotate(-11 45 29)"
+          opacity="0.95"
+        />
+        <Rect
+          x="26"
+          y="16"
+          width="38"
+          height="22"
+          rx="4"
+          fill="url(#amberPhotoGrad1)"
+          transform="rotate(-11 45 27)"
+          opacity="0.8"
+        />
+        <Circle cx="45" cy="27" r="4" fill="#FEF3C7" opacity="0.8" transform="rotate(-11 45 27)" />
 
-        {/* Shutter Button */}
-        <Rect x="46" y="12" width="10" height="4" rx="1" fill="#CBD5E1" />
+        {/* Right Tilted Photo Card */}
+        <Rect
+          x="92"
+          y="12"
+          width="46"
+          height="34"
+          rx="6"
+          fill="#FFFFFF"
+          stroke="#FDE68A"
+          strokeWidth="1.2"
+          transform="rotate(11 115 29)"
+          opacity="0.95"
+        />
+        <Rect
+          x="96"
+          y="16"
+          width="38"
+          height="22"
+          rx="4"
+          fill="url(#amberPhotoGrad2)"
+          transform="rotate(11 115 27)"
+          opacity="0.8"
+        />
+        <Circle cx="115" cy="27" r="4" fill="#FDE68A" opacity="0.8" transform="rotate(11 115 27)" />
 
-        {/* Big Silver Lens Ring */}
-        <Circle cx="80" cy="34" r="18" fill="url(#silverRim)" />
-        <Circle cx="80" cy="34" r="16" fill="#0F172A" />
-        
-        {/* Inner Lens Elements */}
-        <Circle cx="80" cy="34" r="12" fill="url(#dslrLens)" />
-        <Circle cx="80" cy="34" r="12" fill="url(#lensCoating)" />
-        
-        {/* Glare/Reflection on Lens */}
-        <Path d="M72,25 A12,12 0 0,1 87,23" stroke="#F8FAFC" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.6" />
-        <Circle cx="80" cy="34" r="4" fill="#020617" />
-        <Circle cx="83" cy="31" r="1.5" fill="#FFFFFF" opacity="0.8" />
+        {/* Ground Soft Drop Shadow */}
+        <Ellipse cx="80" cy="54" rx="26" ry="4" fill="#B45309" opacity="0.14" />
 
+        {/* Center 3D Camera Lens Badge (Pure White & Golden Amber, No Black) */}
+        <Circle cx="80" cy="32" r="23" fill="#FFFFFF" stroke="#FDE68A" strokeWidth="1.5" />
+        <Circle cx="80" cy="32" r="19" fill="url(#amberLensRingGrad)" />
+        <Circle cx="80" cy="32" r="15" fill="url(#amberLensCoreGrad)" />
+
+        {/* Aperture Shutter Blade Accents */}
+        <Path d="M72,24 L84,24 L78,32 Z" fill="#FDE68A" opacity="0.65" />
+        <Path d="M88,28 L88,40 L80,34 Z" fill="#FBBF24" opacity="0.65" />
+        <Path d="M72,36 L84,36 L78,28 Z" fill="#F59E0B" opacity="0.65" />
+
+        {/* Core Optics & Reticle Center */}
+        <Circle cx="80" cy="32" r="6.5" fill="#78350F" />
+        <Circle cx="80" cy="32" r="3" fill="#FDE68A" />
+        <Circle cx="82" cy="30" r="1.3" fill="#FFFFFF" opacity="0.95" />
+
+        {/* Glass Reflection Highlight Arc */}
+        <Path d="M69,21 A15,15 0 0,1 91,21" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.85" />
+
+        {/* Sparkle / Flash Starburst Accents */}
+        <Path d="M128,14 L129.5,18 L133.5,19.5 L129.5,21 L128,25 L126.5,21 L122.5,19.5 L126.5,18 Z" fill="#F59E0B" opacity="0.9" />
+        <Path d="M32,42 L33,44 L35,45 L33,46 L32,48 L31,46 L29,45 L31,44 Z" fill="#FBBF24" opacity="0.9" />
       </Svg>
     </View>
   );
 }
-
-// Removed backward-compatible alias because SecurityCardArt was deleted.

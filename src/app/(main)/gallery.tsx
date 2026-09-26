@@ -12,24 +12,6 @@ import {
   NativeScrollEvent,
   LayoutAnimation,
 } from "react-native";
-
-const iOSSpringAnimation = {
-  duration: 400,
-  create: {
-    type: LayoutAnimation.Types.spring,
-    property: LayoutAnimation.Properties.opacity,
-    springDamping: 0.8,
-  },
-  update: {
-    type: LayoutAnimation.Types.spring,
-    springDamping: 0.8,
-  },
-  delete: {
-    type: LayoutAnimation.Types.spring,
-    property: LayoutAnimation.Properties.opacity,
-    springDamping: 0.8,
-  },
-};
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -56,6 +38,13 @@ import {
   purgeLegacyFieldsFromDatabase,
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
+
+const iOSSpringAnimation = {
+  duration: 350,
+  create: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.opacity, springDamping: 0.8 },
+  update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
+  delete: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.opacity, springDamping: 0.8 },
+};
 
 export default function GalleryScreen() {
   const router = useRouter();
@@ -168,7 +157,13 @@ export default function GalleryScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-    }, [])
+      loadCachedGalleryPins().then((cached) => {
+        if (cached.length > 0) {
+          setPins(cached.map(normalizeGalleryPin));
+        }
+      });
+      loadFirstPage(false);
+    }, [loadFirstPage])
   );
 
   useEffect(() => {

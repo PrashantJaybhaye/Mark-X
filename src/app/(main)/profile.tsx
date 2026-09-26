@@ -4,7 +4,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   StatusBar as RNStatusBar,
   ScrollView,

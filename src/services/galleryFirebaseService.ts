@@ -311,6 +311,15 @@ export async function addGalleryPinToServer(pin: GalleryPin): Promise<void> {
       saved: normalized.saved,
     });
 
+    // Save to local cache immediately so local UI reads it without delay
+    try {
+      const currentCached = await loadCachedGalleryPins();
+      const filtered = currentCached.filter((p) => p.id !== normalized.id);
+      await saveCachedGalleryPins([normalized, ...filtered]);
+    } catch (cacheErr) {
+      console.warn("[GalleryServerService] Error updating local cache on add:", cacheErr);
+    }
+
     await setDoc(docRef, {
       ...cleanPin,
       createdAt: serverTimestamp(),

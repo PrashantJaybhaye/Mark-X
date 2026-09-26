@@ -117,6 +117,14 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           <Stack.Screen name="profile" />
           <Stack.Screen name="note" />
           <Stack.Screen name="gallery" />
+          <Stack.Screen 
+            name="camera" 
+            options={{ 
+              presentation: 'fullScreenModal', 
+              animation: 'ios_from_right',
+              headerShown: false,
+            }} 
+          />
         </Stack>
         <BiometricLockGate />
       </ThemeProvider>
