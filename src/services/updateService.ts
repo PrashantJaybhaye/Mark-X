@@ -1,64 +1,80 @@
-import { requireOptionalNativeModule } from "expo-modules-core";
+import * as Updates from "expo-updates";
+import { Alert } from "react-native";
 
 export interface OtaCheckResult {
-  hasUpdate: boolean;
   title: string;
   message: string;
+  hasUpdate: boolean;
   applyUpdate?: () => Promise<void>;
 }
 
 /**
- * Safe OTA update service using expo-updates.
- * Returns structured result for custom iOS modal display.
+ * Checks for OTA updates in production on app launch and prompts user to restart.
+ */
+export async function checkForAppUpdates(): Promise<boolean> {
+  if (__DEV__) return false;
+
+  try {
+    const update = await Updates.checkForUpdateAsync();
+    if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
+      Alert.alert(
+        "Update Available",
+        "A new update has been downloaded. Restart Mark-X now to apply updates?",
+        [
+          { text: "Later", style: "cancel" },
+          {
+            text: "Restart",
+            onPress: () => {
+              Updates.reloadAsync();
+            },
+          },
+        ]
+      );
+      return true;
+    }
+  } catch (error) {
+    console.log("[OTA Update] Skip check:", error);
+  }
+  return false;
+}
+
+/**
+ * Manual OTA check invoked from the About screen.
  */
 export async function checkOtaUpdate(): Promise<OtaCheckResult> {
-  const hasNativeUpdates = !!requireOptionalNativeModule("ExpoUpdates");
-
-  // In local development or if native module is not compiled into running binary
-  if (__DEV__ || !hasNativeUpdates) {
+  if (__DEV__) {
     return {
+      title: "Development Build",
+      message: "OTA updates are disabled in development mode.",
       hasUpdate: false,
-      title: "You're Up to Date",
-      message: "Mark-X is currently running the latest build. Over-The-Air updates will automatically apply in production releases.",
     };
   }
 
   try {
-    const Updates = await import("expo-updates");
-
-    if (!Updates.isEnabled) {
-      return {
-        hasUpdate: false,
-        title: "You're Up to Date",
-        message: "Mark-X is running the latest build.",
-      };
-    }
-
     const update = await Updates.checkForUpdateAsync();
-
     if (update.isAvailable) {
+      await Updates.fetchUpdateAsync();
       return {
+        title: "Update Ready",
+        message: "A new update for Mark-X is downloaded and ready to apply.",
         hasUpdate: true,
-        title: "Update Available",
-        message: "A new version of Mark-X is ready. Would you like to download and restart the app to apply it now?",
         applyUpdate: async () => {
-          await Updates.fetchUpdateAsync();
           await Updates.reloadAsync();
         },
       };
+    } else {
+      return {
+        title: "Up to Date",
+        message: "Mark-X is already updated to the latest version.",
+        hasUpdate: false,
+      };
     }
-
+  } catch (error) {
     return {
+      title: "Check Failed",
+      message: "Unable to check for updates at this time. Please try again later.",
       hasUpdate: false,
-      title: "You're Up to Date",
-      message: "Mark-X is running the latest available release.",
-    };
-  } catch (error: any) {
-    console.warn("[UpdateService] Error checking for OTA updates:", error);
-    return {
-      hasUpdate: false,
-      title: "Update Check",
-      message: "Unable to check for updates at this moment. Please try again later.",
     };
   }
 }

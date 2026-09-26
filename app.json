@@ -25,6 +25,10 @@
         "android.permission.RECORD_AUDIO"
       ]
     },
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
@@ -50,7 +54,8 @@
       ],
       "expo-secure-store",
       "expo-video",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -67,7 +72,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/1094cc39-0f3a-4eec-8b31-a324003d2d3d"
+      "url": "https://u.expo.dev/1094cc39-0f3a-4eec-8b31-a324003d2d3d",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
     }
   }
 }
