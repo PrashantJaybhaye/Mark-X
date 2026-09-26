@@ -29,8 +29,10 @@ export function AnimatedSplashScreen({
   const subtitleOpacity = useSharedValue(0);
 
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
+    if (isReady) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
 
   // Reveal subtitle smoothly in sync with logo fill (starts at 750ms)
   useEffect(() => {

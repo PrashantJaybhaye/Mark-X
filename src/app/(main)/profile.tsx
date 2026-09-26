@@ -19,6 +19,7 @@ import { ProfileCardRow } from "../../components/profile/ProfileCardRow";
 import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
+import { clearAppCache } from "../../services/cacheCleaner";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -114,6 +115,22 @@ export default function ProfileScreen() {
     } finally {
       setIsTogglingBiometrics(false);
     }
+  };
+
+  const handleClearCache = async () => {
+    triggerHaptic();
+    const { clearedMB } = await clearAppCache();
+    const formattedSize = clearedMB >= 1024
+      ? `${(clearedMB / 1024).toFixed(2)} GB`
+      : `${clearedMB} MB`;
+
+    setDialogState({
+      visible: true,
+      title: "Cache Cleared",
+      message: clearedMB > 0
+        ? `Freed up ${formattedSize} of cached images and temporary files.`
+        : "Cache is already clean!"
+    });
   };
 
   const joinedDate = user?.metadata?.creationTime
@@ -256,6 +273,11 @@ export default function ProfileScreen() {
               icon="hardware-chip-outline"
               title="Active devices"
               onPress={() => navigateSafely("/profile/devices")}
+            />
+            <ProfileCardRow
+              icon="trash-outline"
+              title="Clear App Cache"
+              onPress={handleClearCache}
             />
           </View>
 

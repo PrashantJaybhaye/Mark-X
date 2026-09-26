@@ -34,6 +34,7 @@ import { GalleryPin, formatBytes } from "../../utils/galleryData";
 import { loadCachedGalleryPins, saveCachedGalleryPins } from "../../services/storageService";
 import { triggerHaptic } from "../../utils/haptics";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { deleteTempFile } from "../../services/cacheCleaner";
 
 export function HomeCamera({ onClose }: { onClose?: () => void }) {
   const [cameraPosition, setCameraPosition] = useState<"back" | "front">("back");
@@ -146,28 +147,16 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     if (!hasMicPermission) requestMicPermission();
   }, [hasPermission, hasMicPermission]);
 
-  if (!hasPermission || !hasMicPermission) {
-    return (
-      <View className="flex-1 bg-white justify-center items-center px-6">
-        <Text className="text-black text-center mb-6 font-outfit-medium text-lg">
-          Camera access is required
-        </Text>
-        <TouchableOpacity
-          onPress={async () => {
-            await requestPermission();
-            await requestMicPermission();
-          }}
-          className="bg-black px-8 py-3 rounded-full"
-        >
-          <Text className="text-white font-outfit-bold text-base">Enable Camera</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!previewUri) return;
 
-  if (device == null) {
-    return <View className="flex-1 bg-black" />;
-  }
+    const backSubscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      setShowDiscardDialog(true);
+      return true;
+    });
+
+    return () => backSubscription.remove();
+  }, [previewUri]);
 
   const toggleCameraFacing = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
@@ -338,10 +327,15 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
 
         if (photo) {
           const path = await photo.saveToTemporaryFileAsync();
-          const cropped = await cropToAspectRatio(`file://${path}`, photo.width, photo.height);
+          const rawUri = `file://${path}`;
+          const cropped = await cropToAspectRatio(rawUri, photo.width, photo.height);
           setPendingMedia(cropped);
           setPreviewUri(cropped.uri);
           photo.dispose();
+          // Only clean up raw temp file if cropping generated a separate new file
+          if (cropped.uri !== rawUri) {
+            deleteTempFile(rawUri);
+          }
         }
       } catch (error) {
         console.warn("Failed to take photo", error);
@@ -427,6 +421,9 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
   };
 
   const handleDiscardDirect = () => {
+    if (pendingMedia?.uri) {
+      deleteTempFile(pendingMedia.uri);
+    }
     setShowDiscardDialog(false);
     setPreviewUri(null);
     setPendingMedia(null);
@@ -436,16 +433,28 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     setShowDiscardDialog(true);
   };
 
-  useEffect(() => {
-    if (!previewUri) return;
+  if (!hasPermission || !hasMicPermission) {
+    return (
+      <View className="flex-1 bg-white justify-center items-center px-6">
+        <Text className="text-black text-center mb-6 font-outfit-medium text-lg">
+          Camera access is required
+        </Text>
+        <TouchableOpacity
+          onPress={async () => {
+            await requestPermission();
+            await requestMicPermission();
+          }}
+          className="bg-black px-8 py-3 rounded-full"
+        >
+          <Text className="text-white font-outfit-bold text-base">Enable Camera</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-    const backSubscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      setShowDiscardDialog(true);
-      return true;
-    });
-
-    return () => backSubscription.remove();
-  }, [previewUri, pendingMedia]);
+  if (device == null) {
+    return <View className="flex-1 bg-black" />;
+  }
 
   const cameraContainerStyle = aspectRatio === "1:1"
     ? { width: "100%" as const, aspectRatio: 1, overflow: "hidden" as const }

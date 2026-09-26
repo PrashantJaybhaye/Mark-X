@@ -19,6 +19,7 @@ import {
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
 import { Anton_400Regular } from "@expo-google-fonts/anton";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
@@ -99,11 +100,14 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
 function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
   const [isDecisionComplete, setIsDecisionComplete] = useState(false);
 
+  if (!isFontsReady) {
+    return null;
+  }
+
   // isAppReady becomes true once:
   // 1. Fonts have loaded (or failed gracefully)
   // 2. NavigationGuard has resolved the auth state and routed the user
-  // No arbitrary timer — the guard is the single source of truth.
-  const isAppReady = isFontsReady && isDecisionComplete;
+  const isAppReady = isDecisionComplete;
 
   return (
     <AnimatedSplashScreen isReady={isAppReady}>
@@ -145,10 +149,12 @@ export default function RootLayout() {
   const isFontsReady = !!(fontsLoaded || fontError);
 
   return (
-    <AuthProvider>
-      <BiometricsProvider>
-        <RootLayoutContent isFontsReady={isFontsReady} />
-      </BiometricsProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <BiometricsProvider>
+          <RootLayoutContent isFontsReady={isFontsReady} />
+        </BiometricsProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

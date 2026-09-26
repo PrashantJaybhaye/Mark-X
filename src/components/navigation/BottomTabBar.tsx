@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Pressable, View } from "react-native";
+import { Animated, Platform, Pressable, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useAuth } from "../../context/AuthContext";
@@ -96,7 +96,7 @@ export const BottomTabBar = React.memo(function BottomTabBar({
   return (
     <View
       className="w-full bg-white border-t border-[#E5E5EA]"
-      style={{ paddingBottom: Math.max(bottomInset, 10) }}
+      style={{ paddingBottom: Math.max(bottomInset, Platform.OS === "android" ? 16 : 10) }}
     >
       <View className="flex-row items-center justify-around h-[54px] px-3">
         {/* 1. Home Tab */}
