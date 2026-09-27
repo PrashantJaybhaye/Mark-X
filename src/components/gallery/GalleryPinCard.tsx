@@ -76,7 +76,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
   const isFailed = pin.uploadStatus === "failed";
 
   return (
-    <View className="mb-2" style={{ width: cardWidth }}>
+    <View className="mb-1" style={{ width: cardWidth }}>
       {/* 1. Main Pin Image with Skeleton Loader */}
       <TouchableOpacity
         activeOpacity={0.88}

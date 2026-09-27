@@ -405,7 +405,7 @@ export default function GalleryScreen() {
             flexGrow: 1,
             paddingHorizontal: sideMargin,
             paddingTop: 8,
-            paddingBottom: 40,
+            paddingBottom: 20,
           }}
         >
           {isLoading || isRefreshing ? (
