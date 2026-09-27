@@ -39,6 +39,12 @@ import {
   purgeLegacyFieldsFromDatabase,
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
+import { 
+  executeUploadWithRetry, 
+  startBackgroundUpload, 
+  stopBackgroundUpload, 
+  updateUploadProgress 
+} from "../../services/BackgroundUploadService";
 
 const iOSSpringAnimation = {
   duration: 350,
@@ -80,14 +86,25 @@ export default function GalleryScreen() {
     });
   }, []);
 
-  // Upload a media pin to cloud storage and sync Firestore
+  // Upload a media pin to cloud storage and sync Firestore with retry capability
   const uploadAndSyncPin = useCallback(async (pin: GalleryPin) => {
     updatePinState(pin.id, { uploadStatus: "uploading" });
 
     try {
       const isVideo = pin.mediaType === "video";
       const mime = pin.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
-      const res = await uploadFileToMarkx(pin.imageUrl, mime, pin.fileName);
+      const safeFileName = pin.fileName || `${pin.id}.${isVideo ? "mp4" : "jpg"}`;
+      
+      const res = await executeUploadWithRetry(
+        {
+          id: pin.id,
+          localUri: pin.imageUrl,
+          mimeType: mime,
+          fileName: safeFileName,
+          maxRetries: 3,
+        },
+        (uri, mimeType, fileName, onProgress) => uploadFileToMarkx(uri, mimeType, fileName, onProgress)
+      );
 
       if (res.success && res.url) {
         updatePinState(pin.id, { imageUrl: res.url, uploadStatus: "synced" });
@@ -100,6 +117,7 @@ export default function GalleryScreen() {
       updatePinState(pin.id, { uploadStatus: "failed" });
     }
   }, [updatePinState]);
+
 
   // Load the first page (12 items)
   const loadFirstPage = useCallback(async (showSkeleton = false) => {

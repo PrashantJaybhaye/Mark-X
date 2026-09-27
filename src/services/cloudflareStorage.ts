@@ -11,14 +11,20 @@ export interface MarkxUploadResponse {
 }
 
 export type CloudflareUploadResponse = MarkxUploadResponse;
+export type UploadProgressCallback = (
+  progressPercent: number,
+  bytesSent: number,
+  totalBytes: number
+) => void;
 
 /**
- * Uploads a local file to the Mark-X Storage Server.
+ * Uploads a local file to the Mark-X Storage Server with real-time progress callbacks.
  */
 export async function uploadFileToMarkx(
   localUri: string,
   mimeType: string = "image/jpeg",
-  filename: string = "upload.jpg"
+  filename: string = "upload.jpg",
+  onProgress?: UploadProgressCallback
 ): Promise<MarkxUploadResponse> {
   if (!SERVER_URL) {
     console.warn("[MarkxStorage] Storage server URL is not configured in .env");
@@ -35,13 +41,31 @@ export async function uploadFileToMarkx(
       headers["X-Auth-Key"] = UPLOAD_SECRET;
     }
 
-    const response = await FileSystem.uploadAsync(uploadEndpoint, localUri, {
-      fieldName: "file",
-      httpMethod: "POST",
-      uploadType: 1 as any, // FileSystemUploadType.MULTIPART
-      mimeType: mimeType || "image/jpeg",
-      headers,
-    });
+    const task = FileSystem.createUploadTask(
+      uploadEndpoint,
+      localUri,
+      {
+        fieldName: "file",
+        httpMethod: "POST",
+        uploadType: 1 as any, // FileSystemUploadType.MULTIPART
+        mimeType: mimeType || "image/jpeg",
+        headers,
+      },
+      (data) => {
+        if (data.totalBytesExpectedToSend > 0 && onProgress) {
+          const percent = Math.min(
+            100,
+            Math.max(0, Math.round((data.totalBytesSent / data.totalBytesExpectedToSend) * 100))
+          );
+          onProgress(percent, data.totalBytesSent, data.totalBytesExpectedToSend);
+        }
+      }
+    );
+
+    const response = await task.uploadAsync();
+    if (!response) {
+      return { success: false, error: "Upload process was interrupted" };
+    }
 
     let result: any = {};
     try {
@@ -64,4 +88,5 @@ export async function uploadFileToMarkx(
 
 // Backward-compatible alias
 export const uploadFileToCloudflare = uploadFileToMarkx;
+
 

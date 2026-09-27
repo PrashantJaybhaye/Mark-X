@@ -30,6 +30,7 @@ import Animated, {
 import { useAuth } from "../../context/AuthContext";
 import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/galleryFirebaseService";
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
+import { executeUploadWithRetry } from "../../services/BackgroundUploadService";
 import { GalleryPin, formatBytes } from "../../utils/galleryData";
 import { loadCachedGalleryPins, saveCachedGalleryPins } from "../../services/storageService";
 import { triggerHaptic } from "../../utils/haptics";
@@ -244,7 +245,17 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const res = await uploadFileToMarkx(media.uri, defaultMime, shortFileName);
+      const res = await executeUploadWithRetry(
+        {
+          id: newPin.id,
+          localUri: media.uri,
+          mimeType: defaultMime,
+          fileName: shortFileName,
+          maxRetries: 3,
+        },
+        (uri, mimeType, fileName, onProgress) => uploadFileToMarkx(uri, mimeType, fileName, onProgress)
+      );
+
       if (res.success && res.url) {
         await updateGalleryPinInServer(newPin.id, {
           imageUrl: res.url,
