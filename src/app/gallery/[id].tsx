@@ -43,9 +43,6 @@ import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoShee
  * High-performance video player with custom tap-to-play/pause overlay
  * and timeline progress indicator.
  */
-import { File, Paths } from "expo-file-system";
-import { encryptFile, decryptFile } from "../../services/cryptoService";
-
 function InlineVideoPlayer({
   sourceUrl,
   fileName,
@@ -57,91 +54,20 @@ function InlineVideoPlayer({
   isMuted: boolean;
   onDoubleTap: () => void;
 }) {
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [showSkeleton, setShowSkeleton] = useState(true);
 
   const playIconAnim = useRef(new Animated.Value(0)).current;
   const skeletonAnim = useRef(new Animated.Value(0.2)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const [showSkeleton, setShowSkeleton] = useState(true);
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track the decrypted temp file so we can delete it when unmounting
-  const tempDecryptedFileRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    const checkCache = async () => {
-      // If it's already a local file (e.g. from picker), just use it
-      if (!sourceUrl.startsWith("http")) {
-        if (isMounted) setResolvedUrl(sourceUrl);
-        return;
-      }
-      
-      try {
-        const encryptedFileName = fileName + ".enc";
-        const encryptedFile = new File(Paths.cache, encryptedFileName);
-        
-        if (encryptedFile.exists) {
-          // It's in the secure cache! Decrypt it Just-In-Time to a temp file
-          const tempFileName = `temp_${Date.now()}_${fileName}`;
-          const tempFile = new File(Paths.cache, tempFileName);
-          
-          await decryptFile(encryptedFile.uri, tempFile.uri);
-          
-          if (isMounted) {
-            tempDecryptedFileRef.current = tempFile.uri;
-            setResolvedUrl(tempFile.uri);
-          } else {
-            // Unmounted during decryption, clean up immediately
-            try { tempFile.delete(); } catch (e) {}
-          }
-        } else {
-          // Play from network right away
-          if (isMounted) setResolvedUrl(sourceUrl);
-          
-          // And download & encrypt to secure cache in background
-          try {
-            const rawTempFile = new File(Paths.cache, `raw_${fileName}`);
-            await File.downloadFileAsync(sourceUrl, rawTempFile, { idempotent: true });
-            
-            // Encrypt the raw file to the secure cache
-            await encryptFile(rawTempFile.uri, encryptedFile.uri);
-            
-            // Delete the unencrypted raw download
-            try { rawTempFile.delete(); } catch (e) {}
-          } catch (e) {
-            // ignore background download/encrypt errors
-            console.warn("[VideoCache] Background encrypt failed:", e);
-          }
-        }
-      } catch (err) {
-        if (isMounted) setResolvedUrl(sourceUrl);
-      }
-    };
-    
-    checkCache();
-    
-    return () => {
-      isMounted = false;
-      // CRITICAL: Delete the unencrypted temporary file as soon as the video is closed!
-      if (tempDecryptedFileRef.current) {
-        try {
-          const fileToWipe = new File(tempDecryptedFileRef.current.replace("file://", ""));
-          fileToWipe.delete();
-        } catch (e) {
-          // Ignore
-        }
-      }
-      
-    };
-  }, [sourceUrl, fileName]);
-
-  const player = useVideoPlayer(resolvedUrl || sourceUrl, (p) => {
+  // Direct native high-performance player instance
+  const player = useVideoPlayer(sourceUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
     p.play();
@@ -149,42 +75,55 @@ function InlineVideoPlayer({
 
   // Apple-style smooth skeleton breathing animation
   useEffect(() => {
-    if (!resolvedUrl) {
+    if (showSkeleton) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(skeletonAnim, { toValue: 0.7, duration: 900, useNativeDriver: true }),
-          Animated.timing(skeletonAnim, { toValue: 0.2, duration: 900, useNativeDriver: true }),
+          Animated.timing(skeletonAnim, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+          Animated.timing(skeletonAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
         ])
       ).start();
-    } else {
-      // Smoothly fade out the entire skeleton over 400ms when the video is ready!
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowSkeleton(false);
-        skeletonAnim.stopAnimation();
-      });
     }
-  }, [resolvedUrl]);
+  }, [showSkeleton]);
+
+  const hideSkeletonSmoothly = useCallback(() => {
+    if (!showSkeleton) return;
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowSkeleton(false);
+      skeletonAnim.stopAnimation();
+    });
+  }, [showSkeleton]);
 
   useEffect(() => {
     if (!player) return;
     player.muted = isMuted;
 
-    const timeSub = player.addListener("timeUpdate", (e) => setCurrentTime(e.currentTime));
+    const timeSub = player.addListener("timeUpdate", (e) => {
+      setCurrentTime(e.currentTime);
+      if (e.currentTime > 0) {
+        hideSkeletonSmoothly();
+      }
+    });
     const sourceSub = player.addListener("sourceLoad", (e) => {
       if (e.duration) setDuration(e.duration);
+      hideSkeletonSmoothly();
     });
-    const playSub = player.addListener("playingChange", (e) => setIsPlaying(e.isPlaying));
+    const playSub = player.addListener("playingChange", (e) => {
+      setIsPlaying(e.isPlaying);
+      if (e.isPlaying) {
+        hideSkeletonSmoothly();
+      }
+    });
 
     return () => {
       timeSub.remove();
       sourceSub.remove();
       playSub.remove();
     };
-  }, [player, isMuted]);
+  }, [player, isMuted, hideSkeletonSmoothly]);
 
   const togglePlayPause = () => {
     if (!player) return;
