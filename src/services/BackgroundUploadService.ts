@@ -1,113 +1,81 @@
 import notifee, { AndroidImportance } from '@notifee/react-native';
 
-const CHANNEL_ID = 'uploads_channel';
+const CHANNEL_ID = 'uploads_channel_v3';
 const NOTIFICATION_ID = 'upload_foreground';
 
 let activeUploads = 0;
-let currentTotalProgress = 0;
 
-// Register the headless task required by Notifee for Foreground Services
-// This keeps the JavaScript thread alive on Android
-notifee.registerForegroundService(() => {
-  return new Promise(() => {
-    // Keeps Foreground Service active until notifee.stopForegroundService() is called
-  });
-});
+// Notifee headless foreground task
+notifee.registerForegroundService(() => new Promise(() => {}));
 
-export async function setupUploadChannel() {
+async function ensureChannel() {
   await notifee.createChannel({
     id: CHANNEL_ID,
     name: 'Media Uploads',
-    importance: AndroidImportance.LOW,
+    importance: AndroidImportance.HIGH,
+    vibration: false,
   });
 }
 
-/**
- * Starts the foreground notification service for background uploads.
- */
+async function renderNotification(
+  title: string,
+  body: string,
+  progress?: { current: number; indeterminate: boolean },
+  isForeground = true
+) {
+  await ensureChannel();
+  await notifee.displayNotification({
+    id: NOTIFICATION_ID,
+    title,
+    body,
+    android: {
+      channelId: CHANNEL_ID,
+      asForegroundService: isForeground,
+      ongoing: isForeground,
+      onlyAlertOnce: true,
+      importance: AndroidImportance.HIGH,
+      pressAction: { id: 'default' },
+      ...(progress
+        ? { progress: { max: 100, current: progress.current, indeterminate: progress.indeterminate } }
+        : {}),
+    },
+  });
+}
+
 export async function startBackgroundUpload(
-  title: string = 'Syncing to Mark-X...',
-  body: string = 'Your media is uploading in the background.'
+  title = 'Syncing to Mark-X...',
+  body = 'Your media is uploading in the background.'
 ) {
   if (activeUploads === 0) {
-    currentTotalProgress = 0;
     try {
       await notifee.requestPermission();
-    } catch {
-      // User may have denied permission
-    }
-    await setupUploadChannel();
-    await notifee.displayNotification({
-      id: NOTIFICATION_ID,
-      title,
-      body,
-      android: {
-        channelId: CHANNEL_ID,
-        asForegroundService: true,
-        ongoing: true,
-        progress: {
-          max: 100,
-          current: 0,
-          indeterminate: true,
-        },
-      },
-    });
+    } catch {}
+    await renderNotification(title, body, { current: 0, indeterminate: true });
   }
   activeUploads++;
 }
 
-/**
- * Updates the ongoing notification with deterministic progress percentage.
- */
 export async function updateUploadProgress(percent: number, statusBody?: string) {
-  const boundedPercent = Math.min(100, Math.max(0, Math.round(percent)));
-  currentTotalProgress = boundedPercent;
-
+  const bounded = Math.min(100, Math.max(0, Math.round(percent)));
   if (activeUploads > 0) {
-    await notifee.displayNotification({
-      id: NOTIFICATION_ID,
-      title: 'Syncing to Mark-X...',
-      body: statusBody || `Uploading media... ${boundedPercent}%`,
-      android: {
-        channelId: CHANNEL_ID,
-        asForegroundService: true,
-        ongoing: true,
-        progress: {
-          max: 100,
-          current: boundedPercent,
-          indeterminate: false,
-        },
-      },
-    });
+    await renderNotification(
+      'Syncing to Mark-X...',
+      statusBody || `Uploading media... ${bounded}%`,
+      { current: bounded, indeterminate: false }
+    );
   }
 }
 
-/**
- * Stops the foreground service notification and displays a final completion state.
- */
-export async function stopBackgroundUpload(
-  success: boolean = true,
-  customMessage?: string
-) {
+export async function stopBackgroundUpload(success = true, customMessage?: string) {
   activeUploads = Math.max(0, activeUploads - 1);
-
   if (activeUploads === 0) {
-    // Stop the foreground service execution
     await notifee.stopForegroundService();
-
-    // Display temporary success/fail notification
-    await notifee.displayNotification({
-      id: NOTIFICATION_ID,
-      title: success ? 'Sync Complete' : 'Sync Failed',
-      body: customMessage || (success ? 'All your media was securely uploaded.' : 'Some media failed to upload.'),
-      android: {
-        channelId: CHANNEL_ID,
-        ongoing: false,
-        asForegroundService: false,
-      },
-    });
-
-    // Automatically dismiss completion notification after 3 seconds
+    await renderNotification(
+      success ? 'Sync Complete' : 'Sync Failed',
+      customMessage || (success ? 'All your media was securely uploaded.' : 'Some media failed to upload.'),
+      undefined,
+      false
+    );
     setTimeout(() => {
       notifee.cancelNotification(NOTIFICATION_ID);
     }, 3000);
@@ -128,70 +96,45 @@ export interface TaskUploadResult {
   error?: string;
 }
 
-/**
- * Executes a single upload task with progress tracking and automatic exponential retries.
- */
 export async function executeUploadWithRetry(
   task: UploadQueueTask,
   uploadFn: (
     localUri: string,
     mimeType: string,
     fileName: string,
-    onProgress: (percent: number) => void
+    onProgress: (pct: number) => void
   ) => Promise<TaskUploadResult>
 ): Promise<TaskUploadResult> {
   const maxRetries = task.maxRetries ?? 3;
   let attempt = 0;
 
-  await startBackgroundUpload(
-    'Syncing to Mark-X...',
-    `Starting upload for ${task.fileName}`
-  );
+  await startBackgroundUpload('Syncing to Mark-X...', `Starting upload for ${task.fileName}`);
 
   while (attempt < maxRetries) {
     attempt++;
 
     try {
       if (attempt > 1) {
-        await updateUploadProgress(
-          0,
-          `Retrying ${task.fileName} (Attempt ${attempt}/${maxRetries})...`
-        );
+        await updateUploadProgress(0, `Retrying ${task.fileName} (Attempt ${attempt}/${maxRetries})...`);
       }
 
-      const result = await uploadFn(
-        task.localUri,
-        task.mimeType,
-        task.fileName,
-        (progressPercent) => {
-          updateUploadProgress(
-            progressPercent,
-            `Uploading ${task.fileName}... ${progressPercent}%`
-          );
-        }
-      );
+      const res = await uploadFn(task.localUri, task.mimeType, task.fileName, (pct) => {
+        updateUploadProgress(pct, `Uploading ${task.fileName}... ${pct}%`);
+      });
 
-      if (result.success) {
+      if (res.success) {
         await stopBackgroundUpload(true, `${task.fileName} uploaded successfully.`);
-        return result;
+        return res;
       }
-
-      console.warn(`[BackgroundUploadService] Attempt ${attempt}/${maxRetries} failed for ${task.fileName}: ${result.error}`);
     } catch (err: any) {
-      console.warn(`[BackgroundUploadService] Attempt ${attempt}/${maxRetries} error for ${task.fileName}: ${err?.message}`);
+      console.warn(`[BackgroundUpload] Attempt ${attempt}/${maxRetries} error for ${task.fileName}:`, err?.message);
     }
 
-    // Exponential backoff before retry if retries remain
     if (attempt < maxRetries) {
-      const backoffMs = attempt * 1500;
-      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      await new Promise((r) => setTimeout(r, attempt * 1500));
     }
   }
 
-  // All retries failed
   await stopBackgroundUpload(false, `Failed to upload ${task.fileName} after ${maxRetries} attempts.`);
-  return {
-    success: false,
-    error: `Upload failed after ${maxRetries} attempts`,
-  };
+  return { success: false, error: `Upload failed after ${maxRetries} attempts` };
 }

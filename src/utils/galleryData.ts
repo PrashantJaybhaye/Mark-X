@@ -106,11 +106,13 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
       createdAt: pin.createdAt,
     });
 
-  const uploadStatus: "uploading" | "synced" | "failed" =
-    pin.uploadStatus ||
-    (pin.imageUrl && (pin.imageUrl.startsWith("http://") || pin.imageUrl.startsWith("https://"))
-      ? "synced"
-      : "uploading");
+  const isRemoteUrl =
+    typeof pin.imageUrl === "string" &&
+    (pin.imageUrl.startsWith("http://") || pin.imageUrl.startsWith("https://"));
+
+  const uploadStatus: "uploading" | "synced" | "failed" = isRemoteUrl
+    ? "synced"
+    : pin.uploadStatus || "uploading";
 
   return {
     id: pin.id,

@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  LayoutAnimation,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
@@ -39,19 +38,7 @@ import {
   purgeLegacyFieldsFromDatabase,
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
-import { 
-  executeUploadWithRetry, 
-  startBackgroundUpload, 
-  stopBackgroundUpload, 
-  updateUploadProgress 
-} from "../../services/BackgroundUploadService";
-
-const iOSSpringAnimation = {
-  duration: 350,
-  create: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.opacity, springDamping: 0.8 },
-  update: { type: LayoutAnimation.Types.spring, springDamping: 0.8 },
-  delete: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.opacity, springDamping: 0.8 },
-};
+import { executeUploadWithRetry } from "../../services/BackgroundUploadService";
 
 export default function GalleryScreen() {
   const router = useRouter();
@@ -72,13 +59,13 @@ export default function GalleryScreen() {
   const [infoPin, setInfoPin] = useState<GalleryPin | null>(null);
 
   // References & animations
+  const scrollViewRef = useRef<ScrollView>(null);
   const lastDocRef = useRef<any>(null);
   const isNavigatingRef = useRef(false);
   const [spinAnim] = useState(() => new Animated.Value(0));
 
   // Helper: update a single pin across state and local storage cache
   const updatePinState = useCallback((id: string, updates: Partial<GalleryPin>) => {
-    LayoutAnimation.configureNext(iOSSpringAnimation);
     setPins((prev) => {
       const updated = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
       saveCachedGalleryPins(updated);
@@ -107,6 +94,12 @@ export default function GalleryScreen() {
       );
 
       if (res.success && res.url) {
+        loadCachedGalleryPins().then((cached) => {
+          const updated = cached.map((p) =>
+            p.id === pin.id ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const } : p
+          );
+          saveCachedGalleryPins(updated);
+        });
         updatePinState(pin.id, { imageUrl: res.url, uploadStatus: "synced" });
         await updateGalleryPinInServer(pin.id, { imageUrl: res.url, uploadStatus: "synced" });
       } else {
@@ -117,7 +110,6 @@ export default function GalleryScreen() {
       updatePinState(pin.id, { uploadStatus: "failed" });
     }
   }, [updatePinState]);
-
 
   // Load the first page (12 items)
   const loadFirstPage = useCallback(async (showSkeleton = false) => {
@@ -170,6 +162,16 @@ export default function GalleryScreen() {
     }
   }, [hasMore, isLoadingMore, isLoading, isRefreshing, handleLoadMore]);
 
+  // Auto-resume any interrupted uploads (e.g. if user closed app while uploading)
+  const resumeInterruptedUploads = useCallback((currentPins: GalleryPin[]) => {
+    const interrupted = currentPins.filter(
+      (p) => p.uploadStatus === "uploading" && p.imageUrl && !p.imageUrl.startsWith("http")
+    );
+    if (interrupted.length > 0) {
+      interrupted.forEach(uploadAndSyncPin);
+    }
+  }, [uploadAndSyncPin]);
+
   useFocusEffect(
     useCallback(() => {
       isNavigatingRef.current = false;
@@ -178,34 +180,49 @@ export default function GalleryScreen() {
         RNStatusBar.setBarStyle("dark-content");
       }
       loadCachedGalleryPins().then((cached) => {
-        if (cached.length > 0) {
-          setPins(cached.map(normalizeGalleryPin));
-        }
+        if (cached.length === 0) return;
+        const normalized = cached.map(normalizeGalleryPin);
+        resumeInterruptedUploads(normalized);
+
+        setPins((prev) => {
+          if (prev.length === 0) return normalized;
+          const cachedMap = new Map(cached.map((p) => [p.id, p]));
+          let hasNewBookmark = false;
+          const updatedList = prev.map((p) => {
+            const updated = cachedMap.get(p.id);
+            if (updated) {
+              if (!p.saved && updated.saved) hasNewBookmark = true;
+              return { ...p, ...updated };
+            }
+            return p;
+          });
+
+          if (hasNewBookmark) {
+            setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
+          }
+          return updatedList;
+        });
       });
-      loadFirstPage(false);
-    }, [loadFirstPage])
+    }, [resumeInterruptedUploads])
   );
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Instant cached load
     loadCachedGalleryPins().then((cached) => {
       if (isMounted && cached.length > 0) {
-        LayoutAnimation.configureNext(iOSSpringAnimation);
-        setPins(cached.map(normalizeGalleryPin));
+        const normalized = cached.map(normalizeGalleryPin);
+        setPins(normalized);
         setIsLoading(false);
+        resumeInterruptedUploads(normalized);
       }
     });
 
-    // 2. Fetch fresh 12-item first page
     loadFirstPage(pins.length === 0);
 
-    // 3. Real-time updates for latest pins
     const unsubscribe = subscribeLatestGalleryPins(
       (latestPins) => {
         if (!isMounted) return;
-        LayoutAnimation.configureNext(iOSSpringAnimation);
         setPins((prev) => {
           const map = new Map(prev.map((p) => [p.id, p]));
           latestPins.forEach((item) => map.set(item.id, { ...(map.get(item.id) || {}), ...item }));
@@ -219,14 +236,13 @@ export default function GalleryScreen() {
       }
     );
 
-    // 4. Background purge
     purgeLegacyFieldsFromDatabase().catch(console.warn);
 
     return () => {
       isMounted = false;
       unsubscribe();
     };
-  }, [loadFirstPage]);
+  }, [loadFirstPage, resumeInterruptedUploads]);
 
   // Retry failed uploads
   const failedPins = useMemo(() => pins.filter((p) => p.uploadStatus === "failed"), [pins]);
@@ -255,18 +271,23 @@ export default function GalleryScreen() {
     });
   }, [router, handleRetryFailedUploads]);
 
-  // Masonry column balancing
+  // Masonry column balancing (Saved pins at top)
   const { leftPins, rightPins } = useMemo(() => {
     const left: GalleryPin[] = [];
     const right: GalleryPin[] = [];
     let leftHeight = 0;
     let rightHeight = 0;
 
-    // Sort pins so saved (bookmarked) ones appear at the top
-    const sortedPins = [...pins].sort((a, b) => {
-      if (a.saved === b.saved) return 0;
-      return a.saved ? -1 : 1;
-    });
+    const savedBucket: GalleryPin[] = [];
+    const unsavedBucket: GalleryPin[] = [];
+
+    for (let i = 0; i < pins.length; i++) {
+      const pin = pins[i];
+      if (pin.saved) savedBucket.push(pin);
+      else unsavedBucket.push(pin);
+    }
+
+    const sortedPins = savedBucket.concat(unsavedBucket);
 
     sortedPins.forEach((pin) => {
       const estimatedHeight = Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 16;
@@ -360,14 +381,12 @@ export default function GalleryScreen() {
       };
     });
 
-    // Optimistically prepend to UI and local storage
     setPins((prev) => {
       const updated = [...newPins, ...prev];
       saveCachedGalleryPins(updated);
       return updated;
     });
 
-    // Save to Firestore and upload to Cloudflare concurrently
     newPins.forEach(async (pin) => {
       await addGalleryPinToServer(pin);
       uploadAndSyncPin(pin);
@@ -415,6 +434,7 @@ export default function GalleryScreen() {
 
         {/* 2-Column Pinterest-Style Masonry Feed */}
         <ScrollView
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           bounces={true}
           onScroll={handleScroll}

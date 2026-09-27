@@ -3,14 +3,10 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Share,
   useWindowDimensions,
   ActivityIndicator,
   Animated,
   Platform,
-  Modal,
-  TouchableWithoutFeedback,
-  ScrollView,
   StatusBar as RNStatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -225,150 +221,6 @@ function InlineVideoPlayer({
         </View>
       )}
     </View>
-  );
-}
-
-/**
- * Inspector modal providing Apple-style metadata table for media details.
- */
-function ApplePhotoInspector({
-  visible,
-  pin,
-  onClose,
-}: {
-  visible: boolean;
-  pin: GalleryPin | null;
-  onClose: () => void;
-}) {
-  const specs = useMemo(() => {
-    if (!pin) return [];
-    const isVideo = pin.mediaType === "video";
-    const durationFormatted = pin.duration
-      ? `${Math.floor(pin.duration / 60)}:${(pin.duration % 60).toString().padStart(2, "0")}`
-      : "0:15";
-
-    return [
-      {
-        icon: "document-text-outline" as const,
-        color: "#007AFF",
-        label: "File Name",
-        value: pin.fileName || `${Date.now()}${isVideo ? ".mp4" : ".jpg"}`,
-      },
-      {
-        icon: "scan-outline" as const,
-        color: "#5856D6",
-        label: "Dimensions",
-        value: `${pin.width || 1920} × ${pin.height || 1080}`,
-      },
-      {
-        icon: "pie-chart" as const,
-        color: "#FF9500",
-        label: "File Size",
-        value: pin.fileSizeFormatted || (pin.fileSize ? formatBytes(pin.fileSize) : isVideo ? "14.2 MB" : "2.8 MB"),
-      },
-      {
-        icon: "document-text-outline" as const,
-        color: "#AF52DE",
-        label: "Format",
-        value: pin.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
-      },
-      ...(isVideo
-        ? [
-            {
-              icon: "time-outline" as const,
-              color: "#FF2D55",
-              label: "Duration",
-              value: durationFormatted,
-            },
-          ]
-        : []),
-      {
-        icon: "person" as const,
-        color: "#007AFF",
-        label: "Creator",
-        value: pin.author || "You",
-      },
-      {
-        icon: "heart" as const,
-        color: "#FF2D55",
-        label: "Favorites",
-        value: String(pin.likes || 0),
-      },
-    ];
-  }, [pin]);
-
-  if (!pin) return null;
-  const isVideo = pin.mediaType === "video";
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/35 justify-end">
-          <TouchableWithoutFeedback>
-            <View className="bg-[#F2F2F7] rounded-t-[32px] px-5 pt-3 pb-8 max-h-[82%] shadow-2xl border-t border-black/5">
-              <View className="w-10 h-1.5 rounded-full bg-[#C7C7CC] self-center mb-3" />
-
-              <View className="flex-row items-center justify-between pb-3">
-                <Text className="text-[20px] font-outfit-bold text-[#1C1C1E]">Info</Text>
-                <TouchableOpacity
-                  onPress={onClose}
-                  className="px-3.5 py-1 rounded-full bg-[#E5E5EA] items-center justify-center"
-                >
-                  <Text className="text-[14px] font-outfit-semibold text-[#007AFF]">Done</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} className="mt-2" contentContainerStyle={{ paddingBottom: 24 }}>
-                {/* Media Preview Card */}
-                <View className="bg-white rounded-2xl p-3.5 shadow-sm flex-row items-center gap-3.5 border border-black/[0.04]">
-                  <Image
-                    source={{ uri: pin.imageUrl }}
-                    style={{ width: 64, height: 64, borderRadius: 14, backgroundColor: "#E5E5EA" }}
-                    contentFit="cover"
-                  />
-                  <View className="flex-1">
-                    <Text numberOfLines={1} className="text-[16px] font-outfit-bold text-[#1C1C1E]">
-                      {pin.fileName || `${Date.now()}${isVideo ? ".mp4" : ".jpg"}`}
-                    </Text>
-                    <Text className="text-[12px] font-outfit text-[#8E8E93] mt-0.5">
-                      {isVideo ? "H.264 • MP4 Video" : "High-Resolution Image"}
-                    </Text>
-                    <Text className="text-[11px] font-outfit text-[#8E8E93] mt-0.5">
-                      {pin.aspectRatio ? `${pin.aspectRatio.toFixed(2)}:1 Ratio` : "Standard"} • Synced
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Specs Table */}
-                <View className="mt-3.5 bg-white rounded-2xl px-4 py-1 shadow-sm border border-black/[0.04]">
-                  {specs.map((item, index) => (
-                    <View
-                      key={item.label}
-                      className={`flex-row items-center justify-between py-2.5 ${
-                        index < specs.length - 1 ? "border-b border-[#F2F2F7]" : ""
-                      }`}
-                    >
-                      <View className="flex-row items-center gap-2.5">
-                        <View
-                          style={{ backgroundColor: `${item.color}1F` }}
-                          className="w-7 h-7 rounded-lg items-center justify-center"
-                        >
-                          <Ionicons name={item.icon} size={15} color={item.color} />
-                        </View>
-                        <Text className="text-[14px] font-outfit text-[#1C1C1E]">{item.label}</Text>
-                      </View>
-                      <Text className="text-[13px] font-outfit-medium text-[#8E8E93] max-w-[55%]" numberOfLines={1}>
-                        {item.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
   );
 }
 

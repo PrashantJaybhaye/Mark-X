@@ -44,7 +44,9 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
   const markDecisionComplete = () => {
     if (!isDecisionCompletedRef.current) {
       isDecisionCompletedRef.current = true;
-      onDecisionComplete();
+      setTimeout(() => {
+        onDecisionComplete();
+      }, 0);
     }
   };
 
