@@ -1,5 +1,3 @@
-import type { Ionicons } from "@expo/vector-icons";
-
 export type DriveFileCategory =
   | "folder"
   | "document"
@@ -31,36 +29,6 @@ export function getFileCategory(fileName?: string, mimeType?: string): DriveFile
   return "other";
 }
 
-export function getCategoryIcon(category: DriveFileCategory): {
-  name: keyof typeof Ionicons.glyphMap;
-  color: string;
-} {
-  switch (category) {
-    case "folder":
-      return { name: "folder", color: "#0B57D0" };
-    case "image":
-      return { name: "image", color: "#8E24AA" };
-    case "pdf":
-      return { name: "document-text", color: "#D93025" };
-    case "spreadsheet":
-      return { name: "grid", color: "#188038" };
-    case "presentation":
-      return { name: "easel", color: "#F29900" };
-    case "document":
-      return { name: "document-text", color: "#0B57D0" };
-    case "video":
-      return { name: "videocam", color: "#E52592" };
-    case "audio":
-      return { name: "musical-notes", color: "#FA7B17" };
-    case "archive":
-      return { name: "archive", color: "#5F6368" };
-    case "code":
-      return { name: "code-slash", color: "#1A73E8" };
-    default:
-      return { name: "document-outline", color: "#5F6368" };
-  }
-}
-
 export interface DriveItem {
   id: string;
   name: string;
@@ -70,6 +38,8 @@ export interface DriveItem {
   uri?: string;
   mimeType?: string;
   sharedBy?: string;
+  starred?: boolean;
   isFolder?: boolean;
+  parentId?: string | null;
 }
 

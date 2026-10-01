@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback, TextInput, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { DriveItem, getCategoryIcon } from "../../utils/driveFileTypes";
+import { DriveItem } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
+import { FileCategoryIcon } from "./FileCategoryIcon";
 
 interface DriveFileOptionsSheetProps {
   visible: boolean;
@@ -33,8 +34,6 @@ export function DriveFileOptionsSheet({
   };
 
   if (!item) return null;
-
-  const iconConfig = getCategoryIcon(item.category);
 
   const startRename = () => {
     setNewName(item.name);
@@ -83,11 +82,8 @@ export function DriveFileOptionsSheet({
 
               {/* Item Summary Header */}
               <View className="flex-row items-center pb-3.5 mb-2 border-b border-[#F0F2F5]">
-                <View
-                  className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-                  style={{ backgroundColor: `${iconConfig.color}15` }}
-                >
-                  <Ionicons name={iconConfig.name} size={20} color={iconConfig.color} />
+                <View className="w-10 h-10 rounded-xl bg-[#F1F3F4] items-center justify-center mr-3">
+                  <FileCategoryIcon category={item.isFolder ? "folder" : item.category} size={22} uri={item.uri} id={item.id} />
                 </View>
                 <View className="flex-1 pr-2">
                   <Text className="text-[15px] font-outfit-bold text-[#1F1F1F]" numberOfLines={1}>

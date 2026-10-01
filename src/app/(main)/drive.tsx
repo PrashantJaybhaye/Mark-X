@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
-import { View, TouchableOpacity, ScrollView, Share, Platform, StatusBar as RNStatusBar } from "react-native";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { View, TouchableOpacity, ScrollView, Share, Platform, BackHandler, StatusBar as RNStatusBar } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import Svg, { Path } from "react-native-svg";
+import { useFocusEffect, useRouter } from "expo-router";
 
 // Drive Components
-import { DriveHeader } from "../../components/drive/DriveHeader";
+import { DriveHeader, DriveTabType } from "../../components/drive/DriveHeader";
+import { DriveBreadcrumbs, FolderStackItem } from "../../components/drive/DriveBreadcrumbs";
 import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
 import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
@@ -21,10 +23,22 @@ import { triggerHaptic } from "../../utils/haptics";
 import { loadDriveItems, saveDriveItems } from "../../services/storageService";
 
 export default function DriveScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // Header state
+  const [activeTab, setActiveTab] = useState<DriveTabType>("drive");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
   // Files state initialized from storage
   const [files, setFiles] = useState<DriveItem[]>([]);
+
+  // Folder navigation hierarchy state
+  const [folderStack, setFolderStack] = useState<FolderStackItem[]>([
+    { id: null, name: "Drive" },
+  ]);
+  const currentFolderId = folderStack[folderStack.length - 1].id;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -35,11 +49,29 @@ export default function DriveScreen() {
     }, [])
   );
 
+  // Hardware Back Button handler for Android subfolder navigation
+  useEffect(() => {
+    const onBackPress = () => {
+      if (folderStack.length > 1) {
+        setFolderStack((prev) => prev.slice(0, prev.length - 1));
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => subscription.remove();
+  }, [folderStack.length]);
+
   useEffect(() => {
     let isMounted = true;
+    // Clear initial dummy data and start with clean real stored items
     loadDriveItems().then((stored) => {
-      if (isMounted && stored.length > 0) {
-        setFiles(stored);
+      if (isMounted) {
+        // Filter out old test items if any exist
+        const realItems = (stored || []).filter((item) => !item.id.startsWith("test-"));
+        setFiles(realItems);
+        saveDriveItems(realItems);
       }
     });
     return () => {
@@ -88,7 +120,40 @@ export default function DriveScreen() {
 
   const generateUniqueId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  // Action handlers - add picked/created files and persist
+  // Navigation handlers
+  const handleItemPress = (item: DriveItem) => {
+    if (item.isFolder) {
+      setFolderStack((prev) => [...prev, { id: item.id, name: item.name }]);
+    } else {
+      setSelectedFileForPreview(item);
+    }
+  };
+
+  const handleNavigateBack = () => {
+    if (folderStack.length > 1) {
+      setFolderStack((prev) => prev.slice(0, prev.length - 1));
+    }
+  };
+
+  const handleNavigateToBreadcrumb = (index: number) => {
+    setFolderStack((prev) => prev.slice(0, index + 1));
+  };
+
+  // Filter items based on active tab ("drive" = all items, "folders" = only folders)
+  const displayedFiles = useMemo(() => {
+    if (activeTab === "folders") {
+      return files.filter((f) => f.isFolder);
+    }
+    return files;
+  }, [files, activeTab]);
+
+  // Current folder files count
+  const currentFolderFilesCount = displayedFiles.filter((f) => {
+    if (!currentFolderId) return !f.parentId;
+    return f.parentId === currentFolderId;
+  }).length;
+
+  // Action handlers - add picked/created files to current folder and persist
   const handleUploadFile = async () => {
     const file = await safePickDocument();
     if (file) {
@@ -101,6 +166,7 @@ export default function DriveScreen() {
         updatedAt: "Just now",
         uri: file.uri,
         mimeType: file.mimeType,
+        parentId: currentFolderId,
       };
       updateFilesAndPersist((prev) => [newItem, ...prev]);
       triggerToast(newItem.name, category, "Saved to Drive");
@@ -120,6 +186,7 @@ export default function DriveScreen() {
         updatedAt: "Just now",
         uri: img.uri,
         mimeType: img.mimeType,
+        parentId: currentFolderId,
       };
       updateFilesAndPersist((prev) => [newItem, ...prev]);
       triggerToast(newItem.name, category, "Document scanned • Saved locally");
@@ -136,6 +203,7 @@ export default function DriveScreen() {
         size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "3.2 MB",
         updatedAt: "Just now",
         uri: img.uri,
+        parentId: currentFolderId,
       };
       updateFilesAndPersist((prev) => [newItem, ...prev]);
       triggerToast(newItem.name, "image", "Photo imported • Saved locally");
@@ -143,12 +211,17 @@ export default function DriveScreen() {
   };
 
   const handleCreateFolder = () => {
+    const currentFolderSiblings = files.filter(
+      (f) => f.isFolder && (currentFolderId ? f.parentId === currentFolderId : !f.parentId)
+    ).length;
+
     const newFolder: DriveItem = {
       id: generateUniqueId(),
-      name: `New Folder ${files.filter((f) => f.isFolder).length + 1}`,
+      name: `New Folder ${currentFolderSiblings + 1}`,
       category: "folder",
       updatedAt: "Just now",
       isFolder: true,
+      parentId: currentFolderId,
     };
     updateFilesAndPersist((prev) => [newFolder, ...prev]);
     triggerToast(newFolder.name, "folder", "Folder created • Saved locally");
@@ -161,6 +234,7 @@ export default function DriveScreen() {
       category: "document",
       size: "12 KB",
       updatedAt: "Just now",
+      parentId: currentFolderId,
     };
     updateFilesAndPersist((prev) => [newNote, ...prev]);
     triggerToast(newNote.name, "document", "Note created • Saved locally");
@@ -176,7 +250,22 @@ export default function DriveScreen() {
 
   const handleDeleteFile = (id: string) => {
     const fileToDelete = files.find((f) => f.id === id);
-    updateFilesAndPersist((prev) => prev.filter((f) => f.id !== id));
+    updateFilesAndPersist((prev) => {
+      const idsToDelete = new Set<string>([id]);
+      if (fileToDelete?.isFolder) {
+        let addedMore = true;
+        while (addedMore) {
+          addedMore = false;
+          for (const item of prev) {
+            if (item.parentId && idsToDelete.has(item.parentId) && !idsToDelete.has(item.id)) {
+              idsToDelete.add(item.id);
+              addedMore = true;
+            }
+          }
+        }
+      }
+      return prev.filter((f) => !idsToDelete.has(f.id));
+    });
     if (fileToDelete) {
       triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive");
     }
@@ -198,20 +287,39 @@ export default function DriveScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* 1. Header & Search */}
+      {/* 1. Drive Header with Search, Drive / Folders Tabs, Sort & Layout Controls */}
       <DriveHeader
         search={search}
         onSearchChange={setSearch}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sortOrder={sortOrder}
+        onToggleSort={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode((prev) => (prev === "grid" ? "list" : "grid"))}
         topInset={insets.top}
       />
 
-      {/* 2. Content Area - Virtualized File List or Empty State */}
-      {files.length > 0 ? (
+      {/* 2. Folder Navigation Breadcrumbs (Shown only inside subfolders) */}
+      {folderStack.length > 1 && (
+        <DriveBreadcrumbs
+          folderStack={folderStack}
+          onNavigateBack={handleNavigateBack}
+          onNavigateToBreadcrumb={handleNavigateToBreadcrumb}
+          itemCount={currentFolderFilesCount}
+        />
+      )}
+
+      {/* 3. Content Area - Virtualized File List / Grid or Empty State */}
+      {displayedFiles.length > 0 || folderStack.length > 1 ? (
         <DriveFileList
-          files={files}
+          files={displayedFiles}
           searchQuery={search}
+          currentFolderId={currentFolderId}
+          viewMode={viewMode}
+          sortOrder={sortOrder}
           contentPaddingBottom={insets.bottom + 80}
-          onItemPress={(item) => setSelectedFileForPreview(item)}
+          onItemPress={handleItemPress}
           onOptionsPress={(item) => setSelectedFileForOptions(item)}
         />
       ) : (
@@ -226,13 +334,13 @@ export default function DriveScreen() {
         </ScrollView>
       )}
 
-      {/* 3. Mark X Squircle Action FAB */}
+      {/* 4. Google Drive Material You 4-Color Action FAB */}
       <View
         style={{
           position: "absolute",
-          right: 20,
-          bottom: 20,
-          elevation: 5,
+          right: 18,
+          bottom: isToastOpen ? 64 : 14,
+          elevation: 10,
           zIndex: 40,
         }}
       >
@@ -242,23 +350,30 @@ export default function DriveScreen() {
             triggerHaptic();
             setIsActionSheetOpen(true);
           }}
-          className="w-14 h-14 rounded-2xl bg-white items-center justify-center border border-[#E6E8EC] shadow-md shadow-[#0B57D0]/20"
+          className="w-16 h-16 rounded-full bg-white items-center justify-center border border-[#E0E4EC] shadow-xl shadow-black/20"
         >
-          <Ionicons name="add" size={28} color="#0B57D0" />
+          {/* Authentic Google 4-Color Plus Icon */}
+          <Svg width={36} height={36} viewBox="0 0 36 36">
+            <Path fill="#EA4335" d="M16 8h4v8h-4z" />
+            <Path fill="#4285F4" d="M20 16h8v4h-8z" />
+            <Path fill="#FBBC05" d="M16 20h4v8h-4z" />
+            <Path fill="#34A853" d="M8 16h8v4h-8z" />
+            <Path fill="#4285F4" d="M16 16h4v4h-4z" />
+          </Svg>
         </TouchableOpacity>
       </View>
 
-      {/* 4. Status Notification Toast */}
+      {/* 5. Status Notification Toast Banner - Touched directly to top of bottom tab bar */}
       <UploadStatusToast
         visible={isToastOpen}
         fileName={fileName}
         category={fileCategory}
         detail={toastDetail}
         onClose={() => setIsToastOpen(false)}
-        bottomInset={insets.bottom + 68}
+        bottomInset={0}
       />
 
-      {/* 5. Add Action Sheet */}
+      {/* 6. Add Action Sheet */}
       <DriveActionSheet
         visible={isActionSheetOpen}
         onClose={() => setIsActionSheetOpen(false)}
@@ -269,7 +384,7 @@ export default function DriveScreen() {
         onCreateNote={handleCreateNote}
       />
 
-      {/* 6. File 3-Dots Options Action Sheet */}
+      {/* 7. File 3-Dots Options Action Sheet */}
       <DriveFileOptionsSheet
         visible={!!selectedFileForOptions}
         item={selectedFileForOptions}
@@ -279,7 +394,7 @@ export default function DriveScreen() {
         onShare={handleShareFile}
       />
 
-      {/* 7. File Details & Image Preview Modal */}
+      {/* 8. File Details & Image Preview Modal */}
       <DriveFilePreviewModal
         visible={!!selectedFileForPreview}
         item={selectedFileForPreview}
@@ -291,4 +406,3 @@ export default function DriveScreen() {
     </View>
   );
 }
-

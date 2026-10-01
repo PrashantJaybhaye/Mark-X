@@ -2,8 +2,9 @@ import React from "react";
 import { View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { DriveItem, getCategoryIcon } from "../../utils/driveFileTypes";
+import { DriveItem } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
+import { FileCategoryIcon } from "./FileCategoryIcon";
 
 interface DriveFilePreviewModalProps {
   visible: boolean;
@@ -20,8 +21,6 @@ export function DriveFilePreviewModal({
 }: DriveFilePreviewModalProps) {
   if (!item) return null;
 
-  const iconConfig = getCategoryIcon(item.category);
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -31,11 +30,8 @@ export function DriveFilePreviewModal({
               {/* Header Bar */}
               <View className="flex-row items-center justify-between pb-3 border-b border-[#F0F2F5] mb-4">
                 <View className="flex-row items-center flex-1 mr-2">
-                  <View
-                    className="w-9 h-9 rounded-xl items-center justify-center mr-2.5"
-                    style={{ backgroundColor: `${iconConfig.color}15` }}
-                  >
-                    <Ionicons name={iconConfig.name} size={18} color={iconConfig.color} />
+                  <View className="w-9 h-9 rounded-xl bg-[#F1F3F4] items-center justify-center mr-2.5">
+                    <FileCategoryIcon category={item.isFolder ? "folder" : item.category} size={20} uri={item.uri} id={item.id} />
                   </View>
                   <Text className="text-[15px] font-outfit-bold text-[#1F1F1F] flex-1" numberOfLines={1}>
                     {item.name}
@@ -62,7 +58,7 @@ export function DriveFilePreviewModal({
                 </View>
               ) : (
                 <View className="w-full py-8 rounded-2xl bg-[#F8F9FA] items-center justify-center mb-4 border border-[#E8EAED]">
-                  <Ionicons name={iconConfig.name} size={48} color={iconConfig.color} />
+                  <FileCategoryIcon category={item.isFolder ? "folder" : item.category} size={48} id={item.id} />
                   <Text className="text-[13px] font-outfit text-[#70757A] mt-2">
                     {item.isFolder ? "Folder ready for files" : "File stored securely"}
                   </Text>
