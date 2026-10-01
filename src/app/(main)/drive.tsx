@@ -139,12 +139,16 @@ export default function DriveScreen() {
     setFolderStack((prev) => prev.slice(0, index + 1));
   };
 
-  // Filter items based on active tab ("drive" = all items, "folders" = only folders)
+  // Filter items based on active tab ("drive" = documents & folders, "folders" = only folders)
+  // Strict Limitation: Images & videos belong in Gallery tab, not Drive.
   const displayedFiles = useMemo(() => {
+    const nonMediaFiles = files.filter(
+      (f) => f.isFolder || (f.category !== "image" && f.category !== "video")
+    );
     if (activeTab === "folders") {
-      return files.filter((f) => f.isFolder);
+      return nonMediaFiles.filter((f) => f.isFolder);
     }
-    return files;
+    return nonMediaFiles;
   }, [files, activeTab]);
 
   // Current folder files count
@@ -158,6 +162,10 @@ export default function DriveScreen() {
     const file = await safePickDocument();
     if (file) {
       const category = getFileCategory(file.name, file.mimeType);
+
+      // Strictly block image & video files silently without showing any toast message
+      if (category === "image" || category === "video") return;
+
       const newItem: DriveItem = {
         id: generateUniqueId(),
         name: file.name || "Uploaded Document",
@@ -176,37 +184,18 @@ export default function DriveScreen() {
   const handleScanDocument = async () => {
     const img = await safePickImage();
     if (img) {
-      const name = img.fileName || `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.jpg`;
-      const category = getFileCategory(name, img.mimeType);
+      const name = `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.pdf`;
       const newItem: DriveItem = {
         id: generateUniqueId(),
         name,
-        category,
+        category: "pdf",
         size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.8 MB",
         updatedAt: "Just now",
         uri: img.uri,
-        mimeType: img.mimeType,
         parentId: currentFolderId,
       };
       updateFilesAndPersist((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category, "Document scanned • Saved locally");
-    }
-  };
-
-  const handleImportPhoto = async () => {
-    const img = await safePickImage();
-    if (img) {
-      const newItem: DriveItem = {
-        id: generateUniqueId(),
-        name: img.fileName || `IMG_${Date.now().toString().slice(-4)}.jpg`,
-        category: "image",
-        size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "3.2 MB",
-        updatedAt: "Just now",
-        uri: img.uri,
-        parentId: currentFolderId,
-      };
-      updateFilesAndPersist((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, "image", "Photo imported • Saved locally");
+      triggerToast(newItem.name, "pdf", "Document scanned • Saved as PDF");
     }
   };
 
@@ -379,7 +368,6 @@ export default function DriveScreen() {
         onClose={() => setIsActionSheetOpen(false)}
         onUploadFile={handleUploadFile}
         onScanDocument={handleScanDocument}
-        onImportPhoto={handleImportPhoto}
         onCreateFolder={handleCreateFolder}
         onCreateNote={handleCreateNote}
       />

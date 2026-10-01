@@ -9,9 +9,7 @@ interface DriveActionSheetProps {
   onClose: () => void;
   onUploadFile: () => void;
   onScanDocument: () => void;
-  onImportPhoto: () => void;
   onCreateFolder: () => void;
-  onCreateNote: () => void;
 }
 
 export function DriveActionSheet({
@@ -19,17 +17,15 @@ export function DriveActionSheet({
   onClose,
   onUploadFile,
   onScanDocument,
-  onImportPhoto,
   onCreateFolder,
-  onCreateNote,
 }: DriveActionSheetProps) {
   const insets = useSafeAreaInsets();
 
   const options = [
     {
       id: "upload",
-      title: "Upload File",
-      subtitle: "Add documents or archives",
+      title: "Upload Document",
+      subtitle: "Add PDFs, sheets, notes, or archives",
       icon: "cloud-upload-outline" as const,
       onPress: onUploadFile,
       tint: "#0B57D0",
@@ -38,20 +34,11 @@ export function DriveActionSheet({
     {
       id: "scan",
       title: "Scan Document",
-      subtitle: "Capture with device camera",
+      subtitle: "Capture paper notes or text",
       icon: "scan-outline" as const,
       onPress: onScanDocument,
       tint: "#188038",
       bg: "#E6F4EA",
-    },
-    {
-      id: "photo",
-      title: "Import Photo",
-      subtitle: "Upload from library",
-      icon: "images-outline" as const,
-      onPress: onImportPhoto,
-      tint: "#8E24AA",
-      bg: "#F3E8FD",
     },
     {
       id: "folder",
@@ -61,15 +48,6 @@ export function DriveActionSheet({
       onPress: onCreateFolder,
       tint: "#F29900",
       bg: "#FEF7E0",
-    },
-    {
-      id: "note",
-      title: "Create Note",
-      subtitle: "Write a quick encrypted note",
-      icon: "create-outline" as const,
-      onPress: onCreateNote,
-      tint: "#17181A",
-      bg: "#F5F7FA",
     },
   ];
 

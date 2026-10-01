@@ -24,7 +24,23 @@ export async function safePickDocument(): Promise<PickedFileResult | null> {
   try {
     setSystemBypassActive(true);
     const result = await DocumentPicker.getDocumentAsync({
-      type: ["*/*"],
+      type: [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/zip",
+        "application/x-rar-compressed",
+        "application/json",
+        "text/plain",
+        "text/csv",
+        "text/html",
+        "text/markdown",
+        "application/octet-stream",
+      ],
       copyToCacheDirectory: true,
     });
 
