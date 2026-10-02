@@ -1,14 +1,24 @@
-import React from "react";
-import { View, Text, TouchableOpacity, Modal, TouchableWithoutFeedback } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useRef, useEffect } from "react";
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Animated,
+  Dimensions,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { triggerHaptic } from "../../utils/haptics";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface DriveActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onUploadFile: () => void;
-  onScanDocument: () => void;
   onCreateFolder: () => void;
 }
 
@@ -16,94 +26,134 @@ export function DriveActionSheet({
   visible,
   onClose,
   onUploadFile,
-  onScanDocument,
   onCreateFolder,
 }: DriveActionSheetProps) {
   const insets = useSafeAreaInsets();
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 70,
+          friction: 12,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      backdropOpacity.setValue(0);
+      slideAnim.setValue(SCREEN_HEIGHT);
+    }
+  }, [visible]);
+
+  const animateClose = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+      callback?.();
+    });
+  };
 
   const options = [
     {
       id: "upload",
-      title: "Upload Document",
-      subtitle: "Add PDFs, sheets, notes, or archives",
+      title: "Upload document",
+      subtitle: "PDFs, spreadsheets, text files",
       icon: "cloud-upload-outline" as const,
       onPress: onUploadFile,
-      tint: "#0B57D0",
-      bg: "#E8F0FE",
-    },
-    {
-      id: "scan",
-      title: "Scan Document",
-      subtitle: "Capture paper notes or text",
-      icon: "scan-outline" as const,
-      onPress: onScanDocument,
-      tint: "#188038",
-      bg: "#E6F4EA",
     },
     {
       id: "folder",
-      title: "Create Folder",
-      subtitle: "Organize files cleanly",
+      title: "Create folder",
+      subtitle: "Create a new directory for files",
       icon: "folder-outline" as const,
       onPress: onCreateFolder,
-      tint: "#F29900",
-      bg: "#FEF7E0",
     },
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/45 justify-end">
-          <TouchableWithoutFeedback>
-            <View
-              className="bg-white rounded-t-[28px] px-5 pt-3 border-t border-[#E6E8EC]"
-              style={{ paddingBottom: Math.max(insets.bottom, 20) + 16 }}
-            >
-              {/* Top Handlebar */}
-              <View className="items-center mb-3.5">
-                <View className="w-10 h-1 rounded-full bg-[#E6E8EC]" />
-              </View>
+    <Modal
+      visible={visible}
+      animationType="none"
+      transparent
+      onRequestClose={() => animateClose()}
+    >
+      <View className="flex-1 justify-end">
+        {/* Animated Backdrop Fade Overlay */}
+        <TouchableWithoutFeedback onPress={() => animateClose()}>
+          <Animated.View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.45)",
+              opacity: backdropOpacity,
+            }}
+          />
+        </TouchableWithoutFeedback>
 
-              <Text className="text-[17px] font-outfit-bold text-[#17181A] mb-3 px-1">
-                Add to Mark X Drive
-              </Text>
-
-              {/* Action List */}
-              <View className="gap-1.5">
-                {options.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      triggerHaptic();
-                      onClose();
-                      item.onPress();
-                    }}
-                    className="flex-row items-center p-2.5 rounded-2xl active:bg-[#F5F7FA]"
-                  >
-                    <View
-                      className="w-10 h-10 rounded-xl items-center justify-center mr-3.5"
-                      style={{ backgroundColor: item.bg }}
-                    >
-                      <Ionicons name={item.icon} size={20} color={item.tint} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[15px] font-outfit-semibold text-[#17181A]">
-                        {item.title}
-                      </Text>
-                      <Text className="text-[12px] font-outfit text-[#6B7078] mt-0.5">
-                        {item.subtitle}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color="#B4B8BF" />
-                  </TouchableOpacity>
-                ))}
-              </View>
+        {/* Animated Sheet Container Matched to Gallery Tab */}
+        <TouchableWithoutFeedback>
+          <Animated.View
+            className="bg-[#F5F4F0] rounded-t-[32px] px-5 pt-3 shadow-2xl relative border-t border-black/[0.05]"
+            style={{
+              transform: [{ translateY: slideAnim }],
+              paddingBottom: Math.max(insets.bottom, 24) + 24,
+            }}
+          >
+            {/* Top Handlebar */}
+            <View className="items-center mb-3.5">
+              <View className="w-10 h-1 rounded-full bg-black/15" />
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+
+            {/* Header Title */}
+            <Text className="text-[18px] font-outfit-bold text-[#1C1C1E] mb-3 px-1">
+              Add to Drive
+            </Text>
+
+            {/* Action Items: 2 horizontal icon buttons in a single row */}
+            <View className="flex-row gap-3 mt-1 mb-2">
+              {options.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+                    animateClose(() => item.onPress());
+                  }}
+                  className="flex-1 items-center justify-center py-6 px-3 rounded-[22px] bg-[#E7E4DC] active:bg-[#DCD8CD]"
+                >
+                  <View className="mb-1.5 items-center justify-center">
+                    <Ionicons name={item.icon} size={26} color="#1C1C1E" />
+                  </View>
+                  <Text className="text-[13.5px] font-outfit-semibold text-[#1C1C1E] text-center">
+                    {item.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 }

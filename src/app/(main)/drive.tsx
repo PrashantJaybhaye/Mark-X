@@ -181,24 +181,6 @@ export default function DriveScreen() {
     }
   };
 
-  const handleScanDocument = async () => {
-    const img = await safePickImage();
-    if (img) {
-      const name = `Scanned_Doc_${new Date().toISOString().slice(0, 10)}.pdf`;
-      const newItem: DriveItem = {
-        id: generateUniqueId(),
-        name,
-        category: "pdf",
-        size: img.fileSize ? `${(img.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.8 MB",
-        updatedAt: "Just now",
-        uri: img.uri,
-        parentId: currentFolderId,
-      };
-      updateFilesAndPersist((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, "pdf", "Document scanned • Saved as PDF");
-    }
-  };
-
   const handleCreateFolder = () => {
     const currentFolderSiblings = files.filter(
       (f) => f.isFolder && (currentFolderId ? f.parentId === currentFolderId : !f.parentId)
@@ -214,19 +196,6 @@ export default function DriveScreen() {
     };
     updateFilesAndPersist((prev) => [newFolder, ...prev]);
     triggerToast(newFolder.name, "folder", "Folder created • Saved locally");
-  };
-
-  const handleCreateNote = () => {
-    const newNote: DriveItem = {
-      id: generateUniqueId(),
-      name: `Encrypted Note ${new Date().toLocaleDateString()}.md`,
-      category: "document",
-      size: "12 KB",
-      updatedAt: "Just now",
-      parentId: currentFolderId,
-    };
-    updateFilesAndPersist((prev) => [newNote, ...prev]);
-    triggerToast(newNote.name, "document", "Note created • Saved locally");
   };
 
   // Item Options Handlers
@@ -367,9 +336,7 @@ export default function DriveScreen() {
         visible={isActionSheetOpen}
         onClose={() => setIsActionSheetOpen(false)}
         onUploadFile={handleUploadFile}
-        onScanDocument={handleScanDocument}
         onCreateFolder={handleCreateFolder}
-        onCreateNote={handleCreateNote}
       />
 
       {/* 7. File 3-Dots Options Action Sheet */}
