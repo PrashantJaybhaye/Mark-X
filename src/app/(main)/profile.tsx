@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   StatusBar as RNStatusBar,
   ScrollView,
@@ -20,6 +21,9 @@ import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { clearAppCache, getAppCacheSize } from "../../services/cacheCleaner";
+import { getOrFetchCachedImage, forceRefetchCachedImage } from "../../services/cachedImageService";
+
+const PROFILE_BANNER_URL = "https://repo-asset.vercel.app/mark/profile-banner.webp";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -37,6 +41,54 @@ export default function ProfileScreen() {
 
   const [isFocused, setIsFocused] = useState(false);
   const isNavigatingRef = React.useRef(false);
+  const [bannerUri, setBannerUri] = useState<string>(PROFILE_BANNER_URL);
+  const [isRefetchingBanner, setIsRefetchingBanner] = useState(false);
+
+  const bannerTapCountRef = React.useRef(0);
+  const bannerTapTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getOrFetchCachedImage(PROFILE_BANNER_URL, "profile-banner.webp").then((uri) => {
+      if (isMounted && uri) {
+        setBannerUri(uri);
+      }
+    });
+    return () => {
+      isMounted = false;
+      if (bannerTapTimerRef.current) {
+        clearTimeout(bannerTapTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleBannerPress = () => {
+    triggerHaptic();
+    bannerTapCountRef.current += 1;
+
+    if (bannerTapTimerRef.current) {
+      clearTimeout(bannerTapTimerRef.current);
+    }
+
+    if (bannerTapCountRef.current >= 6) {
+      bannerTapCountRef.current = 0;
+      setIsRefetchingBanner(true);
+
+      forceRefetchCachedImage(PROFILE_BANNER_URL, "profile-banner.webp").then((newUri) => {
+        setBannerUri(`${newUri}?t=${Date.now()}`);
+        setIsRefetchingBanner(false);
+        setDialogState({
+          visible: true,
+          title: "Banner Refetched",
+          message: "Profile banner refetching in sometimes."
+        });
+      });
+    } else {
+      bannerTapTimerRef.current = setTimeout(() => {
+        bannerTapCountRef.current = 0;
+      }, 2500);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -193,14 +245,30 @@ export default function ProfileScreen() {
         bounces={true}
         scrollEventThrottle={16}
       >
-        {/* City Skyline Banner */}
-        <View className="w-full h-[180px] relative">
+        {/* Profile Banner */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={handleBannerPress}
+          className="w-full h-[180px] relative"
+        >
           <Image
-            source={require("../../../assets/images/profile-banner.jpg")}
+            source={{ uri: bannerUri }}
+            placeholder={require("../../../assets/images/profile-banner.jpg")}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             transition={300}
           />
+          {isRefetchingBanner && (
+            <View className="absolute inset-0 bg-black/40 items-center justify-center z-20">
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text
+                className="text-white text-[12px] mt-1.5"
+                style={{ fontFamily: "Outfit_500Medium" }}
+              >
+                Refetching banner...
+              </Text>
+            </View>
+          )}
           <View
             style={{
               position: "absolute",
@@ -210,7 +278,7 @@ export default function ProfileScreen() {
               height: insets.top + 20,
             }}
           />
-        </View>
+        </TouchableOpacity>
 
         {/* User Identity & Info */}
         <View className="px-5">
