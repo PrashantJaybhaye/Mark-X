@@ -24,7 +24,6 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
 import { AnimatedSplashScreen } from "../components/splash/AnimatedSplashScreen";
-import { checkForAppUpdates } from "../services/updateService";
 import "../services/BackgroundUploadService"; // Register foreground service
 
 // Keep native splash screen visible until custom splash is ready to animate
@@ -103,10 +102,6 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
 
 function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
   const [isDecisionComplete, setIsDecisionComplete] = useState(false);
-
-  useEffect(() => {
-    checkForAppUpdates();
-  }, []);
 
   if (!isFontsReady) {
     return null;

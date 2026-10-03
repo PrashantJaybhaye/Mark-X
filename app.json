@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mark-X",
     "slug": "mark-x",
-    "version": "1.0.0",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "markx",
@@ -57,8 +57,7 @@
       ],
       "expo-secure-store",
       "expo-video",
-      "expo-sharing",
-      "expo-updates"
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -70,15 +69,6 @@
         "projectId": "1094cc39-0f3a-4eec-8b31-a324003d2d3d"
       }
     },
-    "owner": "prashantvb14",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/1094cc39-0f3a-4eec-8b31-a324003d2d3d",
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 3000
-    }
+    "owner": "prashantvb14"
   }
 }

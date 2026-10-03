@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React from "react";
 import {
-  ActivityIndicator,
   Platform,
   StatusBar as RNStatusBar,
   Text,
@@ -14,15 +13,11 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { triggerHaptic } from "../../utils/haptics";
-import { checkOtaUpdate, OtaCheckResult } from "../../services/updateService";
-import { IosDialog } from "../../components/common/IosDialog";
+import { APP_VERSION, BUILD_NUMBER } from "../../constants/version";
 
 export default function AboutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-
-  const [isChecking, setIsChecking] = useState(false);
-  const [modalResult, setModalResult] = useState<OtaCheckResult | null>(null);
 
   const topInset = Math.max(
     insets.top,
@@ -36,22 +31,6 @@ export default function AboutScreen() {
     } else {
       router.replace("/(main)/profile");
     }
-  };
-
-  const handleCheckUpdate = async () => {
-    triggerHaptic();
-    setIsChecking(true);
-    try {
-      const result = await checkOtaUpdate();
-      setModalResult(result);
-    } finally {
-      setIsChecking(false);
-    }
-  };
-
-  const handleCloseModal = () => {
-    triggerHaptic();
-    setModalResult(null);
   };
 
   return (
@@ -94,32 +73,21 @@ export default function AboutScreen() {
           />
         </View>
 
-        {/* Tappable Version & Build (Clean, No intrusive buttons) */}
-        <TouchableOpacity
-          onPress={handleCheckUpdate}
-          disabled={isChecking}
-          activeOpacity={0.6}
-          className="items-center py-2"
-        >
+        <View className="items-center py-2">
           <Text
             className="text-[18px] text-[#111111] mb-1.5"
             style={{ fontFamily: "Outfit_600SemiBold" }}
           >
-            Version 1.0.0
+            Version {APP_VERSION}
           </Text>
 
-          <View className="flex-row items-center justify-center">
-            {isChecking ? (
-              <ActivityIndicator size="small" color="#8E8E93" style={{ marginRight: 6 }} />
-            ) : null}
-            <Text
-              className="text-[14px] text-[#71717A]"
-              style={{ fontFamily: "Outfit_400Regular" }}
-            >
-              {isChecking ? "Checking for updates..." : "Build: 57.0.22"}
-            </Text>
-          </View>
-        </TouchableOpacity>
+          <Text
+            className="text-[14px] text-[#71717A]"
+            style={{ fontFamily: "Outfit_400Regular" }}
+          >
+            Build {BUILD_NUMBER}
+          </Text>
+        </View>
 
         <View className="h-14" />
 
@@ -132,43 +100,6 @@ export default function AboutScreen() {
           All Rights Reserved
         </Text>
       </View>
-
-      {/* Pixel-Perfect iOS Alert Modal */}
-      <IosDialog
-        visible={modalResult !== null}
-        title={modalResult?.title || ""}
-        message={modalResult?.message}
-        actions={
-          modalResult?.hasUpdate && modalResult?.applyUpdate
-            ? [
-                {
-                  text: "Later",
-                  style: "cancel",
-                  onPress: handleCloseModal,
-                },
-                {
-                  text: "Update",
-                  style: "default",
-                  bold: true,
-                  onPress: async () => {
-                    handleCloseModal();
-                    if (modalResult.applyUpdate) {
-                      await modalResult.applyUpdate();
-                    }
-                  },
-                },
-              ]
-            : [
-                {
-                  text: "OK",
-                  style: "default",
-                  bold: true,
-                  onPress: handleCloseModal,
-                },
-              ]
-        }
-        onClose={handleCloseModal}
-      />
     </View>
   );
 }

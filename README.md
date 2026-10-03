@@ -293,8 +293,13 @@ This project is licensed under the MIT License - see the [LICENSE](file:///d:/Ma
 
 <div align="left">
 
+## Build Android APK
+
+adb -s [IP_ADDRESS:PORT] install -r D:\Mark-X\android\app\build\outputs\apk\release\app-release.apk
+
 # Release APK
 cd android; .\gradlew.bat assembleRelease
+npx expo run:android --variant release
 
 # Debug APK
 cd android; .\gradlew.bat assembleDebug

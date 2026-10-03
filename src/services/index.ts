@@ -10,5 +10,4 @@ export * from "./mediaExportService";
 export * from "./nativePickerService";
 export * from "./notesSyncService";
 export * from "./storageService";
-export * from "./updateService";
 export * from "./userService";
