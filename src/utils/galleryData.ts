@@ -3,6 +3,7 @@ export interface GalleryPin {
   author?: string;
   authorAvatar?: string;
   imageUrl: string;
+  thumbnailUrl?: string;
   fileName?: string;
   mediaType?: "image" | "video";
   duration?: number;
@@ -19,6 +20,66 @@ export interface GalleryPin {
   mimeType?: string;
   createdAt?: any;
   updatedAt?: any;
+  blurHash?: string;
+}
+
+export const DEFAULT_BLURHASH = "L6PZfSi_.AyE_3t7t7R**0o#DGR4";
+
+/**
+ * Generates a compressed 350px JPEG thumbnail locally for instant grid loading.
+ */
+export async function createLocalThumbnail(localUri: string, width = 350): Promise<string> {
+  if (!localUri || typeof localUri !== "string") return localUri;
+  if (localUri.endsWith(".mp4") || localUri.endsWith(".mov") || localUri.endsWith(".webm")) {
+    return localUri;
+  }
+
+  try {
+    const ImageManipulator = require("expo-image-manipulator");
+    const result = await ImageManipulator.manipulateAsync(
+      localUri,
+      [{ resize: { width } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  } catch (err) {
+    console.warn("[GalleryData] Local thumbnail generation fallback:", err);
+    return localUri;
+  }
+}
+
+/**
+ * Transforms an image URL into a low-bandwidth grid thumbnail URL (350px WebP).
+ * Reduces image payload size by ~90-95% for fast masonry grid rendering.
+ */
+export function getGridThumbnailUrl(url: string, width = 350, quality = 80): string {
+  if (!url || typeof url !== "string") return url;
+  
+  // Local file URIs and data URLs don't need CDN transformations
+  if (
+    url.startsWith("file://") ||
+    url.startsWith("ph://") ||
+    url.startsWith("content://") ||
+    url.startsWith("data:")
+  ) {
+    return url;
+  }
+
+  // Videos don't support image resizing query params
+  const cleanUrl = url.split("?")[0].toLowerCase();
+  if (cleanUrl.endsWith(".mp4") || cleanUrl.endsWith(".mov") || cleanUrl.endsWith(".webm")) {
+    return url;
+  }
+
+  // Append Cloudflare Image Resizing parameters (width, webp format, quality)
+  const hasQuery = url.includes("?");
+  const separator = hasQuery ? "&" : "?";
+
+  if (!url.includes("width=") && !url.includes("w=")) {
+    return `${url}${separator}width=${width}&format=webp&quality=${quality}`;
+  }
+
+  return url;
 }
 
 export function formatBytes(bytes?: number): string {
@@ -114,9 +175,13 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
     ? "synced"
     : pin.uploadStatus || "uploading";
 
+  const rawThumb = pin.thumbnailUrl || pin.imageUrl;
+  const thumbnailUrl = getGridThumbnailUrl(rawThumb);
+
   return {
     id: pin.id,
     imageUrl: pin.imageUrl,
+    thumbnailUrl,
     fileName,
     mediaType: pin.mediaType || "image",
     duration: pin.duration,

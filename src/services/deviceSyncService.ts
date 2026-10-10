@@ -6,7 +6,8 @@ import {
   setDoc,
   deleteDoc,
   Timestamp,
-} from "firebase/firestore";
+  FirebaseFirestoreTypes,
+} from "@react-native-firebase/firestore";
 import { db } from "./firebase";
 import { Platform } from "react-native";
 import * as Device from "expo-device";
@@ -188,7 +189,7 @@ export function subscribeActiveDevices(
       devicesColRef,
       (snapshot) => {
         const list: FirestoreDevice[] = [];
-        snapshot.forEach((docSnap) => {
+        snapshot.forEach((docSnap: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
           list.push(docSnap.data() as FirestoreDevice);
         });
         onUpdate(list);

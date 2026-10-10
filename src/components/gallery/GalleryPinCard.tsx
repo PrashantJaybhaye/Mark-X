@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Text, TouchableOpacity, View } from "react-native";
-import { GalleryPin } from "../../utils/galleryData";
+import { GalleryPin, getGridThumbnailUrl, DEFAULT_BLURHASH } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
 
 interface GalleryPinCardProps {
@@ -19,9 +19,19 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
   onPress,
   onOptionsPress,
 }: GalleryPinCardProps) {
+  const isMountedRef = useRef(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [pulseAnim] = useState(() => new Animated.Value(0.35));
   const spinAnim = useRef(new Animated.Value(0)).current;
+
+  const thumbnailUrl = getGridThumbnailUrl(pin.imageUrl, Math.round(cardWidth * 2));
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -96,12 +106,19 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         )}
 
         <Image
-          source={{ uri: pin.imageUrl }}
+          source={{ uri: thumbnailUrl }}
+          placeholder={{ blurhash: pin.blurHash || DEFAULT_BLURHASH }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
-          transition={250}
+          transition={150}
           cachePolicy="memory-disk"
-          onLoad={() => setIsLoaded(true)}
+          recyclingKey={pin.id}
+          priority="high"
+          onLoad={() => {
+            if (isMountedRef.current) {
+              setIsLoaded(true);
+            }
+          }}
         />
 
         {/* Upload Status Indicator: Shown only while uploading or on failure */}

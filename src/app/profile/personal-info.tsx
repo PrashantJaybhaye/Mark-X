@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { updateProfile } from "firebase/auth";
+import { updateProfile } from "@react-native-firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import * as Clipboard from "expo-clipboard";

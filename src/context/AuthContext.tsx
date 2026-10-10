@@ -7,7 +7,7 @@ import React, {
   ReactNode,
 } from "react";
 import {
-  User,
+  FirebaseAuthTypes,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -18,7 +18,7 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   signInWithPopup,
-} from "firebase/auth";
+} from "@react-native-firebase/auth";
 import { Platform, AppState } from "react-native";
 import {
   GoogleSignin,
@@ -46,7 +46,7 @@ if (Platform.OS !== "web") {
 
 
 interface AuthContextType {
-  user: User | null;
+  user: FirebaseAuthTypes.User | null;
   loading: boolean;
   signIn: (identifier: string, pass: string) => Promise<void>;
   signUp: (
@@ -71,7 +71,7 @@ export function normalizeEmail(identifier: string): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const signOut = async () => {

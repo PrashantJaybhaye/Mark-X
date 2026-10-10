@@ -57,7 +57,11 @@
       ],
       "expo-secure-store",
       "expo-video",
-      "expo-sharing"
+      "expo-sharing",
+      "react-native-blob-util",
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      "@react-native-firebase/auth"
     ],
     "experiments": {
       "typedRoutes": true,

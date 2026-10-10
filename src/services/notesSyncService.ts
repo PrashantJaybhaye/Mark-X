@@ -5,7 +5,8 @@ import {
   getDocs,
   collection,
   serverTimestamp,
-} from "firebase/firestore";
+  FirebaseFirestoreTypes,
+} from "@react-native-firebase/firestore";
 import { db, auth } from "./firebase";
 import { NoteItem } from "../types/note";
 import { loadNotes, saveNotes } from "./storageService";
@@ -66,7 +67,7 @@ export async function pullAndMergeNotesFromFirestore(): Promise<NoteItem[] | nul
     const localNotes = await loadNotes();
     const mergedMap = new Map(localNotes.map((n) => [n.id, n]));
 
-    snapshot.forEach((d) => {
+    snapshot.forEach((d: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
       const data = d.data();
       const remote: NoteItem = {
         id: data.id,

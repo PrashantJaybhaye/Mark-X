@@ -1,47 +1,38 @@
 import '../utils/cryptoPolyfill';
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import {
-  initializeAuth,
-  getAuth,
-  Auth,
-  browserLocalPersistence,
-  // @ts-ignore
-  getReactNativePersistence,
-} from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
-import { getStorage, FirebaseStorage } from "firebase/storage";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getApp } from "@react-native-firebase/app";
+import { getAuth } from "@react-native-firebase/auth";
+import { getFirestore } from "@react-native-firebase/firestore";
+import { getStorage } from "@react-native-firebase/storage";
 import { Platform } from "react-native";
+import {
+  initializeAppCheck as initializeNativeAppCheck,
+  ReactNativeFirebaseAppCheckProvider,
+} from "@react-native-firebase/app-check";
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
+const firebaseApp = getApp();
 
-// Initialize Firebase App if not already initialized
-const app: FirebaseApp =
-  getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-
-// Initialize Auth with AsyncStorage persistence for React Native or browser persistence on web
-let auth: Auth;
-try {
-  const persistence =
-    Platform.OS === "web"
-      ? browserLocalPersistence
-      : getReactNativePersistence(AsyncStorage);
-  auth = initializeAuth(app, {
-    persistence,
-  });
-} catch {
-  auth = getAuth(app);
+if (Platform.OS !== "web") {
+  try {
+    const provider = new ReactNativeFirebaseAppCheckProvider();
+    provider.configure({
+      android: {
+        provider: __DEV__ ? "debug" : "playIntegrity",
+      },
+      apple: {
+        provider: __DEV__ ? "debug" : "appAttest",
+      },
+    });
+    initializeNativeAppCheck(firebaseApp, {
+      provider,
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (e) {
+    console.warn("Native AppCheck initialization error:", e);
+  }
 }
 
-const db: Firestore = getFirestore(app);
-const storage: FirebaseStorage = getStorage(app);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 
-export { app, auth, db, storage };
+export { firebaseApp as app, auth, db, storage };

@@ -17,7 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 
-import { GalleryPin, formatBytes, normalizeGalleryPin } from "../../utils/galleryData";
+import { Image } from "expo-image";
+import { GalleryPin, formatBytes, normalizeGalleryPin, getGridThumbnailUrl, createLocalThumbnail } from "../../utils/galleryData";
 import { auth } from "../../services/firebase";
 import { MarkXLogo } from "../../components/common/MarkXLogo";
 import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
@@ -35,7 +36,6 @@ import {
   addGalleryPinToServer, 
   deleteGalleryPinFromServer, 
   updateGalleryPinInServer,
-  purgeLegacyFieldsFromDatabase,
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
 import { executeUploadWithRetry } from "../../services/BackgroundUploadService";
@@ -62,7 +62,25 @@ export default function GalleryScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const lastDocRef = useRef<any>(null);
   const isNavigatingRef = useRef(false);
+  const isMountedRef = useRef(true);
   const [spinAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Background image prefetcher for seamless scrolling
+  const prefetchPinImages = useCallback((pinList: GalleryPin[]) => {
+    pinList.forEach((pin) => {
+      if (pin.imageUrl && (pin.imageUrl.startsWith("http://") || pin.imageUrl.startsWith("https://"))) {
+        const thumbUrl = getGridThumbnailUrl(pin.imageUrl, Math.round(columnWidth * 2));
+        Image.prefetch(thumbUrl, "memory-disk").catch(() => {});
+      }
+    });
+  }, [columnWidth]);
 
   // Helper: update a single pin across state and local storage cache
   const updatePinState = useCallback((id: string, updates: Partial<GalleryPin>) => {
@@ -111,33 +129,55 @@ export default function GalleryScreen() {
     }
   }, [updatePinState]);
 
-  // Load the first page (12 items)
+
   const loadFirstPage = useCallback(async (showSkeleton = false) => {
-    if (showSkeleton) setIsLoading(true);
+    if (showSkeleton && isMountedRef.current) setIsLoading(true);
     try {
       const result = await fetchGalleryPinsPage(null, GALLERY_PAGE_LIMIT);
+      if (!isMountedRef.current) return;
       setPins(result.pins);
       lastDocRef.current = result.lastVisibleDoc;
       setHasMore(result.hasMore);
       await saveCachedGalleryPins(result.pins);
+      prefetchPinImages(result.pins);
+
+      // Proactively pre-buffer the next page in background if more items exist
+      if (result.hasMore && result.lastVisibleDoc) {
+        fetchGalleryPinsPage(result.lastVisibleDoc, GALLERY_PAGE_LIMIT).then((nextResult) => {
+          if (!isMountedRef.current || nextResult.pins.length === 0) return;
+          lastDocRef.current = nextResult.lastVisibleDoc;
+          setHasMore(nextResult.hasMore);
+          prefetchPinImages(nextResult.pins);
+
+          setPins((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newItems = nextResult.pins.filter((p) => !existingIds.has(p.id));
+            const updated = [...prev, ...newItems];
+            saveCachedGalleryPins(updated);
+            return updated;
+          });
+        }).catch(console.warn);
+      }
     } catch (err) {
       console.warn("[GalleryScreen] Failed to load first page:", err);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
     }
-  }, []);
+  }, [prefetchPinImages]);
 
   // Load next batch of 12 items on scroll
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore || !lastDocRef.current) return;
-    setIsLoadingMore(true);
+    if (isMountedRef.current) setIsLoadingMore(true);
 
     try {
       const result = await fetchGalleryPinsPage(lastDocRef.current, GALLERY_PAGE_LIMIT);
+      if (!isMountedRef.current) return;
       lastDocRef.current = result.lastVisibleDoc;
       setHasMore(result.hasMore);
 
       if (result.pins.length > 0) {
+        prefetchPinImages(result.pins);
         setPins((prev) => {
           const existingIds = new Set(prev.map((p) => p.id));
           const newItems = result.pins.filter((p) => !existingIds.has(p.id));
@@ -149,14 +189,14 @@ export default function GalleryScreen() {
     } catch (err) {
       console.warn("[GalleryScreen] Failed to load more pins:", err);
     } finally {
-      setIsLoadingMore(false);
+      if (isMountedRef.current) setIsLoadingMore(false);
     }
-  }, [isLoadingMore, hasMore]);
+  }, [isLoadingMore, hasMore, prefetchPinImages]);
 
-  // Detect scroll near bottom for infinite pagination
+  
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 250;
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 1200;
     if (isCloseToBottom && hasMore && !isLoadingMore && !isLoading && !isRefreshing) {
       handleLoadMore();
     }
@@ -214,6 +254,7 @@ export default function GalleryScreen() {
         const normalized = cached.map(normalizeGalleryPin);
         setPins(normalized);
         setIsLoading(false);
+        prefetchPinImages(normalized);
         resumeInterruptedUploads(normalized);
       }
     });
@@ -223,6 +264,7 @@ export default function GalleryScreen() {
     const unsubscribe = subscribeLatestGalleryPins(
       (latestPins) => {
         if (!isMounted) return;
+        prefetchPinImages(latestPins);
         setPins((prev) => {
           const map = new Map(prev.map((p) => [p.id, p]));
           latestPins.forEach((item) => map.set(item.id, { ...(map.get(item.id) || {}), ...item }));
@@ -235,8 +277,6 @@ export default function GalleryScreen() {
         if (isMounted) setIsLoading(false);
       }
     );
-
-    purgeLegacyFieldsFromDatabase().catch(console.warn);
 
     return () => {
       isMounted = false;
@@ -351,35 +391,39 @@ export default function GalleryScreen() {
     const results = await safePickMultipleImages(5);
     if (!results || results.length === 0) return;
 
-    const newPins: GalleryPin[] = results.map((result, idx) => {
-      const ratio = result.width && result.height
-        ? Math.max(Math.min(result.width / result.height, 1.4), 0.6)
-        : 0.75;
+    const newPins: GalleryPin[] = await Promise.all(
+      results.map(async (result, idx) => {
+        const ratio = result.width && result.height
+          ? Math.max(Math.min(result.width / result.height, 1.4), 0.6)
+          : 0.75;
 
-      const isVideo = result.type === "video";
-      const timestamp = Date.now() + idx;
-      const fileName = `${timestamp}${isVideo ? ".mp4" : ".jpg"}`;
-      const fileSize = result.fileSize || (isVideo ? 14800000 : 2800000);
+        const isVideo = result.type === "video";
+        const timestamp = Date.now() + idx;
+        const fileName = `${timestamp}${isVideo ? ".mp4" : ".jpg"}`;
+        const fileSize = result.fileSize || (isVideo ? 14800000 : 2800000);
+        const thumbnailUrl = await createLocalThumbnail(result.uri, 350);
 
-      return {
-        id: `pin-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
-        fileName,
-        author: auth.currentUser?.displayName || "You",
-        imageUrl: result.uri,
-        mediaType: isVideo ? "video" : "image",
-        ...(isVideo && typeof result.duration === "number" ? { duration: result.duration } : {}),
-        aspectRatio: ratio,
-        width: result.width || (ratio >= 1 ? 1920 : 1080),
-        height: result.height || Math.round((result.width || 1080) / ratio),
-        fileSize,
-        fileSizeFormatted: formatBytes(fileSize),
-        mimeType: result.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
-        likes: 0,
-        isLiked: false,
-        saved: false,
-        uploadStatus: "uploading",
-      };
-    });
+        return {
+          id: `pin-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
+          fileName,
+          author: auth.currentUser?.displayName || "You",
+          imageUrl: result.uri,
+          thumbnailUrl,
+          mediaType: isVideo ? "video" : "image",
+          ...(isVideo && typeof result.duration === "number" ? { duration: result.duration } : {}),
+          aspectRatio: ratio,
+          width: result.width || (ratio >= 1 ? 1920 : 1080),
+          height: result.height || Math.round((result.width || 1080) / ratio),
+          fileSize,
+          fileSizeFormatted: formatBytes(fileSize),
+          mimeType: result.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
+          likes: 0,
+          isLiked: false,
+          saved: false,
+          uploadStatus: "uploading",
+        };
+      })
+    );
 
     setPins((prev) => {
       const updated = [...newPins, ...prev];

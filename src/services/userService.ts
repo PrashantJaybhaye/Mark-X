@@ -6,8 +6,8 @@ import {
   onSnapshot,
   serverTimestamp,
   FieldValue,
-} from "firebase/firestore";
-import { User } from "firebase/auth";
+} from "@react-native-firebase/firestore";
+import { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import { db } from "./firebase";
 
 export interface UserMetadata {
@@ -35,7 +35,7 @@ export interface UserMetadata {
  * Preserves existing data using { merge: true }.
  */
 export async function syncUserMetadata(
-  user: User,
+  user: FirebaseAuthTypes.User,
   isNewUser: boolean = false
 ): Promise<void> {
   if (!user?.uid) return;
@@ -43,7 +43,7 @@ export async function syncUserMetadata(
   try {
     const userDocRef = doc(db, "users", user.uid);
 
-    const providerList = user.providerData?.map((p) => p.providerId) || [];
+    const providerList = user.providerData?.map((p: FirebaseAuthTypes.UserInfo) => p.providerId) || [];
     const primaryProvider =
       user.providerData?.[0]?.providerId ||
       (providerList.includes("google.com") ? "google.com" : "password");

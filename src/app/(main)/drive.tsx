@@ -13,7 +13,7 @@ import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
 import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
 import { DriveFileOptionsSheet } from "../../components/drive/DriveFileOptionsSheet";
-import { DriveFilePreviewModal } from "../../components/drive/DriveFilePreviewModal";
+import { DriveFilePreviewScreen } from "../../components/drive/DriveFilePreviewScreen";
 import { UploadStatusToast } from "../../components/drive/UploadStatusToast";
 
 // Services & Helpers
@@ -350,7 +350,7 @@ export default function DriveScreen() {
       />
 
       {/* 8. File Details & Image Preview Modal */}
-      <DriveFilePreviewModal
+      <DriveFilePreviewScreen
         visible={!!selectedFileForPreview}
         item={selectedFileForPreview}
         onClose={() => setSelectedFileForPreview(null)}
