@@ -52,7 +52,6 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { height: screenHeight } = useWindowDimensions();
 
-  // Storage and file counter states dynamically derived from real storage & Firestore
   const [usedStorage, setUsedStorage] = useState("0.00");
   const [galleryCount, setGalleryCount] = useState(0);
   const [notesCount, setNotesCount] = useState(0);
@@ -69,16 +68,14 @@ export default function HomeScreen() {
 
   const refreshCounts = React.useCallback(async (explicitUid?: string) => {
     try {
-      // 0. Recalculate local storage GB based on actual stored items
+
       const recalculatedGB = await recalculateTotalUsedStorageGB();
 
-      // 1. Fast local cache path for immediate rendering
       const prefs = await loadUserPreferences();
       if (prefs.stats) {
         applyStats({ ...prefs.stats, usedStorageGB: Math.max(recalculatedGB, prefs.stats.usedStorageGB || 0) });
       }
 
-      // 2. Fetch fresh user stats from Firestore user metadata
       const uid = explicitUid || user?.uid || auth.currentUser?.uid;
       if (uid) {
         const metadata = await getUserMetadata(uid);
@@ -97,9 +94,8 @@ export default function HomeScreen() {
     }
   }, [user?.uid, applyStats]);
 
-  // Real-time listener for user stats in Firestore
   React.useEffect(() => {
-    // Safety fallback: if no stats loaded after 2.5s (offline or new user), stop loading skeleton
+
     const timer = setTimeout(() => {
       setIsStatsLoading(false);
     }, 2500);
@@ -107,10 +103,8 @@ export default function HomeScreen() {
     const uid = user?.uid || auth.currentUser?.uid;
     if (!uid) return () => clearTimeout(timer);
 
-    // Refresh immediately when user becomes available
     refreshCounts(uid);
 
-    // Live subscription: updates automatically if changed on any device/backend
     const unsubscribe = subscribeUserStats(uid, (stats) => {
       applyStats(stats);
       loadUserPreferences().then((prefs) => {
@@ -211,10 +205,8 @@ export default function HomeScreen() {
       uploadStatus: "uploading",
     };
 
-    // Save metadata to server
     await addGalleryPinToServer(newPin);
 
-    // Upload physical file to Mark-X Storage in background with shortFileName
     uploadFileToMarkx(img.uri, img.mimeType || defaultMime, shortFileName)
       .then(async (res) => {
         if (res.success && res.url) {
@@ -240,7 +232,7 @@ export default function HomeScreen() {
     <View className="flex-1 bg-[#F4F5F7]">
       <StatusBar style="dark" />
 
-      {/* Top Ambient Atmospheric Glow (Monzo Style) */}
+      {}
       <Svg
         width="100%"
         height={screenHeight > 800 ? 560 : 490}
@@ -248,7 +240,7 @@ export default function HomeScreen() {
         pointerEvents="none"
       >
         <Defs>
-          {/* Main vertical atmospheric gradient */}
+          {}
           <LinearGradient id="topGlow" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor="#FF8A5B" stopOpacity="0.92" />
             <Stop offset="20%" stopColor="#FF9B73" stopOpacity="0.75" />
@@ -258,7 +250,7 @@ export default function HomeScreen() {
             <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
           </LinearGradient>
 
-          {/* Concentrated top-right warm amber light */}
+          {}
           <RadialGradient id="coreAmberGlow" cx="80%" cy="2%" rx="75%" ry="50%">
             <Stop offset="0%" stopColor="#FF7043" stopOpacity="0.75" />
             <Stop offset="25%" stopColor="#FF825A" stopOpacity="0.55" />
@@ -267,7 +259,7 @@ export default function HomeScreen() {
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </RadialGradient>
 
-          {/* Soft ambient balance from top-left */}
+          {}
           <RadialGradient id="softCoralGlow" cx="15%" cy="8%" rx="60%" ry="40%">
             <Stop offset="0%" stopColor="#FFD0BC" stopOpacity="0.28" />
             <Stop offset="50%" stopColor="#FFE5D9" stopOpacity="0.1" />
@@ -281,13 +273,13 @@ export default function HomeScreen() {
       </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        {/* Top Header Bar */}
+        {}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
           <View className="justify-center">
             <MarkXLogo width={110} height={15} color="#111111" />
           </View>
 
-          {/* Right Actions: Frosted Pill (Search & Add) */}
+          {}
           <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
               activeOpacity={0.7}
@@ -307,7 +299,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Fixed Hero Card (Outside ScrollView) */}
+        {}
         <View className="px-4 pt-3 pb-1">
           <StorageHeroCard
             usedStorage={usedStorage}
@@ -317,7 +309,7 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Scrollable Content Below Hero Card */}
+        {}
         <ScrollView
           showsVerticalScrollIndicator={false}
           bounces={true}
@@ -329,9 +321,9 @@ export default function HomeScreen() {
             paddingBottom: 40,
           }}
         >
-          {/* 2x2 Feature Grid */}
+          {}
           <View className="w-full gap-3.5">
-            {/* Row 1: Gallery & Reminders */}
+            {}
             <View className="flex-row gap-3.5">
               <FeatureCard
                 title="Gallery"
@@ -356,7 +348,7 @@ export default function HomeScreen() {
               </FeatureCard>
             </View>
 
-            {/* Row 2: Secure Notes & Document Drive */}
+            {}
             <View className="flex-row gap-3.5">
               <FeatureCard
                 title="Secure Notes"

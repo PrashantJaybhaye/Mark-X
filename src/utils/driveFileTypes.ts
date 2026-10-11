@@ -41,5 +41,33 @@ export interface DriveItem {
   starred?: boolean;
   isFolder?: boolean;
   parentId?: string | null;
+  cloudflareUrl?: string;
+  cloudflareKey?: string;
+  createdAt?: number;
+  uploading?: boolean;
+  uploadProgress?: number;
 }
 
+export function splitFileName(fileName: string, isFolder?: boolean): { base: string; ext: string } {
+  if (isFolder) return { base: fileName, ext: "" };
+  const lastDotIndex = fileName.lastIndexOf(".");
+  if (lastDotIndex <= 0 || lastDotIndex === fileName.length - 1) {
+    return { base: fileName, ext: "" };
+  }
+  return {
+    base: fileName.slice(0, lastDotIndex),
+    ext: fileName.slice(lastDotIndex),
+  };
+}
+
+export function getKindLabel(item: DriveItem): string {
+  if (item.isFolder) return "Folder";
+  const ext = item.name.split(".").pop()?.toUpperCase();
+  if (ext === "PDF" || item.category === "pdf") return "PDF Document (.pdf)";
+  if (ext === "DOC" || ext === "DOCX") return "Word Document (.docx)";
+  if (ext === "XLS" || ext === "XLSX") return "Excel Spreadsheet (.xlsx)";
+  if (ext === "PPT" || ext === "PPTX") return "PowerPoint Presentation (.pptx)";
+  if (ext === "TXT") return "Plain Text Document (.txt)";
+  if (item.category === "image") return `Image (${ext || "IMG"})`;
+  return item.mimeType || `${item.category.toUpperCase()} File`;
+}

@@ -35,10 +35,6 @@ import {
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
 import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
 
-/**
- * High-performance video player with custom tap-to-play/pause overlay
- * and timeline progress indicator.
- */
 function InlineVideoPlayer({
   sourceUrl,
   fileName,
@@ -62,14 +58,12 @@ function InlineVideoPlayer({
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Direct native high-performance player instance
   const player = useVideoPlayer(sourceUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
     p.play();
   });
 
-  // Apple-style smooth skeleton breathing animation
   useEffect(() => {
     if (showSkeleton) {
       Animated.loop(
@@ -170,13 +164,13 @@ function InlineVideoPlayer({
       />
 
       {showSkeleton && (
-        <Animated.View 
-          className="absolute inset-0 z-10 bg-[#E5E5EA]" 
+        <Animated.View
+          className="absolute inset-0 z-10 bg-[#E5E5EA]"
           style={{ opacity: fadeAnim }}
           pointerEvents="none"
         >
-          <Animated.View 
-            className="w-full h-full bg-[#C7C7CC]" 
+          <Animated.View
+            className="w-full h-full bg-[#C7C7CC]"
             style={{ opacity: skeletonAnim }}
           />
         </Animated.View>
@@ -224,9 +218,6 @@ function InlineVideoPlayer({
   );
 }
 
-/**
- * Unified Media Viewer screen for full-screen photo & video presentation.
- */
 export default function GalleryDetailPage() {
   const router = useRouter();
   const { id, initialPin } = useLocalSearchParams<{ id: string; initialPin?: string }>();
@@ -260,13 +251,11 @@ export default function GalleryDetailPage() {
     }
   }, []);
 
-  // Fetch / verify pin with remote Firestore
   useEffect(() => {
     let isMounted = true;
     const resolvePin = async () => {
       if (!id) return;
 
-      // 1. Fast path: load from local cache
       const cached = await loadCachedGalleryPins();
       const foundCached = cached.find((p) => p.id === id);
       if (isMounted && foundCached) {
@@ -274,7 +263,6 @@ export default function GalleryDetailPage() {
         setLoading(false);
       }
 
-      // 2. Fresh path: query server to confirm media still exists
       const serverPins = await fetchGalleryPinsFromServer();
       if (!isMounted) return;
 
@@ -300,19 +288,15 @@ export default function GalleryDetailPage() {
 
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to persist updates to state, cache, and Firestore
   const updatePin = useCallback((updates: Partial<GalleryPin>) => {
     if (!pin) return;
-    
-    // 1. Optimistic UI update immediately
+
     setPin((prev) => (prev ? { ...prev, ...updates } : null));
-    
-    // 2. Clear any pending sync
+
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
-    
-    // 3. Schedule the background sync
+
     syncTimeoutRef.current = setTimeout(async () => {
       try {
         await updateGalleryPinInServer(pin.id, updates);
@@ -321,7 +305,7 @@ export default function GalleryDetailPage() {
       } catch (err) {
         console.warn(err);
       }
-    }, 800); // 800ms debounce
+    }, 800);
   }, [pin]);
 
   const animateBookmarkBounce = () => {
@@ -414,7 +398,6 @@ export default function GalleryDetailPage() {
 
   const isVideo = pin.mediaType === "video";
 
-  // Fitted viewport dimensions based on aspect ratio
   const ratio = pin.aspectRatio && pin.aspectRatio > 0 ? pin.aspectRatio : 1;
   const maxImgWidth = windowWidth - 16;
   const maxImgHeight = windowHeight - 140;
@@ -464,17 +447,17 @@ export default function GalleryDetailPage() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* 1. Dynamic Media Viewport */}
+      {}
       <View className="flex-1 items-center justify-center px-2 py-4 bg-white">
         {isVideo ? (
           <View
             style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
           >
-            <InlineVideoPlayer 
-              sourceUrl={pin.imageUrl} 
+            <InlineVideoPlayer
+              sourceUrl={pin.imageUrl}
               fileName={pin.fileName || "temp.mp4"}
-              isMuted={isMuted} 
-              onDoubleTap={handleSaveToggle} 
+              isMuted={isMuted}
+              onDoubleTap={handleSaveToggle}
             />
           </View>
         ) : (
@@ -493,7 +476,7 @@ export default function GalleryDetailPage() {
         )}
       </View>
 
-      {/* 2. Floating Top Navigation Bar */}
+      {}
       <View pointerEvents="box-none" className="absolute top-0 left-0 right-0 z-30">
         <SafeAreaView edges={["top"]}>
           <View className="flex-row items-center justify-between px-4 py-2 pt-4">
@@ -509,7 +492,7 @@ export default function GalleryDetailPage() {
               <Ionicons name="chevron-back" size={22} color="#1C1C1E" />
             </TouchableOpacity>
 
-            {/* Middle: Clean Apple Photos Style Date & Time Header Button */}
+            {}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -566,7 +549,7 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
-      {/* 3. Bottom Action Toolbar */}
+      {}
       <View className="absolute bottom-0 left-0 right-0 z-30">
         <SafeAreaView edges={["bottom"]} className="bg-white/95 backdrop-blur-md border-t border-[#E5E5EA]">
           <View className="flex-row items-center justify-around py-3 px-2">
@@ -623,10 +606,10 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
-      {/* 4. Inspector Sheet */}
+      {}
       <GalleryPinInfoSheet visible={infoVisible} pin={pin} onClose={() => setInfoVisible(false)} />
 
-      {/* 5. Options Sheet */}
+      {}
       <GalleryPinOptionsSheet
         visible={optionsVisible}
         pin={pin}
@@ -636,7 +619,7 @@ export default function GalleryDetailPage() {
         onInfo={() => setInfoVisible(true)}
       />
 
-      {/* 6. Delete Confirmation Dialog */}
+      {}
       <IosDialog
         visible={deleteDialogVisible}
         onClose={() => setDeleteDialogVisible(false)}
@@ -658,7 +641,7 @@ export default function GalleryDetailPage() {
         ]}
       />
 
-      {/* 7. Export Status Dialog */}
+      {}
       <IosDialog
         visible={exportMessageDialog !== null}
         onClose={() => setExportMessageDialog(null)}

@@ -30,7 +30,6 @@ export function NotesEmptyState({
     onClearSearch?.();
   };
 
-  // Search Empty State: Clean, compact Notion search result
   if (searchQuery && searchQuery.trim().length > 0) {
     return (
       <View className="w-full py-6 items-center justify-center">
@@ -68,7 +67,6 @@ export function NotesEmptyState({
     );
   }
 
-  // --- Notion List Mode: Minimal Dashed Row ---
   if (viewMode === "list") {
     return (
       <TouchableOpacity
@@ -88,10 +86,9 @@ export function NotesEmptyState({
     );
   }
 
-  // --- Notion Grid Mode: Minimal Ghost Note Card (Gallery / Board Slot) ---
   return (
     <View className="flex-row justify-between w-full">
-      {/* Ghost Card Slot 1: Active + New Note */}
+      {}
       <TouchableOpacity
         activeOpacity={0.72}
         onPress={handleCreate}
@@ -117,7 +114,7 @@ export function NotesEmptyState({
         </Text>
       </TouchableOpacity>
 
-      {/* Ghost Card Slot 2: Translucent Outline Guide */}
+      {}
       <View
         style={columnWidth ? { width: columnWidth } : undefined}
         className="rounded-[24px] border border-dashed border-black/[0.08] items-center justify-center min-h-[160px]"

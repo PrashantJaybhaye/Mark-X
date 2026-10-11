@@ -25,7 +25,7 @@ function DriveBreadcrumbsComponent({
 
   return (
     <View className="flex-row items-center justify-between px-4 py-2.5 bg-white border-b border-[#F0F2F5]">
-      {/* Left: Back Arrow + Breadcrumb Trail */}
+      {}
       <View className="flex-1 flex-row items-center mr-2">
         {isSubFolder && (
           <TouchableOpacity
@@ -85,7 +85,7 @@ function DriveBreadcrumbsComponent({
         </ScrollView>
       </View>
 
-      {/* Right: Item Count Badge */}
+      {}
       <View className="bg-[#F1F3F4] px-2.5 py-1 rounded-full">
         <Text className="text-[11px] font-outfit-medium text-[#5F6368]">
           {itemCount} {itemCount === 1 ? "item" : "items"}

@@ -96,7 +96,7 @@ export function DriveActionSheet({
       onRequestClose={() => animateClose()}
     >
       <View className="flex-1 justify-end">
-        {/* Animated Backdrop Fade Overlay */}
+        {}
         <TouchableWithoutFeedback onPress={() => animateClose()}>
           <Animated.View
             style={{
@@ -111,7 +111,7 @@ export function DriveActionSheet({
           />
         </TouchableWithoutFeedback>
 
-        {/* Animated Sheet Container Matched to Gallery Tab */}
+        {}
         <TouchableWithoutFeedback>
           <Animated.View
             className="bg-[#F5F4F0] rounded-t-[32px] px-5 pt-3 shadow-2xl relative border-t border-black/[0.05]"
@@ -120,17 +120,17 @@ export function DriveActionSheet({
               paddingBottom: Math.max(insets.bottom, 24) + 24,
             }}
           >
-            {/* Top Handlebar */}
+            {}
             <View className="items-center mb-3.5">
               <View className="w-10 h-1 rounded-full bg-black/15" />
             </View>
 
-            {/* Header Title */}
+            {}
             <Text className="text-[18px] font-outfit-bold text-[#1C1C1E] mb-3 px-1">
               Add to Drive
             </Text>
 
-            {/* Action Items: 2 horizontal icon buttons in a single row */}
+            {}
             <View className="flex-row gap-3 mt-1 mb-2">
               {options.map((item) => (
                 <TouchableOpacity

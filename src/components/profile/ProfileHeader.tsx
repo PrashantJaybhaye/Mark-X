@@ -40,7 +40,6 @@ export function ProfileHeader({
     }
   }, [onBack, router]);
 
-  // Hardware back button support for Android
   useEffect(() => {
     const onBackPress = () => {
       handleBack();
@@ -63,7 +62,7 @@ export function ProfileHeader({
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
       >
         <View className="flex-row items-center justify-between min-h-[44px]">
-          {/* Left: Back button + Title in modern native mobile pattern */}
+          {}
           <View className="flex-row items-center flex-1 pr-2">
             <TouchableOpacity
               onPress={handleBack}
@@ -94,7 +93,7 @@ export function ProfileHeader({
             </View>
           </View>
 
-          {/* Right Action slot */}
+          {}
           {rightAction ? (
             <View className="items-end justify-center pl-2">
               {rightAction}

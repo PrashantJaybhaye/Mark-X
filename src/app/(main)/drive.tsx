@@ -6,7 +6,8 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { useFocusEffect, useRouter } from "expo-router";
 
-// Drive Components
+import * as FileSystem from "expo-file-system/legacy";
+
 import { DriveHeader, DriveTabType } from "../../components/drive/DriveHeader";
 import { DriveBreadcrumbs, FolderStackItem } from "../../components/drive/DriveBreadcrumbs";
 import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
@@ -16,25 +17,31 @@ import { DriveFileOptionsSheet } from "../../components/drive/DriveFileOptionsSh
 import { DriveFilePreviewScreen } from "../../components/drive/DriveFilePreviewScreen";
 import { UploadStatusToast } from "../../components/drive/UploadStatusToast";
 
-// Services & Helpers
 import { DriveItem, DriveFileCategory, getFileCategory } from "../../utils/driveFileTypes";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
+import { openInNativeApp } from "../../services/nativeFileOpenerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { loadDriveItems, saveDriveItems } from "../../services/storageService";
+import {
+  fetchDriveItemsFromServer,
+  saveDriveItemToServer,
+  deleteDriveItemFromServer,
+  subscribeToDriveServer,
+  uploadDriveFileToCloudflare,
+  exportDriveFile,
+  toggleDriveItemStarInServer,
+} from "../../services/driveFirebaseService";
 
 export default function DriveScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Header state
   const [activeTab, setActiveTab] = useState<DriveTabType>("drive");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
 
-  // Files state initialized from storage
   const [files, setFiles] = useState<DriveItem[]>([]);
 
-  // Folder navigation hierarchy state
   const [folderStack, setFolderStack] = useState<FolderStackItem[]>([
     { id: null, name: "Drive" },
   ]);
@@ -49,7 +56,6 @@ export default function DriveScreen() {
     }, [])
   );
 
-  // Hardware Back Button handler for Android subfolder navigation
   useEffect(() => {
     const onBackPress = () => {
       if (folderStack.length > 1) {
@@ -65,17 +71,29 @@ export default function DriveScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    // Clear initial dummy data and start with clean real stored items
+
     loadDriveItems().then((stored) => {
       if (isMounted) {
-        // Filter out old test items if any exist
         const realItems = (stored || []).filter((item) => !item.id.startsWith("test-"));
         setFiles(realItems);
-        saveDriveItems(realItems);
       }
     });
+
+    fetchDriveItemsFromServer().then((serverItems) => {
+      if (isMounted && serverItems && serverItems.length > 0) {
+        setFiles(serverItems);
+      }
+    });
+
+    const unsubscribe = subscribeToDriveServer((updatedItems) => {
+      if (isMounted && updatedItems) {
+        setFiles(updatedItems);
+      }
+    });
+
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -87,24 +105,19 @@ export default function DriveScreen() {
     });
   };
 
-  // Screen state
   const [search, setSearch] = useState("");
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
 
-  // Selected item modal states
   const [selectedFileForOptions, setSelectedFileForOptions] = useState<DriveItem | null>(null);
   const [selectedFileForPreview, setSelectedFileForPreview] = useState<DriveItem | null>(null);
 
-  // Toast status state
   const [isToastOpen, setIsToastOpen] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [fileCategory, setFileCategory] = useState<DriveFileCategory>("document");
   const [toastDetail, setToastDetail] = useState("");
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const triggerToast = (name: string, category: DriveFileCategory, detail: string) => {
+  const triggerToast = (name: string, _category: any, detail: string) => {
     setFileName(name);
-    setFileCategory(category);
     setToastDetail(detail);
     setIsToastOpen(true);
 
@@ -120,12 +133,19 @@ export default function DriveScreen() {
 
   const generateUniqueId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  // Navigation handlers
   const handleItemPress = (item: DriveItem) => {
     if (item.isFolder) {
       setFolderStack((prev) => [...prev, { id: item.id, name: item.name }]);
-    } else {
+      return;
+    }
+
+    const isPdf = item.category === "pdf" || item.name.toLowerCase().endsWith(".pdf");
+    const isImage = item.category === "image";
+
+    if (isPdf || isImage) {
       setSelectedFileForPreview(item);
+    } else {
+      openInNativeApp(item);
     }
   };
 
@@ -139,8 +159,6 @@ export default function DriveScreen() {
     setFolderStack((prev) => prev.slice(0, index + 1));
   };
 
-  // Filter items based on active tab ("drive" = documents & folders, "folders" = only folders)
-  // Strict Limitation: Images & videos belong in Gallery tab, not Drive.
   const displayedFiles = useMemo(() => {
     const nonMediaFiles = files.filter(
       (f) => f.isFolder || (f.category !== "image" && f.category !== "video")
@@ -151,33 +169,75 @@ export default function DriveScreen() {
     return nonMediaFiles;
   }, [files, activeTab]);
 
-  // Current folder files count
   const currentFolderFilesCount = displayedFiles.filter((f) => {
     if (!currentFolderId) return !f.parentId;
     return f.parentId === currentFolderId;
   }).length;
 
-  // Action handlers - add picked/created files to current folder and persist
   const handleUploadFile = async () => {
     const file = await safePickDocument();
     if (file) {
       const category = getFileCategory(file.name, file.mimeType);
 
-      // Strictly block image & video files silently without showing any toast message
       if (category === "image" || category === "video") return;
+
+      let permanentUri = file.uri;
+      if (FileSystem.documentDirectory && file.uri.startsWith("file://")) {
+        try {
+          const safeName = `drive_${Date.now()}_${(file.name || "document").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+          const destUri = `${FileSystem.documentDirectory}${safeName}`;
+          await FileSystem.copyAsync({ from: file.uri, to: destUri });
+          permanentUri = destUri;
+        } catch (copyErr) {
+          console.warn("[Drive] Failed to copy to permanent storage, using original uri:", copyErr);
+        }
+      }
 
       const newItem: DriveItem = {
         id: generateUniqueId(),
         name: file.name || "Uploaded Document",
         category,
         size: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB",
-        updatedAt: "Just now",
-        uri: file.uri,
+        updatedAt: String(Date.now()),
+        uri: permanentUri,
         mimeType: file.mimeType,
         parentId: currentFolderId,
+        createdAt: Date.now(),
+        uploading: true,
       };
+
       updateFilesAndPersist((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category, "Saved to Drive");
+      triggerToast(newItem.name, category, "Uploading to Cloud Storage...");
+
+      saveDriveItemToServer(newItem).catch((err) =>
+        console.warn("[Drive] Firebase metadata write error:", err)
+      );
+
+      uploadDriveFileToCloudflare(newItem)
+        .then((cfRes) => {
+          if (cfRes.success && cfRes.url) {
+            updateFilesAndPersist((prev) =>
+              prev.map((f) =>
+                f.id === newItem.id
+                  ? { ...f, cloudflareUrl: cfRes.url, cloudflareKey: cfRes.key, uploading: false }
+                  : f
+              )
+            );
+            triggerToast(newItem.name, category, "Saved to Cloud Storage");
+          } else {
+            console.warn("[Drive] Cloudflare upload error:", cfRes.error);
+            updateFilesAndPersist((prev) =>
+              prev.map((f) => (f.id === newItem.id ? { ...f, uploading: false } : f))
+            );
+            triggerToast(newItem.name, category, "Saved locally");
+          }
+        })
+        .catch((err) => {
+          console.warn("[Drive] Cloudflare upload error:", err);
+          updateFilesAndPersist((prev) =>
+            prev.map((f) => (f.id === newItem.id ? { ...f, uploading: false } : f))
+          );
+        });
     }
   };
 
@@ -190,24 +250,59 @@ export default function DriveScreen() {
       id: generateUniqueId(),
       name: `New Folder ${currentFolderSiblings + 1}`,
       category: "folder",
-      updatedAt: "Just now",
+      updatedAt: String(Date.now()),
       isFolder: true,
       parentId: currentFolderId,
+      createdAt: Date.now(),
     };
+
     updateFilesAndPersist((prev) => [newFolder, ...prev]);
-    triggerToast(newFolder.name, "folder", "Folder created • Saved locally");
+    saveDriveItemToServer(newFolder).catch((err) =>
+      console.warn("[Drive] Firebase folder creation error:", err)
+    );
+    triggerToast(newFolder.name, "folder", "Folder created");
   };
 
-  // Item Options Handlers
+  const handleToggleStar = (item: DriveItem) => {
+    const nextStarred = !item.starred;
+    updateFilesAndPersist((prev) =>
+      prev.map((f) =>
+        f.id === item.id ? { ...f, starred: nextStarred, updatedAt: String(Date.now()) } : f
+      )
+    );
+    toggleDriveItemStarInServer(item.id, nextStarred).catch((err) =>
+      console.warn("[Drive] Toggle star server error:", err)
+    );
+    triggerToast(
+      item.name,
+      item.category,
+      nextStarred ? "Added to Starred" : "Removed from Starred"
+    );
+  };
+
   const handleRenameFile = (id: string, newName: string) => {
     updateFilesAndPersist((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, name: newName, updatedAt: "Edited just now" } : f))
+      prev.map((f) => {
+        if (f.id === id) {
+          const updated = { ...f, name: newName, updatedAt: String(Date.now()) };
+          saveDriveItemToServer(updated).catch((err) =>
+            console.warn("[Drive] Firebase rename sync error:", err)
+          );
+          return updated;
+        }
+        return f;
+      })
     );
-    triggerToast(`Renamed to "${newName}"`, "document", "Name updated");
+    triggerToast(`Renamed to "${newName}"`, "document", "Name updated & synced");
   };
 
   const handleDeleteFile = (id: string) => {
     const fileToDelete = files.find((f) => f.id === id);
+
+    deleteDriveItemFromServer(id, files).catch((err) =>
+      console.warn("[Drive] Firebase delete error:", err)
+    );
+
     updateFilesAndPersist((prev) => {
       const idsToDelete = new Set<string>([id]);
       if (fileToDelete?.isFolder) {
@@ -225,19 +320,19 @@ export default function DriveScreen() {
       return prev.filter((f) => !idsToDelete.has(f.id));
     });
     if (fileToDelete) {
-      triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive");
+      triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive & Cloud");
     }
   };
 
   const handleShareFile = async (item: DriveItem) => {
-    try {
-      await Share.share({
-        title: item.name,
-        message: item.uri ? `${item.name}\n${item.uri}` : `Mark-X File: ${item.name}`,
-        url: item.uri,
-      });
-    } catch {
-      triggerToast(`Shared "${item.name}"`, item.category, "Ready to share");
+    if (item.isFolder) {
+      triggerToast("Cannot Export", "folder", "Folders cannot be exported as a single file");
+      return;
+    }
+    triggerToast(`Exporting "${item.name}"...`, item.category, "Preparing file attachment");
+    const result = await exportDriveFile(item);
+    if (!result.success && result.error) {
+      triggerToast("Export Failed", item.category, result.error);
     }
   };
 
@@ -245,7 +340,7 @@ export default function DriveScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* 1. Drive Header with Search, Drive / Folders Tabs, Sort & Layout Controls */}
+      {}
       <DriveHeader
         search={search}
         onSearchChange={setSearch}
@@ -258,7 +353,7 @@ export default function DriveScreen() {
         topInset={insets.top}
       />
 
-      {/* 2. Folder Navigation Breadcrumbs (Shown only inside subfolders) */}
+      {}
       {folderStack.length > 1 && (
         <DriveBreadcrumbs
           folderStack={folderStack}
@@ -268,7 +363,7 @@ export default function DriveScreen() {
         />
       )}
 
-      {/* 3. Content Area - Virtualized File List / Grid or Empty State */}
+      {}
       {displayedFiles.length > 0 || folderStack.length > 1 ? (
         <DriveFileList
           files={displayedFiles}
@@ -292,7 +387,7 @@ export default function DriveScreen() {
         </ScrollView>
       )}
 
-      {/* 4. Google Drive Material You 4-Color Action FAB */}
+      {}
       <View
         style={{
           position: "absolute",
@@ -310,7 +405,7 @@ export default function DriveScreen() {
           }}
           className="w-16 h-16 rounded-full bg-white items-center justify-center border border-[#E0E4EC] shadow-xl shadow-black/20"
         >
-          {/* Authentic Google 4-Color Plus Icon */}
+          {}
           <Svg width={36} height={36} viewBox="0 0 36 36">
             <Path fill="#EA4335" d="M16 8h4v8h-4z" />
             <Path fill="#4285F4" d="M20 16h8v4h-8z" />
@@ -321,17 +416,16 @@ export default function DriveScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 5. Status Notification Toast Banner - Touched directly to top of bottom tab bar */}
+      {}
       <UploadStatusToast
         visible={isToastOpen}
         fileName={fileName}
-        category={fileCategory}
         detail={toastDetail}
         onClose={() => setIsToastOpen(false)}
         bottomInset={0}
       />
 
-      {/* 6. Add Action Sheet */}
+      {}
       <DriveActionSheet
         visible={isActionSheetOpen}
         onClose={() => setIsActionSheetOpen(false)}
@@ -339,24 +433,27 @@ export default function DriveScreen() {
         onCreateFolder={handleCreateFolder}
       />
 
-      {/* 7. File 3-Dots Options Action Sheet */}
+      {}
       <DriveFileOptionsSheet
         visible={!!selectedFileForOptions}
         item={selectedFileForOptions}
+        allItems={files}
         onClose={() => setSelectedFileForOptions(null)}
         onDelete={handleDeleteFile}
         onRename={handleRenameFile}
         onShare={handleShareFile}
+        onToggleStar={handleToggleStar}
       />
 
-      {/* 8. File Details & Image Preview Modal */}
+      {}
       <DriveFilePreviewScreen
         visible={!!selectedFileForPreview}
         item={selectedFileForPreview}
+        allItems={files}
         onClose={() => setSelectedFileForPreview(null)}
-        onOptionsPress={(item) => {
-          setSelectedFileForOptions(item);
-        }}
+        onDelete={handleDeleteFile}
+        onRename={handleRenameFile}
+        onToggleStar={handleToggleStar}
       />
     </View>
   );

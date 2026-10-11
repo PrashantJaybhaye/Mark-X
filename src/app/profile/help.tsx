@@ -163,7 +163,7 @@ export default function HelpScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Unified Header matching About & Terms */}
+      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
@@ -199,7 +199,7 @@ export default function HelpScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* Opal Headline Header adapted to Mark-X theme */}
+        {}
         <View className="mt-1 mb-7">
           <Text
             className="text-[32px] text-[#111111] tracking-tight leading-[38px]"
@@ -209,7 +209,7 @@ export default function HelpScreen() {
           </Text>
         </View>
 
-        {/* FAQS Section */}
+        {}
         <Text
           className="text-[12px] text-[#71717A] uppercase tracking-wider mb-2.5 px-1"
           style={{ fontFamily: "Outfit_600SemiBold" }}
@@ -244,7 +244,7 @@ export default function HelpScreen() {
           ))}
         </View>
 
-        {/* BROWSE TOPICS Section */}
+        {}
         <Text
           className="text-[12px] text-[#71717A] uppercase tracking-wider mb-2.5 px-1"
           style={{ fontFamily: "Outfit_600SemiBold" }}
@@ -279,7 +279,7 @@ export default function HelpScreen() {
           ))}
         </View>
 
-        {/* Still need help? Section */}
+        {}
         <View className="mb-6">
           <Text
             className="text-[22px] text-[#111111] mb-1.5"
@@ -295,7 +295,7 @@ export default function HelpScreen() {
           </Text>
         </View>
 
-        {/* Contact us Blue Pill Button */}
+        {}
         <TouchableOpacity
           onPress={handleContactSupport}
           activeOpacity={0.8}

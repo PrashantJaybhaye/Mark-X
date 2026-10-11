@@ -12,3 +12,5 @@ export * from "./nativePickerService";
 export * from "./notesSyncService";
 export * from "./storageService";
 export * from "./userService";
+export * from "./nativeFileOpenerService";
+export * from "./driveFirebaseService";

@@ -57,9 +57,9 @@ export function NotesHeader({
 
   return (
     <View className="w-full">
-      {/* Top Header Bar */}
+      {}
       <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
-        {/* Left: Notes Title in Extreme Bold */}
+        {}
         <View className="justify-center">
           <Text
             allowFontScaling={false}
@@ -70,9 +70,9 @@ export function NotesHeader({
           </Text>
         </View>
 
-        {/* Right Actions: Neutral Pill */}
+        {}
         <View className="flex-row items-center bg-[#F0F0F0] border border-black/[0.06] rounded-full px-4 py-2 gap-4">
-          {/* Search Toggle */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleToggleSearch}
@@ -85,7 +85,7 @@ export function NotesHeader({
             />
           </TouchableOpacity>
 
-          {/* Grid / List Layout Switcher */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleViewModePress}
@@ -98,7 +98,7 @@ export function NotesHeader({
             />
           </TouchableOpacity>
 
-          {/* Add Note Action */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleAddPress}
@@ -109,7 +109,7 @@ export function NotesHeader({
         </View>
       </View>
 
-      {/* Expandable Search Bar */}
+      {}
       {isSearchActive && (
         <View className="px-5 pt-1 pb-3">
           <View className="flex-row items-center bg-[#F0F0F0] border border-black/[0.06] rounded-full px-4 h-[46px]">

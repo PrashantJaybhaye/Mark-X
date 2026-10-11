@@ -17,15 +17,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
   withSpring,
   withTiming,
   withSequence,
   runOnJS
 } from "react-native-reanimated";
-
 
 import { useAuth } from "../../context/AuthContext";
 import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/galleryFirebaseService";
@@ -41,8 +40,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
   const [cameraPosition, setCameraPosition] = useState<"back" | "front">("back");
   const { hasPermission, requestPermission } = useCameraPermission();
   const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
-  
-  // Vision Camera: Pick the best default camera device for requested facing direction
+
   const device = useCameraDevice(cameraPosition);
 
   const [isRecording, setIsRecording] = useState(false);
@@ -55,7 +53,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // AppState & Camera Lifecycle management
   const [appIsActive, setAppIsActive] = useState(true);
 
   useEffect(() => {
@@ -75,8 +72,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
 
   const cameraRef = useRef<any>(null);
   const recorderRef = useRef<any>(null);
-  
-  // Configure high-resolution photo capture (uncompressed quality) & video output
+
   const photoOutput = usePhotoOutput({
     targetResolution: CommonResolutions.HIGHEST_4_3,
     quality: 1.0,
@@ -85,14 +81,13 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     targetResolution: CommonResolutions.FHD_16_9,
     enableAudio: true,
   });
-  
+
   const { user } = useAuth();
-  
-  // Reanimated values for shutter interaction & focus
+
   const outerScale = useSharedValue(1);
   const innerScale = useSharedValue(1);
   const ringBorderWidth = useSharedValue(6);
-  const isVideoMode = useSharedValue(0); 
+  const isVideoMode = useSharedValue(0);
   const screenFlash = useSharedValue(0);
   const focusScale = useSharedValue(1.3);
   const focusOpacity = useSharedValue(0);
@@ -135,7 +130,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         await cameraRef.current.focus({ x, y });
       }
     } catch (err) {
-      // Focus not supported on this specific device/emulator
     }
   };
 
@@ -201,7 +195,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         )
       );
     } catch (err) {
-      // ignore
     }
   };
 
@@ -211,7 +204,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     const timestampNow = Date.now();
     const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
     const newPinId = `pin-${timestampNow}`;
-    
+
     const actualWidth = media.width || 1080;
     const actualHeight = media.height || 1920;
     const calculatedRatio = aspectRatio === "full"
@@ -344,7 +337,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
           setPendingMedia(cropped);
           setPreviewUri(cropped.uri);
           photo.dispose();
-          // Only clean up raw temp file if cropping generated a separate new file
           if (cropped.uri !== rawUri) {
             deleteTempFile(rawUri);
           }
@@ -373,10 +365,10 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
       await recorder.startRecording(
         (filePath: string) => {
           resetAnimations();
-          handleMediaCaptured({ 
-            uri: `file://${filePath}`, 
-            width: 1080, 
-            height: 1920 
+          handleMediaCaptured({
+            uri: `file://${filePath}`,
+            width: 1080,
+            height: 1920
           }, "video");
         },
         (error: any) => {
@@ -391,7 +383,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     if (isRecording && recorderRef.current) {
       await recorderRef.current.stopRecording();
       recorderRef.current = null;
-      // resetAnimations is called in onRecordingFinished
     }
   };
 
@@ -488,28 +479,28 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         <StatusBar style="light" />
 
         <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: 'black' }}>
-          {/* Main Content Area (Rounded Photo Card with Black Background) */}
+          {}
           <View className="flex-1 w-full px-3 pt-1 pb-3">
-            <View 
+            <View
               className="flex-1 w-full rounded-[28px] overflow-hidden relative bg-black items-center justify-center border border-white/10"
             >
               <View style={cameraContainerStyle}>
                 <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               </View>
 
-              {/* Top Bar on Image Card */}
+              {}
               <View className="w-full flex-row justify-between items-center px-5 pt-4 absolute top-0 left-0 right-0 z-20" pointerEvents="box-none">
-                <TouchableOpacity 
-                  onPress={handleRetake} 
-                  activeOpacity={0.7} 
+                <TouchableOpacity
+                  onPress={handleRetake}
+                  activeOpacity={0.7}
                   className="w-10 h-10 bg-black/50 rounded-full items-center justify-center backdrop-blur-md border border-white/10"
                   hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
                 >
                   <Ionicons name="chevron-back" size={24} color="white" />
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                  activeOpacity={0.7} 
+                <TouchableOpacity
+                  activeOpacity={0.7}
                   className="w-10 h-10 bg-black/50 rounded-full items-center justify-center backdrop-blur-md border border-white/10"
                 >
                   <Ionicons name="ellipsis-horizontal" size={22} color="white" />
@@ -518,23 +509,23 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             </View>
           </View>
 
-          {/* Bottom Control Bar Below Photo Card */}
+          {}
           <View className="w-full px-6 py-3 flex-row items-center justify-between bg-black">
-            {/* Left Dark Button: Retake */}
-            <TouchableOpacity 
-              onPress={handleRetake} 
+            {}
+            <TouchableOpacity
+              onPress={handleRetake}
               disabled={isSaving}
-              activeOpacity={0.75} 
+              activeOpacity={0.75}
               className={`bg-[#222222] px-7 py-3 rounded-full items-center justify-center ${isSaving ? "opacity-40" : ""}`}
             >
               <Text className="text-white font-outfit-bold text-base">Retake</Text>
             </TouchableOpacity>
 
-            {/* Right White Button: Use Photo > */}
-            <TouchableOpacity 
-              onPress={handleUsePhoto} 
+            {}
+            <TouchableOpacity
+              onPress={handleUsePhoto}
               disabled={isSaving}
-              activeOpacity={0.8} 
+              activeOpacity={0.8}
               className={`bg-white px-7 py-3 rounded-full flex-row items-center gap-2 shadow-lg ${isSaving ? "opacity-90" : ""}`}
             >
               {isSaving ? (
@@ -552,7 +543,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
           </View>
         </SafeAreaView>
 
-        {/* iOS-Styled Confirmation Dialog Modal */}
+        {}
         <Modal
           transparent
           visible={showDiscardDialog}
@@ -568,7 +559,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
               activeOpacity={1}
               className="w-full max-w-[280px] bg-[#252525] rounded-[18px] overflow-hidden border border-white/10 shadow-2xl"
             >
-              {/* Header */}
+              {}
               <View className="pt-5 pb-4 px-5 items-center">
                 <Text className="text-white font-outfit-bold text-lg text-center mb-1">
                   Unsaved Photo
@@ -578,9 +569,9 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                 </Text>
               </View>
 
-              {/* iOS Style Action List */}
+              {}
               <View className="border-t border-white/10">
-                {/* Save Photo */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
@@ -594,7 +585,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Discard Photo */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleDiscardDirect}
@@ -605,7 +596,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                   </Text>
                 </TouchableOpacity>
 
-                {/* Cancel */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setShowDiscardDialog(false)}
@@ -627,7 +618,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'black' }}>
       <StatusBar style="light" />
 
-      {/* Main Camera Feed */}
+      {}
       <View style={{ flex: 1, width: "100%", position: "relative", backgroundColor: "black", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
         <GestureDetector gesture={cameraTapGesture}>
           <View style={cameraContainerStyle}>
@@ -642,7 +633,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
               outputs={[photoOutput]}
               onError={(error) => {
                 if (
-                  error?.message?.includes("OperationCanceledException") || 
+                  error?.message?.includes("OperationCanceledException") ||
                   error?.message?.includes("not active") ||
                   error?.message?.includes("No flash unit") ||
                   error?.message?.includes("IllegalStateException")
@@ -672,14 +663,14 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
           </View>
         </GestureDetector>
 
-        <Animated.View 
-          style={[StyleSheet.absoluteFill, flashAnimatedStyle, { backgroundColor: 'white', zIndex: 50 }]} 
-          pointerEvents="none" 
+        <Animated.View
+          style={[StyleSheet.absoluteFill, flashAnimatedStyle, { backgroundColor: 'white', zIndex: 50 }]}
+          pointerEvents="none"
         />
 
-        {/* Overlay Controls */}
+        {}
         <SafeAreaView edges={["top"]} style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          {/* Top Icons */}
+          {}
           <View className="w-full flex-row justify-between items-center px-6 pt-4" pointerEvents="box-none">
             <TouchableOpacity onPress={onClose} activeOpacity={0.7} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Ionicons name="close" size={32} color="white" />
@@ -688,40 +679,40 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             <View className="flex-row items-center gap-5">
               {cameraPosition === "back" && (
                 <TouchableOpacity onPress={toggleFlash} activeOpacity={0.7} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
-                  <Ionicons 
-                    name={getFlashIcon()} 
-                    size={24} 
-                    color={flash === "on" ? "#EAB308" : "white"} 
+                  <Ionicons
+                    name={getFlashIcon()}
+                    size={24}
+                    color={flash === "on" ? "#EAB308" : "white"}
                   />
                 </TouchableOpacity>
               )}
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={toggleAspectRatio}
                 activeOpacity={0.7}
                 hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
               >
-                <Ionicons 
-                  name={aspectRatio === "1:1" ? "square-outline" : aspectRatio === "16:9" ? "crop-outline" : "scan-outline"} 
-                  size={24} 
-                  color={aspectRatio !== "full" ? "#EAB308" : "white"} 
+                <Ionicons
+                  name={aspectRatio === "1:1" ? "square-outline" : aspectRatio === "16:9" ? "crop-outline" : "scan-outline"}
+                  size={24}
+                  color={aspectRatio !== "full" ? "#EAB308" : "white"}
                 />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Bottom Icons (over camera feed) */}
+          {}
           <View className="absolute bottom-6 w-full flex-row justify-between items-center px-10" pointerEvents="box-none">
             <TouchableOpacity activeOpacity={0.7}>
               <Ionicons name="images" size={30} color="white" />
             </TouchableOpacity>
 
             <GestureDetector gesture={composedGestures}>
-              <Animated.View 
+              <Animated.View
                 style={outerAnimatedStyle}
                 className="w-[78px] h-[78px] rounded-full border-[3.5px] border-white items-center justify-center bg-transparent p-[3px]"
               >
-                <Animated.View 
+                <Animated.View
                   style={innerAnimatedStyle}
                   className="w-full h-full rounded-full bg-white"
                 />
@@ -735,7 +726,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         </SafeAreaView>
       </View>
 
-      {/* Bottom SafeArea Bar */}
+      {}
       <SafeAreaView edges={["bottom"]} className="bg-black">
         <View className="w-full py-6 items-center justify-center">
           <Text className="text-white text-[13px]">Tap for photo</Text>

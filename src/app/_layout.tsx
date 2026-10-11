@@ -24,9 +24,8 @@ import { AuthProvider, useAuth } from "../context/AuthContext";
 import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
 import { AnimatedSplashScreen } from "../components/splash/AnimatedSplashScreen";
-import "../services/BackgroundUploadService"; // Register foreground service
+import "../services/BackgroundUploadService";
 
-// Keep native splash screen visible until custom splash is ready to animate
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 interface NavigationGuardProps {
@@ -107,9 +106,6 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
     return null;
   }
 
-  // isAppReady becomes true once:
-  // 1. Fonts have loaded (or failed gracefully)
-  // 2. NavigationGuard has resolved the auth state and routed the user
   const isAppReady = isDecisionComplete;
 
   return (
@@ -124,13 +120,13 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           <Stack.Screen name="profile" />
           <Stack.Screen name="note" />
           <Stack.Screen name="gallery" />
-          <Stack.Screen 
-            name="camera" 
-            options={{ 
-              presentation: 'fullScreenModal', 
+          <Stack.Screen
+            name="camera"
+            options={{
+              presentation: 'fullScreenModal',
               animation: 'ios_from_right',
               headerShown: false,
-            }} 
+            }}
           />
         </Stack>
         <BiometricLockGate />

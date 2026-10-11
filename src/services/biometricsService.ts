@@ -16,9 +16,6 @@ export interface BiometricAuthResult {
   cancelled?: boolean;
 }
 
-/**
- * Inspects device hardware and enrolled biometric security status.
- */
 export async function checkBiometricsCapability(): Promise<BiometricCapability> {
   try {
     if (Platform.OS === "web") {
@@ -97,9 +94,6 @@ export async function checkBiometricsCapability(): Promise<BiometricCapability> 
   }
 }
 
-/**
- * Triggers native system biometric prompt (Touch ID, Face ID, Android BiometricPrompt).
- */
 export async function authenticateWithBiometrics(options?: {
   promptMessage?: string;
   cancelLabel?: string;
@@ -156,9 +150,6 @@ export async function authenticateWithBiometrics(options?: {
   }
 }
 
-/**
- * Cancels active authentication prompt if running on Android.
- */
 export async function cancelBiometrics(): Promise<void> {
   try {
     if (Platform.OS === "android") {
@@ -169,9 +160,6 @@ export async function cancelBiometrics(): Promise<void> {
   }
 }
 
-/**
- * Global flag to temporarily bypass biometric lock (e.g. when opening an image picker)
- */
 export let isSystemBypassActive = false;
 
 export function setSystemBypassActive(active: boolean) {

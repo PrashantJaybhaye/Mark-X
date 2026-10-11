@@ -48,7 +48,6 @@ export function BiometricLockGate() {
     }
   }, [unlockApp]);
 
-  // Prompt biometrics once per lock session
   useEffect(() => {
     if (isLocked) {
       if (!hasAutoPromptedRef.current) {
@@ -97,7 +96,7 @@ export function BiometricLockGate() {
       >
           <StatusBar style="dark" />
 
-          {/* Floating White Sheet */}
+          {}
           <View
             style={{
               flex: 1,
@@ -112,7 +111,7 @@ export function BiometricLockGate() {
               elevation: 10,
             }}
           >
-            {/* Mark-X Brand Header */}
+            {}
             <View
               style={{
                 width: "100%",
@@ -125,7 +124,7 @@ export function BiometricLockGate() {
               <MarkXLogo width={145} height={19} color="#111111" />
             </View>
 
-            {/* Biometric Center Hero */}
+            {}
             <View className="flex-1 items-center justify-center px-6">
               <View className="items-center -mt-8">
                 <TouchableOpacity
@@ -154,7 +153,7 @@ export function BiometricLockGate() {
             </View>
           </View>
 
-          {/* Bottom Navigation Dock */}
+          {}
           <View
             style={{
               paddingTop: 18,
@@ -164,7 +163,7 @@ export function BiometricLockGate() {
               justifyContent: "center",
             }}
           >
-            {/* Primary Unlock Action */}
+            {}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleUnlock}
@@ -189,7 +188,7 @@ export function BiometricLockGate() {
               </Text>
             </TouchableOpacity>
 
-            {/* Emergency Access Button */}
+            {}
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={handleEmergencyAccess}
@@ -209,7 +208,7 @@ export function BiometricLockGate() {
           </View>
       </View>
 
-      {/* Center iOS Alert Dialog */}
+      {}
       <IosDialog
         visible={isEmergencyModalVisible}
         title="Emergency Access"

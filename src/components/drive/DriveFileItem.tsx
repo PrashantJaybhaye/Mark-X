@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { DriveItem } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 import { FileCategoryIcon } from "./FileCategoryIcon";
+import { formatDriveTimestamp } from "../../services/driveFirebaseService";
 
 interface DriveFileItemProps {
   item: DriveItem;
@@ -31,7 +32,6 @@ function DriveFileItemComponent({
     onOptionsPress?.(item);
   }, [item, onOptionsPress]);
 
-  // ==================== GRID VIEW MODE ====================
   if (viewMode === "grid") {
     if (item.isFolder) {
       return (
@@ -41,8 +41,8 @@ function DriveFileItemComponent({
             onPress={handleRowPress}
             className="flex-1 items-center justify-center pt-2"
           >
-            <View className="w-16 h-16 rounded-2xl bg-[#F1F3F4] items-center justify-center">
-              <FileCategoryIcon category="folder" size={38} />
+            <View className="w-16 h-16 rounded-2xl bg-[#F8F9FA] items-center justify-center">
+              <FileCategoryIcon category="folder" size={42} fileName={item.name} />
             </View>
           </TouchableOpacity>
 
@@ -67,11 +67,11 @@ function DriveFileItemComponent({
 
     return (
       <View className="flex-1 m-1.5 bg-white border border-[#EBECEF] rounded-2xl overflow-hidden h-[145px] shadow-xs">
-        {/* Upper Preview Thumbnail Box */}
+        {}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleRowPress}
-          className="h-[95px] bg-[#F1F3F4] items-center justify-center overflow-hidden relative"
+          className="h-[95px] bg-[#F8F9FA] items-center justify-center overflow-hidden relative"
         >
           {item.category === "image" && item.uri ? (
             <Image
@@ -82,16 +82,16 @@ function DriveFileItemComponent({
               recyclingKey={item.id}
             />
           ) : (
-            <View className="w-12 h-12 rounded-xl bg-[#F1F3F4] items-center justify-center">
-              <FileCategoryIcon category={item.category} size={28} id={item.id} />
+            <View className="w-14 h-14 items-center justify-center">
+              <FileCategoryIcon category={item.category} size={36} id={item.id} fileName={item.name} />
             </View>
           )}
         </TouchableOpacity>
 
-        {/* Lower Info Bar */}
+        {}
         <View className="flex-row items-center justify-between px-2.5 py-2 bg-white flex-1 border-t border-[#F0F2F5]">
           <View className="flex-row items-center flex-1 mr-1">
-            <FileCategoryIcon category={item.category} size={15} id={item.id} />
+            <FileCategoryIcon category={item.category} size={18} id={item.id} fileName={item.name} />
             <Text
               className="text-[12px] font-outfit-semibold text-[#1F1F1F] flex-1 ml-1.5"
               numberOfLines={1}
@@ -112,7 +112,6 @@ function DriveFileItemComponent({
     );
   }
 
-  // ==================== LIST VIEW MODE ====================
   const itemCountText =
     item.isFolder && childCount !== undefined
       ? `${childCount} ${childCount === 1 ? "item" : "items"}`
@@ -125,24 +124,25 @@ function DriveFileItemComponent({
         onPress={handleRowPress}
         className="flex-1 flex-row items-center pr-2"
       >
-        {/* Category Icon / Thumbnail */}
-        <View className="w-9 h-9 items-center justify-center mr-3.5">
+        {}
+        <View className="w-10 h-10 items-center justify-center mr-3.5">
           <FileCategoryIcon
             category={item.isFolder ? "folder" : item.category}
-            size={26}
+            size={32}
             uri={item.uri}
             id={item.id}
+            fileName={item.name}
           />
         </View>
 
-        {/* File / Folder Metadata */}
+        {}
         <View className="flex-1">
           <Text className="text-[15px] font-outfit-medium text-[#1F1F1F]" numberOfLines={1}>
             {item.name}
           </Text>
           <View className="flex-row items-center mt-0.5">
             {item.starred && (
-              <Ionicons name="star" size={13} color="#5F6368" style={{ marginRight: 4 }} />
+              <Ionicons name="star" size={13} color="#FFB800" style={{ marginRight: 4 }} />
             )}
             {item.sharedBy && (
               <Ionicons name="people" size={13} color="#5F6368" style={{ marginRight: 4 }} />
@@ -154,17 +154,13 @@ function DriveFileItemComponent({
               </>
             )}
             <Text className="text-[12px] font-outfit text-[#5F6368]" numberOfLines={1}>
-              {item.updatedAt.includes("opened") ||
-              item.updatedAt.includes("modified") ||
-              item.updatedAt.includes("edited")
-                ? item.updatedAt
-                : `You opened • ${item.updatedAt}`}
+              {`You opened • ${formatDriveTimestamp(item.updatedAt)}`}
             </Text>
           </View>
         </View>
       </TouchableOpacity>
 
-      {/* Options 3-Dots Button */}
+      {}
       <TouchableOpacity
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         onPress={handleOptions}

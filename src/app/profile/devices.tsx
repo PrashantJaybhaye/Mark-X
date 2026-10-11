@@ -27,10 +27,6 @@ import {
   syncCurrentDevice,
 } from "../../services/deviceSyncService";
 
-
-/**
- * Renders an active device row (icon badge, name, platform, and right action/status).
- */
 interface DeviceRowProps {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -78,9 +74,6 @@ function DeviceRow({
   );
 }
 
-/**
- * Standard Mark-X profile key-value specification row.
- */
 function SpecRow({
   label,
   description,
@@ -123,9 +116,6 @@ function SpecRow({
   );
 }
 
-
-
-
 function getDeviceIcon(type: string): keyof typeof Ionicons.glyphMap {
   switch (type) {
     case "tablet":
@@ -138,7 +128,6 @@ function getDeviceIcon(type: string): keyof typeof Ionicons.glyphMap {
       return "phone-portrait-outline";
   }
 }
-
 
 export default function DevicesScreen() {
   const router = useRouter();
@@ -165,7 +154,6 @@ export default function DevicesScreen() {
     [hardwareInfo]
   );
 
-  // Focus effect: Sync heartbeat, resolve device ID & subscribe to real-time active devices whenever focused
   useFocusEffect(
     React.useCallback(() => {
       let isMounted = true;
@@ -233,7 +221,6 @@ export default function DevicesScreen() {
     setLogoutTarget(null);
     triggerHaptic();
 
-    // Optimistically update list immediately for instant UI feedback
     setAllDevices((prev) => prev.filter((d) => d.deviceId !== target.deviceId));
 
     try {
@@ -243,7 +230,6 @@ export default function DevicesScreen() {
     }
   };
 
-  // Declarative hardware specifications data
   const hardwareSpecs = [
     { label: "Model", description: "Hardware model identifier", value: hardwareInfo.modelName },
     { label: "Manufacturer", description: "Device maker & branding", value: hardwareInfo.brand },
@@ -256,7 +242,7 @@ export default function DevicesScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Top Navigation Bar */}
+      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#EBEBEB]"
@@ -304,7 +290,7 @@ export default function DevicesScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* ================= CURRENT DEVICE ================= */}
+        {}
         <DeviceRow
           icon={getDeviceIcon(hardwareInfo.deviceType)}
           title={deviceLabel}
@@ -329,7 +315,7 @@ export default function DevicesScreen() {
 
         <View className="h-5" />
 
-        {/* ================= OTHER ACTIVE DEVICES ================= */}
+        {}
         <View className="mb-6">
           <View className="flex-row items-center justify-between mb-1">
             <Text
@@ -402,7 +388,7 @@ export default function DevicesScreen() {
           )}
         </View>
 
-        {/* ================= HARDWARE SPECIFICATIONS ================= */}
+        {}
         <View className="mb-6">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -423,7 +409,7 @@ export default function DevicesScreen() {
         </View>
       </ScrollView>
 
-      {/* iOS Confirmation Dialog */}
+      {}
       <IosDialog
         visible={logoutTarget !== null}
         title="Log Out Device"

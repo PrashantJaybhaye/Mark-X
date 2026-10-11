@@ -101,7 +101,6 @@ export default function ProfileScreen() {
 
       return () => {
         setIsFocused(false);
-        // ALWAYS restore to dark status bar when leaving Profile tab
         setStatusBarStyle("dark");
         if (Platform.OS === "android") {
           RNStatusBar.setBarStyle("dark-content");
@@ -116,7 +115,6 @@ export default function ProfileScreen() {
       isNavigatingRef.current = true;
       router.push(path as any);
 
-      // Failsafe timeout to unlock if screen did not blur
       setTimeout(() => {
         isNavigatingRef.current = false;
       }, 750);
@@ -245,7 +243,7 @@ export default function ProfileScreen() {
         bounces={true}
         scrollEventThrottle={16}
       >
-        {/* Profile Banner */}
+        {}
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={handleBannerPress}
@@ -280,7 +278,7 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
 
-        {/* User Identity & Info */}
+        {}
         <View className="px-5">
           <View className="-mt-[52px]">
             <TouchableOpacity
@@ -328,7 +326,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Account Settings */}
+          {}
           <Text
             className="text-[20px] text-[#222222] mt-6 mb-1"
             style={{ fontFamily: "Outfit_700Bold" }}
@@ -349,7 +347,7 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Security & Device Settings */}
+          {}
           <Text
             className="text-[20px] text-[#222222] mt-6 mb-1"
             style={{ fontFamily: "Outfit_700Bold" }}
@@ -392,7 +390,7 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Support & Legal */}
+          {}
           <Text
             className="text-[20px] text-[#222222] mt-6 mb-1"
             style={{ fontFamily: "Outfit_700Bold" }}

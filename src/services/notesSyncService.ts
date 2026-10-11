@@ -79,8 +79,6 @@ export async function pullAndMergeNotesFromFirestore(): Promise<NoteItem[] | nul
 
       const local = mergedMap.get(data.id);
 
-      // Keep whichever version was updated most recently.
-      // If updatedAt is missing, prefer remote (it's the authoritative source).
       const remoteTime = data.updatedAt?.toMillis?.() ?? 0;
       const localTime = local?.updatedAt
         ? new Date(local.updatedAt as string).getTime() || 0

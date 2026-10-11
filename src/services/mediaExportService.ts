@@ -9,10 +9,6 @@ export interface ExportResult {
   savedToGallery?: boolean;
 }
 
-/**
- * Downloads remote media (if needed) and saves it directly to the device gallery / Photos.
- * Falls back to native file sharing if gallery permissions are not granted.
- */
 export async function exportMediaToDevice(
   mediaUrl: string,
   fileName?: string
@@ -25,7 +21,7 @@ export async function exportMediaToDevice(
 
   try {
     setSystemBypassActive(true);
-    // 1. If remote URL, download directly to cache directory using SDK 57 File API
+
     if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
       const ext = mediaUrl.includes(".mp4") ? "mp4" : "jpg";
       const cleanFileName = fileName || `markx_${Date.now()}.${ext}`;
@@ -37,7 +33,6 @@ export async function exportMediaToDevice(
       localUri = downloadedFile.uri;
     }
 
-    // 2. Request permission to save to device Photos / Media Library
     const { status } = await MediaLibrary.requestPermissionsAsync();
 
     if (status === "granted") {
@@ -49,7 +44,6 @@ export async function exportMediaToDevice(
       };
     }
 
-    // 3. Fallback to native file sharing sheet if media library permission is not granted
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(localUri, {
         dialogTitle: "Export Media",

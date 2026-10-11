@@ -6,7 +6,6 @@ import { triggerHaptic } from "../../utils/haptics";
 interface UploadStatusToastProps {
   visible: boolean;
   fileName: string;
-  category?: any;
   detail: string;
   onClose: () => void;
   bottomInset?: number;
@@ -33,7 +32,7 @@ export function UploadStatusToast({
         zIndex: 50,
       }}
     >
-      {/* Left: Green checkmark in circle */}
+      {}
       <View className="flex-row items-center flex-1 mr-3">
         <Ionicons name="checkmark-circle-outline" size={22} color="#1E8E3E" />
         <View className="flex-1 ml-3">
@@ -46,7 +45,7 @@ export function UploadStatusToast({
         </View>
       </View>
 
-      {/* Right: Close X + Chevron Up */}
+      {}
       <View className="flex-row items-center gap-3">
         <TouchableOpacity
           activeOpacity={0.7}
@@ -70,4 +69,3 @@ export function UploadStatusToast({
     </View>
   );
 }
-

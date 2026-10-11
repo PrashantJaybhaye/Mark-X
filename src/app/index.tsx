@@ -20,7 +20,6 @@ export default function OnboardingScreen() {
   const isNavigatingRef = useRef(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
-  // Proportional scale factors anchored to standard reference design (390 x 844)
   const scale = width / 390;
   const heightScale = height / 844;
 
@@ -68,7 +67,7 @@ export default function OnboardingScreen() {
           paddingBottom: Math.max(insets.bottom, Platform.OS === "android" ? 28 : 24) + 12,
         }}
       >
-        {/* Header */}
+        {}
         <View className="items-center" style={{ marginBottom: headerMarginBottom }}>
           <Text
             allowFontScaling={false}
@@ -107,7 +106,7 @@ export default function OnboardingScreen() {
           </Text>
         </View>
 
-        {/* Action Button */}
+        {}
         <TouchableOpacity
           onPress={handleGetStarted}
           disabled={isNavigating}

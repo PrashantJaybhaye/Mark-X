@@ -36,7 +36,7 @@ export function GallerySkeletonCard({
 
   return (
     <View className="mb-2" style={{ width }}>
-      {/* Image Skeleton with Rounded Corners */}
+      {}
       <Animated.View
         className="w-full bg-[#E5E7EB] rounded-2xl"
         style={{

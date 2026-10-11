@@ -6,7 +6,8 @@ export * from "./DriveFileItem";
 export * from "./DriveFileList";
 export * from "./DriveFileOptionsSheet";
 export * from "./DriveFilePreviewScreen";
-export * from "./DrivePdfViewer";
 export * from "./DriveHeader";
+export * from "./DrivePdfViewer";
+export * from "./DrivePreviewActionSheet";
+export * from "./FileCategoryIcon";
 export * from "./UploadStatusToast";
-

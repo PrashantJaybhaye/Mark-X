@@ -17,9 +17,6 @@ export type UploadProgressCallback = (
   totalBytes: number
 ) => void;
 
-/**
- * Uploads a local file to the Mark-X Storage Server with real-time progress callbacks.
- */
 export async function uploadFileToMarkx(
   localUri: string,
   mimeType: string = "image/jpeg",
@@ -47,7 +44,7 @@ export async function uploadFileToMarkx(
       {
         fieldName: "file",
         httpMethod: "POST",
-        uploadType: 1 as any, // FileSystemUploadType.MULTIPART
+        uploadType: 1 as any,
         mimeType: mimeType || "image/jpeg",
         headers,
       },
@@ -86,7 +83,4 @@ export async function uploadFileToMarkx(
   }
 }
 
-// Backward-compatible alias
 export const uploadFileToCloudflare = uploadFileToMarkx;
-
-

@@ -91,7 +91,7 @@ export default function AboutScreen() {
 
         <View className="h-14" />
 
-        {/* Copyright */}
+        {}
         <Text
           className="text-[13px] text-[#8E8E93] text-center leading-5"
           style={{ fontFamily: "Outfit_400Regular" }}

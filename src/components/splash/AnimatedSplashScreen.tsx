@@ -34,7 +34,6 @@ export function AnimatedSplashScreen({
     }
   }, [isReady]);
 
-  // Reveal subtitle smoothly in sync with logo fill (starts at 750ms)
   useEffect(() => {
     subtitleOpacity.value = withDelay(
       750,
@@ -53,7 +52,6 @@ export function AnimatedSplashScreen({
     });
   }, [subtitleOpacity]);
 
-  // Safety fallback timer: ensure drawing is marked done even if frame was dropped
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       setIsDrawingDone(true);
@@ -64,7 +62,6 @@ export function AnimatedSplashScreen({
   useEffect(() => {
     if (!isReady || !isDrawingDone) return;
 
-    // Comfortable dwell time (850ms) so users can clearly read both MARK-X and EXECUTIVE CLOUD
     const timeout = setTimeout(() => {
       triggerHaptic();
 

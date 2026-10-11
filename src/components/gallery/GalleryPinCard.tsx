@@ -73,7 +73,6 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     outputRange: ["0deg", "360deg"],
   });
 
-  // Compute dynamic height based on aspect ratio (e.g. 0.58 -> tall, 1.1 -> wide)
   const imageHeight = Math.min(Math.max(cardWidth / pin.aspectRatio, 120), 320);
 
   const handleOptions = (e: any) => {
@@ -87,7 +86,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
 
   return (
     <View className="mb-1" style={{ width: cardWidth }}>
-      {/* 1. Main Pin Image with Skeleton Loader */}
+      {}
       <TouchableOpacity
         activeOpacity={0.88}
         onPress={() => {
@@ -97,7 +96,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         className="w-full bg-[#E5E7EB] rounded-2xl overflow-hidden relative"
         style={{ height: imageHeight }}
       >
-        {/* Animated Skeleton Placeholder while image is loading */}
+        {}
         {!isLoaded && (
           <Animated.View
             className="absolute inset-0 bg-[#D1D5DB] rounded-2xl"
@@ -121,7 +120,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
           }}
         />
 
-        {/* Upload Status Indicator: Shown only while uploading or on failure */}
+        {}
         {isUploading ? (
           <View
             style={{ backgroundColor: "rgba(0,0,0,0.65)", borderColor: "rgba(255,255,255,0.25)", borderWidth: 1 }}
@@ -140,7 +139,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
           </View>
         ) : null}
 
-        {/* Video Indicator Pill (Top-Right) */}
+        {}
         {pin.mediaType === "video" && (
           <View className="absolute top-2.5 right-2.5 bg-black/60 px-2 py-1 rounded-full flex-row items-center gap-1">
             <Ionicons name="play" size={10} color="#FFFFFF" />
@@ -152,7 +151,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
           </View>
         )}
 
-        {/* Bookmarked Badge (Top-Left, No Round Border) */}
+        {}
         {pin.saved && !isUploading && !isFailed && (
           <View
             className="absolute top-2.5 left-2.5"
@@ -169,7 +168,7 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         )}
       </TouchableOpacity>
 
-      {/* 2. Pin Sub-Row: Options menu action */}
+      {}
       <View className="flex-row items-center justify-end mt-1 px-1 min-h-[20px]">
         <TouchableOpacity
           activeOpacity={0.6}
@@ -183,4 +182,3 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
     </View>
   );
 });
-

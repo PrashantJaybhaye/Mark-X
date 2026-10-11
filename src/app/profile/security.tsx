@@ -169,7 +169,7 @@ export default function SecurityScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Top Nav Bar */}
+      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#EBEBEB]"
@@ -205,7 +205,7 @@ export default function SecurityScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* ================= ACCOUNT DETAIL HEADER ================= */}
+        {}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => {
@@ -265,7 +265,7 @@ export default function SecurityScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* ================= SECURITY HEALTH CARD ================= */}
+        {}
         <View className="bg-[#FAFAFA] rounded-xl p-3.5 border border-[#EBEBEB] mb-5">
           <View className="flex-row items-center justify-between mb-1.5">
             <View className="flex-row items-center">
@@ -319,7 +319,7 @@ export default function SecurityScreen() {
           </Text>
         </View>
 
-        {/* ================= SECTION 1: LOGIN ================= */}
+        {}
         <View className="mb-5">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -328,7 +328,7 @@ export default function SecurityScreen() {
             Login
           </Text>
 
-          {/* Password Row */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -366,7 +366,7 @@ export default function SecurityScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Social accounts Row */}
+          {}
           <View className="py-3.5 flex-row items-center justify-between">
             <View className="flex-1 pr-3">
               <Text
@@ -394,7 +394,7 @@ export default function SecurityScreen() {
           </View>
         </View>
 
-        {/* ================= SECTION 2: VAULT & APP LOCK ================= */}
+        {}
         <View className="mb-5">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -403,7 +403,7 @@ export default function SecurityScreen() {
             Vault & app lock
           </Text>
 
-          {/* Biometrics Row with Inline Switch */}
+          {}
           <View className="py-3.5 border-b border-[#EBEBEB] flex-row items-center justify-between">
             <View className="flex-1 pr-3">
               <Text
@@ -438,7 +438,7 @@ export default function SecurityScreen() {
             />
           </View>
 
-          {/* Auto-Lock Timer Row */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -474,7 +474,7 @@ export default function SecurityScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Lock Vault Now Row */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -509,7 +509,7 @@ export default function SecurityScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ================= SECTION 3: SECURITY & ENCRYPTION ================= */}
+        {}
         <View className="mb-5">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -518,7 +518,7 @@ export default function SecurityScreen() {
             Security & encryption
           </Text>
 
-          {/* Email Verification Row */}
+          {}
           <TouchableOpacity
             activeOpacity={user?.emailVerified ? 1 : 0.7}
             disabled={user?.emailVerified || isSendingVerify}
@@ -573,7 +573,7 @@ export default function SecurityScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Hardware Encryption Row */}
+          {}
           <View className="py-3.5 flex-row items-center justify-between">
             <View className="flex-1 pr-3">
               <Text
@@ -601,7 +601,7 @@ export default function SecurityScreen() {
           </View>
         </View>
 
-        {/* ================= SECTION 4: ACCOUNT ================= */}
+        {}
         <View className="mb-4">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -610,7 +610,7 @@ export default function SecurityScreen() {
             Account
           </Text>
 
-          {/* Log out Row */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -644,7 +644,7 @@ export default function SecurityScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Deactivate Account Row */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -680,7 +680,7 @@ export default function SecurityScreen() {
         </View>
       </ScrollView>
 
-      {/* ================= DIALOGS ================= */}
+      {}
       <IosDialog
         visible={activeModal === "reset_password"}
         title="Update Password"
@@ -743,7 +743,7 @@ export default function SecurityScreen() {
         ]}
       />
 
-      {/* Auto-Lock Picker Modal */}
+      {}
       <Modal
         visible={activeModal === "auto_lock"}
         transparent

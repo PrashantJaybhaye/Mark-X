@@ -18,7 +18,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
     onPress?.();
   };
 
-  // Card dimensions (enlarged for substantial hero presence)
   const containerPadding = 20;
   const availableWidth = screenWidth - containerPadding * 2;
   const frontCardWidth = availableWidth - 24;
@@ -32,7 +31,7 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
         className="relative w-full justify-center"
         style={{ height: cardHeight + 12 }}
       >
-        {/* Card 3: Back card */}
+        {}
         <View
           style={{
             position: "absolute",
@@ -47,7 +46,7 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           className="shadow-sm"
         />
 
-        {/* Card 2: Mid card */}
+        {}
         <View
           style={{
             position: "absolute",
@@ -62,7 +61,7 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           className="shadow-sm"
         />
 
-        {/* Card 1: Front Executive Obsidian Card */}
+        {}
         <View
           style={{
             width: frontCardWidth,
@@ -72,7 +71,7 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           }}
           className="p-6 justify-between shadow-xl shadow-black/40 border border-white/10"
         >
-          {/* Top Label */}
+          {}
           <View className="flex-row items-center">
             <Text
               allowFontScaling={false}
@@ -83,7 +82,7 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
             </Text>
           </View>
 
-          {/* Headline & Snippet */}
+          {}
           <View className="mt-auto">
             <Text
               allowFontScaling={false}

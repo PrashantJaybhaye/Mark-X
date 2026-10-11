@@ -2,10 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
 import { Image } from "expo-image";
-import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
-import * as WebBrowser from "expo-web-browser";
-import { WebView } from "react-native-webview";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +10,6 @@ import {
   Dimensions,
   Modal,
   ScrollView,
-  Share,
   Text,
   TouchableOpacity,
   View,
@@ -23,21 +19,79 @@ import { DriveFileCategory, DriveItem } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 import { DrivePdfViewer } from "./DrivePdfViewer";
 import { FileCategoryIcon } from "./FileCategoryIcon";
+import { openInNativeApp, getRecommendedAppName } from "../../services/nativeFileOpenerService";
+import { DrivePreviewActionSheet } from "./DrivePreviewActionSheet";
+import { exportDriveFile } from "../../services/driveFirebaseService";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+async function parseNativeDocxContent(uri: string): Promise<string[] | null> {
+  try {
+    if (!uri) return null;
+
+    let targetUri = uri;
+    if (uri.startsWith("http://") || uri.startsWith("https://")) {
+      const safeName = `temp_${Date.now()}.docx`;
+      const cachePath = `${FileSystem.cacheDirectory}${safeName}`;
+      const downloadRes = await FileSystem.downloadAsync(uri, cachePath);
+      if (downloadRes.status === 200 && downloadRes.uri) {
+        targetUri = downloadRes.uri;
+      }
+    }
+
+    const raw = await FileSystem.readAsStringAsync(targetUri, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+
+    if (raw && (raw.includes("<w:t") || raw.includes("<w:p"))) {
+      const paragraphMatches = raw.match(/<w:p[\s\S]*?<\/w:p>/g);
+      if (paragraphMatches && paragraphMatches.length > 0) {
+        const parsedParagraphs: string[] = [];
+        for (const pXml of paragraphMatches) {
+          const textMatches = pXml.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
+          if (textMatches) {
+            const pText = textMatches
+              .map((t) => t.replace(/<[^>]+>/g, "").trim())
+              .filter(Boolean)
+              .join(" ");
+            if (pText) {
+              parsedParagraphs.push(pText);
+            }
+          }
+        }
+        if (parsedParagraphs.length > 0) {
+          return parsedParagraphs;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[NativeDocxParser] Error parsing XML:", err);
+  }
+  return null;
+}
 
 interface DriveFilePreviewScreenProps {
   visible: boolean;
   item: DriveItem | null;
+  allItems?: DriveItem[];
+  parentFolderName?: string;
   onClose: () => void;
+  onDelete?: (id: string) => void;
+  onRename?: (id: string, newName: string) => void;
   onOptionsPress?: (item: DriveItem) => void;
+  onToggleStar?: (item: DriveItem) => void;
 }
 
 export function DriveFilePreviewScreen({
   visible,
   item,
+  allItems,
+  parentFolderName,
   onClose,
+  onDelete,
+  onRename,
   onOptionsPress,
+  onToggleStar,
 }: DriveFilePreviewScreenProps) {
   const insets = useSafeAreaInsets();
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -45,16 +99,20 @@ export function DriveFilePreviewScreen({
   const [isStarred, setIsStarred] = useState<boolean>(item?.starred || false);
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [showJumpModal, setShowJumpModal] = useState(false);
+  const [docParagraphs, setDocParagraphs] = useState<string[] | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [fullScreenImage, setFullScreenImage] = useState(false);
-  const [presentationSlide, setPresentationSlide] = useState(0);
+  const [showActionSheet, setShowActionSheet] = useState(false);
 
-  // Animated Blue Loading Line
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   const isMountedRef = useRef(true);
 
   const isLoading = isLoadingText || isLoadingPdf;
+
+  useEffect(() => {
+    if (!visible) setShowActionSheet(false);
+  }, [visible]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -82,41 +140,59 @@ export function DriveFilePreviewScreen({
     if (!isMountedRef.current) return;
     setIsStarred(item?.starred || false);
     setTextContent(null);
+    setDocParagraphs(null);
     setFullScreenImage(false);
     setIsLoadingPdf(false);
     setShowJumpModal(false);
 
     if (!item || !item.uri) return;
 
-    const isTextReadable =
-      item.category === "code" ||
+    const isWordDocument =
       item.category === "document" ||
-      item.name.endsWith(".txt") ||
-      item.name.endsWith(".md") ||
-      item.name.endsWith(".json") ||
-      item.name.endsWith(".csv") ||
-      item.name.endsWith(".xml") ||
-      item.name.endsWith(".html") ||
-      item.name.endsWith(".css") ||
-      item.name.endsWith(".js") ||
-      item.name.endsWith(".ts") ||
-      item.name.endsWith(".tsx") ||
-      item.name.endsWith(".jsx") ||
-      item.name.endsWith(".py") ||
-      item.name.endsWith(".log");
+      item.name.toLowerCase().endsWith(".docx") ||
+      item.name.toLowerCase().endsWith(".doc") ||
+      item.name.toLowerCase().endsWith(".odt") ||
+      item.name.toLowerCase().endsWith(".rtf");
 
-    if (isTextReadable && item.uri.startsWith("file://")) {
+    if (isWordDocument && item.uri) {
       setIsLoadingText(true);
-      FileSystem.readAsStringAsync(item.uri)
-        .then((content) => {
-          if (isMountedRef.current) setTextContent(content);
-        })
-        .catch(() => {
-          if (isMountedRef.current) setTextContent(null);
+      parseNativeDocxContent(item.uri)
+        .then((paras) => {
+          if (isMountedRef.current) setDocParagraphs(paras);
         })
         .finally(() => {
           if (isMountedRef.current) setIsLoadingText(false);
         });
+    } else {
+      const isTextReadable =
+        item.category === "code" ||
+        item.name.endsWith(".txt") ||
+        item.name.endsWith(".md") ||
+        item.name.endsWith(".json") ||
+        item.name.endsWith(".csv") ||
+        item.name.endsWith(".xml") ||
+        item.name.endsWith(".html") ||
+        item.name.endsWith(".css") ||
+        item.name.endsWith(".js") ||
+        item.name.endsWith(".ts") ||
+        item.name.endsWith(".tsx") ||
+        item.name.endsWith(".jsx") ||
+        item.name.endsWith(".py") ||
+        item.name.endsWith(".log");
+
+      if (isTextReadable && item.uri.startsWith("file://")) {
+        setIsLoadingText(true);
+        FileSystem.readAsStringAsync(item.uri)
+          .then((content) => {
+            if (isMountedRef.current) setTextContent(content);
+          })
+          .catch(() => {
+            if (isMountedRef.current) setTextContent(null);
+          })
+          .finally(() => {
+            if (isMountedRef.current) setIsLoadingText(false);
+          });
+      }
     }
   }, [item]);
 
@@ -127,11 +203,7 @@ export function DriveFilePreviewScreen({
   const handleShare = async () => {
     triggerHaptic();
     try {
-      if (item.uri && (await Sharing.isAvailableAsync())) {
-        await Sharing.shareAsync(item.uri, { dialogTitle: item.name });
-      } else {
-        await Share.share({ title: item.name, message: item.name, url: item.uri });
-      }
+      await exportDriveFile(item);
     } catch (e) {
       console.warn("Share error:", e);
     }
@@ -141,15 +213,6 @@ export function DriveFilePreviewScreen({
     if (textContent) {
       triggerHaptic();
       await Clipboard.setStringAsync(textContent);
-      setCopiedToast(true);
-      setTimeout(() => setCopiedToast(false), 2000);
-    }
-  };
-
-  const handleCopyUri = async () => {
-    if (item.uri) {
-      triggerHaptic();
-      await Clipboard.setStringAsync(item.uri);
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 2000);
     }
@@ -179,6 +242,7 @@ export function DriveFilePreviewScreen({
           onLoadingChange={setIsLoadingPdf}
           showJumpModal={showJumpModal}
           onCloseJumpModal={() => setShowJumpModal(false)}
+          onRequestClose={onClose}
         />
       );
     }
@@ -193,7 +257,6 @@ export function DriveFilePreviewScreen({
       );
     }
 
-    // Text or Code Content Viewer
     if (textContent !== null) {
       const lines = textContent.split("\n");
       const wordCount = textContent.trim().split(/\s+/).filter(Boolean).length;
@@ -201,7 +264,7 @@ export function DriveFilePreviewScreen({
 
       return (
         <View className="flex-1 bg-[#1E1E1E] rounded-3xl overflow-hidden border border-[#2D2D2D]">
-          {/* Editor Header Bar */}
+          {}
           <View className="flex-row items-center justify-between px-4 py-3 bg-[#252526] border-b border-[#333333]">
             <View className="flex-row items-center space-x-2">
               <View className="px-2 py-0.5 rounded bg-[#333333]">
@@ -231,7 +294,7 @@ export function DriveFilePreviewScreen({
             </TouchableOpacity>
           </View>
 
-          {/* Source Code Content View */}
+          {}
           <ScrollView className="flex-1 p-4 bg-[#1E1E1E]" showsVerticalScrollIndicator={true}>
             {lines.map((line, idx) => (
               <View key={idx} className="flex-row py-0.5">
@@ -248,7 +311,6 @@ export function DriveFilePreviewScreen({
       );
     }
 
-    // High Quality Image Viewer
     if (item.category === "image" && item.uri) {
       return (
         <View className="flex-1 rounded-3xl overflow-hidden bg-black items-center justify-center border border-[#1F1F1F] relative">
@@ -273,7 +335,6 @@ export function DriveFilePreviewScreen({
       );
     }
 
-    // Video / Audio Media Card Preview
     if ((item.category === "video" || item.category === "audio") && item.uri) {
       return (
         <View className="flex-1 bg-[#121212] rounded-3xl p-6 border border-[#222222] items-center justify-center">
@@ -307,309 +368,69 @@ export function DriveFilePreviewScreen({
       );
     }
 
-    const isSpreadsheet =
-      item.category === "spreadsheet" ||
-      item.name.toLowerCase().endsWith(".xlsx") ||
-      item.name.toLowerCase().endsWith(".xls") ||
-      item.name.toLowerCase().endsWith(".csv");
-
-    const isPresentation =
-      item.category === "presentation" ||
-      item.name.toLowerCase().endsWith(".pptx") ||
-      item.name.toLowerCase().endsWith(".ppt") ||
-      item.name.toLowerCase().endsWith(".key");
-
-    // Interactive In-App Excel Spreadsheet View
-    if (isSpreadsheet) {
-      let rows: string[][] = [
-        ["ID", "Product / Item Name", "Category", "Units Sold", "Unit Price", "Total Revenue"],
-        ["101", "MacBook Pro 16\"", "Electronics", "42", "$2,499.00", "$104,958.00"],
-        ["102", "iPhone 15 Pro", "Mobile Devices", "128", "$1,199.00", "$153,472.00"],
-        ["103", "iPad Air M2", "Tablets", "85", "$699.00", "$59,415.00"],
-        ["104", "AirPods Max", "Audio", "64", "$549.00", "$35,136.00"],
-        ["105", "Apple Watch Ultra 2", "Wearables", "91", "$799.00", "$72,709.00"],
-        ["106", "Pro Display XDR", "Displays", "14", "$4,999.00", "$69,986.00"],
-        ["107", "Magic Keyboard", "Accessories", "112", "$299.00", "$33,488.00"],
-      ];
-
-      const rawText = textContent as string | null;
-      if (rawText) {
-        const parsed = rawText
-          .split("\n")
-          .filter((line: string) => line.trim().length > 0)
-          .map((line: string) => line.split(/,|\t/));
-        if (parsed.length > 0) {
-          rows = parsed;
-        }
-      }
-
-      const columns = ["A", "B", "C", "D", "E", "F", "G", "H"];
-
-      return (
-        <View className="flex-1 bg-[#121212] rounded-3xl overflow-hidden border border-[#222222]">
-          {/* Excel App Top Bar */}
-          <View className="flex-row items-center justify-between px-4 py-2.5 bg-[#1B2A1E] border-b border-[#2D4532]">
-            <View className="flex-row items-center">
-              <Ionicons name="grid" size={18} color="#107C41" style={{ marginRight: 6 }} />
-              <Text className="text-[13px] font-outfit-bold text-[#4ADE80]">Excel Workbook View</Text>
-            </View>
-            <Text className="text-[11px] font-outfit text-[#888888]">{rows.length} Rows • {rows[0]?.length || 0} Cols</Text>
+    const appName = getRecommendedAppName(item.name);
+    return (
+      <View className="flex-1 bg-white m-3 rounded-3xl p-6 border border-[#E8EAED] items-center justify-between">
+        <View className="items-center justify-center pt-8 w-full">
+          <View
+            className="w-24 h-24 rounded-3xl items-center justify-center mb-6 shadow-sm"
+            style={{ backgroundColor: `${themeColor}15` }}
+          >
+            <FileCategoryIcon category={item.category} size={54} id={item.id} fileName={item.name} />
           </View>
 
-          {/* Formula Bar */}
-          <View className="flex-row items-center px-3 py-2 bg-[#1A1A1A] border-b border-[#2D2D2D]">
-            <Text className="text-[12px] font-outfit-bold text-[#107C41] mr-3">fx</Text>
-            <View className="flex-1 bg-[#121212] px-3 py-1 rounded-lg border border-[#2A2A2A]">
-              <Text className="text-[12px] font-mono text-[#CCCCCC]" numberOfLines={1}>
-                =SUM(D2:D{rows.length})
+          <Text className="text-[20px] font-outfit-bold text-[#1F1F1F] text-center mb-1.5 px-4" numberOfLines={2}>
+            {item.name}
+          </Text>
+
+          <View className="flex-row items-center gap-2 mt-1 mb-5">
+            <View className="px-2.5 py-0.5 rounded-full bg-[#F1F3F4] border border-[#E0E0E0]">
+              <Text className="text-[11px] font-outfit-semibold text-[#5F6368] uppercase">
+                {item.name.split(".").pop() || item.category}
               </Text>
             </View>
+            <Text className="text-[12px] font-outfit text-[#5F6368]">
+              {item.size || "Original Document"}
+            </Text>
           </View>
 
-          {/* Grid Header & Body Scroll */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} className="flex-1">
-            <View>
-              {/* Column Letter Headers */}
-              <View className="flex-row bg-[#222222] border-b border-[#333333]">
-                <View className="w-10 py-1.5 items-center justify-center border-r border-[#333333] bg-[#1E1E1E]">
-                  <Text className="text-[11px] font-outfit-bold text-[#888888]">#</Text>
-                </View>
-                {(rows[0] || []).map((_, colIdx) => (
-                  <View key={colIdx} className="w-36 py-1.5 items-center justify-center border-r border-[#333333]">
-                    <Text className="text-[11px] font-outfit-bold text-[#CCCCCC]">
-                      {columns[colIdx] || `C${colIdx + 1}`}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Grid Rows */}
-              <ScrollView className="flex-1" showsVerticalScrollIndicator={true}>
-                {rows.map((row, rowIdx) => (
-                  <View key={rowIdx} className={`flex-row border-b border-[#222222] ${rowIdx === 0 ? "bg-[#1E2E22]" : "bg-[#141414]"}`}>
-                    <View className="w-10 py-2.5 items-center justify-center border-r border-[#262626] bg-[#1A1A1A]">
-                      <Text className="text-[11px] font-mono text-[#777777]">{rowIdx + 1}</Text>
-                    </View>
-                    {row.map((cell, colIdx) => (
-                      <View
-                        key={colIdx}
-                        className="w-36 px-3 py-2.5 justify-center border-r border-[#222222]"
-                      >
-                        <Text
-                          className={`text-[12px] ${rowIdx === 0 ? "font-outfit-bold text-[#4ADE80]" : "font-outfit text-white"}`}
-                          numberOfLines={1}
-                        >
-                          {cell.trim()}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ))}
-              </ScrollView>
+          <View className="bg-[#F8F9FA] border border-[#E8EAED] rounded-2xl p-4 w-full">
+            <View className="flex-row items-center mb-1.5">
+              <Ionicons name="information-circle-outline" size={16} color={themeColor} style={{ marginRight: 6 }} />
+              <Text className="text-[12px] font-outfit-bold text-[#1F1F1F]">Full-Fidelity Native Viewing</Text>
             </View>
-          </ScrollView>
-
-          {/* Sheet Selector Tabs */}
-          <View className="flex-row items-center px-3 py-2 bg-[#1A1A1A] border-t border-[#2A2A2A] space-x-2">
-            <View className="px-3 py-1 rounded-lg bg-[#107C41] flex-row items-center">
-              <Ionicons name="document-text" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text className="text-[11px] font-outfit-bold text-white">Sheet1</Text>
-            </View>
-            <View className="px-3 py-1 rounded-lg bg-[#252526]">
-              <Text className="text-[11px] font-outfit text-[#888888]">Summary</Text>
-            </View>
-            <View className="px-3 py-1 rounded-lg bg-[#252526]">
-              <Text className="text-[11px] font-outfit text-[#888888]">Charts</Text>
-            </View>
+            <Text className="text-[12px] font-outfit text-[#5F6368] leading-5">
+              To preserve authentic animations, formatting, and fonts, this file opens directly in your phone's native {appName} app.
+            </Text>
           </View>
         </View>
-      );
-    }
 
-    // Interactive In-App PowerPoint Presentation View
-    if (isPresentation) {
-      const slides = [
-        {
-          title: "Executive Q4 Growth Strategy",
-          subtitle: "Market Expansion & Product Architecture Roadmap",
-          bullets: [
-            "Accelerating enterprise adoption across North America & APAC",
-            "Introducing high-performance native document processing pipeline",
-            "Targeting 42% Year-over-Year revenue growth in Q4",
-          ],
-          tag: "OVERVIEW",
-          bg: "#C43E1C",
-        },
-        {
-          title: "Key Market Drivers",
-          subtitle: "Industry Trends & Competitive Analysis",
-          bullets: [
-            "Demand for instant, zero-latency document previews on mobile",
-            "Migration towards privacy-first, on-device encrypted storage",
-            "Seamless cross-platform collaboration tools for team productivity",
-          ],
-          tag: "ANALYSIS",
-          bg: "#B7472A",
-        },
-        {
-          title: "Financial Performance",
-          subtitle: "Revenue Distribution & Quarterly Highlights",
-          bullets: [
-            "ARR reached $14.2M (+38% QoQ expansion)",
-            "Net Retention Rate maintained at 124%",
-            "Operating margin improved by 450 basis points",
-          ],
-          tag: "FINANCIALS",
-          bg: "#A53A1B",
-        },
-        {
-          title: "Next Steps & Action Items",
-          subtitle: "Q1 Execution Timeline",
-          bullets: [
-            "Finalize v2.0 native mobile framework deployment",
-            "Expand developer ecosystem & API integration benchmarks",
-            "Initiate global enterprise security audit & compliance certification",
-          ],
-          tag: "ROADMAP",
-          bg: "#8F3116",
-        },
-      ];
+        <View className="w-full gap-3 pb-2">
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => openInNativeApp(item)}
+            className="w-full py-3.5 rounded-full flex-row items-center justify-center shadow-sm"
+            style={{ backgroundColor: themeColor }}
+          >
+            <Ionicons name="open-outline" size={19} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text className="text-[15px] font-outfit-bold text-white">
+              Open in {appName}
+            </Text>
+          </TouchableOpacity>
 
-      const slide = slides[presentationSlide] || slides[0];
-
-      return (
-        <View className="flex-1 bg-[#121212] rounded-3xl overflow-hidden border border-[#222222] flex-col">
-          {/* Top Presentation Bar */}
-          <View className="flex-row items-center justify-between px-4 py-3 bg-[#2A1810] border-b border-[#3D2317]">
-            <View className="flex-row items-center">
-              <Ionicons name="easel" size={18} color="#FF6B4A" style={{ marginRight: 6 }} />
-              <Text className="text-[13px] font-outfit-bold text-[#FF8C70]">PowerPoint Presentation View</Text>
-            </View>
-
-            <View className="flex-row items-center space-x-2">
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic();
-                  setPresentationSlide((prev) => Math.max(0, prev - 1));
-                }}
-                disabled={presentationSlide === 0}
-                className={`p-1.5 rounded-lg ${presentationSlide === 0 ? "bg-[#222222]" : "bg-[#C43E1C]"}`}
-              >
-                <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-
-              <Text className="text-[12px] font-outfit-bold text-white px-2">
-                {presentationSlide + 1} / {slides.length}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic();
-                  setPresentationSlide((prev) => Math.min(slides.length - 1, prev + 1));
-                }}
-                disabled={presentationSlide === slides.length - 1}
-                className={`p-1.5 rounded-lg ${presentationSlide === slides.length - 1 ? "bg-[#222222]" : "bg-[#C43E1C]"}`}
-              >
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Presentation Stage Canvas */}
-          <View className="flex-1 p-6 bg-[#1A1A1A] items-center justify-center relative">
-            <View className="w-full bg-[#242424] rounded-2xl p-6 border border-[#333333] relative overflow-hidden min-h-[280px] justify-between">
-              <View
-                className="absolute top-0 left-0 right-0 h-2"
-                style={{ backgroundColor: slide.bg }}
-              />
-
-              <View>
-                <View className="flex-row items-center justify-between mb-3 mt-1">
-                  <View className="px-2.5 py-0.5 rounded-md" style={{ backgroundColor: `${slide.bg}30` }}>
-                    <Text className="text-[10px] font-outfit-bold text-[#FF8C70]">{slide.tag}</Text>
-                  </View>
-                  <Text className="text-[10px] font-outfit text-[#777777]">{item.name}</Text>
-                </View>
-
-                <Text className="text-[22px] font-outfit-bold text-white leading-7 mb-1.5">
-                  {slide.title}
-                </Text>
-                <Text className="text-[13px] font-outfit text-[#FFA085] mb-5">
-                  {slide.subtitle}
-                </Text>
-
-                <View className="space-y-3">
-                  {slide.bullets.map((b, idx) => (
-                    <View key={idx} className="flex-row items-start space-x-2">
-                      <View className="w-2 h-2 rounded-full bg-[#FF6B4A] mt-1.5 mr-2" />
-                      <Text className="flex-1 text-[13px] font-outfit text-[#DDDDDD] leading-5">
-                        {b}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <View className="flex-row justify-between items-center pt-4 border-t border-[#333333] mt-6">
-                <Text className="text-[10px] font-outfit text-[#666666]">Mark-X Slide Engine</Text>
-                <Text className="text-[10px] font-outfit-bold text-[#999999]">Slide {presentationSlide + 1}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Slide Thumbnails Selector Bar */}
-          <View className="flex-row items-center justify-center p-3 bg-[#1A1A1A] border-t border-[#2A2A2A] space-x-3">
-            {slides.map((_, idx) => (
-              <TouchableOpacity
-                key={idx}
-                onPress={() => {
-                  triggerHaptic();
-                  setPresentationSlide(idx);
-                }}
-                className={`w-14 h-9 rounded-lg border items-center justify-center ${
-                  presentationSlide === idx ? "border-[#FF6B4A] bg-[#C43E1C]/20" : "border-[#333333] bg-[#222222]"
-                }`}
-              >
-                <Text className={`text-[11px] font-outfit-bold ${presentationSlide === idx ? "text-[#FF8C70]" : "text-[#777777]"}`}>
-                  S{idx + 1}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleShare}
+            className="w-full py-3.5 rounded-full bg-[#F1F3F4] border border-[#E0E0E0] flex-row items-center justify-center"
+          >
+            <Ionicons name="share-outline" size={18} color="#444746" style={{ marginRight: 8 }} />
+            <Text className="text-[14px] font-outfit-semibold text-[#444746]">
+              Share / Export File
+            </Text>
+          </TouchableOpacity>
         </View>
-      );
-    }
-
-    // In-App Document Viewer for Web / Office Docs via embedded WebView
-    if (item.uri) {
-      const isRemote = item.uri.startsWith("http://") || item.uri.startsWith("https://");
-      const viewerUrl = isRemote
-        ? `https://docs.google.com/viewer?url=${encodeURIComponent(item.uri)}&embedded=true`
-        : item.uri;
-
-      return (
-        <View className="flex-1 bg-[#121212] overflow-hidden rounded-3xl border border-[#222222] relative">
-          <WebView
-            source={{ uri: viewerUrl }}
-            style={{ flex: 1, backgroundColor: "#121212" }}
-            startInLoadingState={true}
-            renderLoading={() => (
-              <View className="absolute inset-0 bg-[#121212] items-center justify-center z-10">
-                <ActivityIndicator size="large" color="#1A73E8" />
-                <Text className="text-[14px] font-outfit-bold text-white mt-4">Opening in-app viewer...</Text>
-                <Text className="text-[12px] font-outfit text-[#888888] mt-1">{item.name}</Text>
-              </View>
-            )}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            scalesPageToFit={true}
-            onError={() => {
-              handleShare();
-            }}
-          />
-        </View>
-      );
-    }
+      </View>
+    );
   };
 
   const categoryBadgeStyles: Record<DriveFileCategory, { bg: string; text: string; border: string }> = {
@@ -633,10 +454,10 @@ export function DriveFilePreviewScreen({
       <View className="flex-1 bg-[#1E1F22]" style={{ paddingTop: insets.top }}>
         <StatusBar style="light" />
 
-        {/* NATIVE GOOGLE DRIVE HEADER MATCHING REFERENCE UI */}
+        {}
         <View className="bg-[#1E1F22] border-b border-[#2B2D31] z-10">
           <View className="flex-row items-center justify-between px-4 py-3.5 min-h-[64px]">
-            {/* Left: Back Chevron + Document Name */}
+            {}
             <View className="flex-row items-center flex-1 mr-2 space-x-1.5">
               <TouchableOpacity
                 onPress={() => {
@@ -654,7 +475,7 @@ export function DriveFilePreviewScreen({
               </Text>
             </View>
 
-            {/* Right Action Icons: Search (PDF only), Share, Ellipsis Overflow */}
+            {}
             <View className="flex-row items-center space-x-7">
               {isPdf && (
                 <TouchableOpacity
@@ -680,7 +501,7 @@ export function DriveFilePreviewScreen({
               <TouchableOpacity
                 onPress={() => {
                   triggerHaptic();
-                  onClose();
+                  setShowActionSheet(true);
                   onOptionsPress?.(item);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -691,7 +512,7 @@ export function DriveFilePreviewScreen({
             </View>
           </View>
 
-          {/* GOOGLE DRIVE ANIMATED LOADING BLUE LINE */}
+          {}
           {isLoading && (
             <View className="h-[3px] w-full bg-[#2B2D31] overflow-hidden">
               <Animated.View
@@ -713,13 +534,38 @@ export function DriveFilePreviewScreen({
           )}
         </View>
 
-        {/* MAIN BODY PREVIEW */}
+        {}
         <View className="flex-1 bg-[#121212]">{renderPreviewBody()}</View>
       </View>
+
+      {}
+      <DrivePreviewActionSheet
+        visible={showActionSheet}
+        item={item}
+        allItems={allItems}
+        parentFolderName={parentFolderName}
+        onClose={() => setShowActionSheet(false)}
+        onDelete={(id) => {
+          setShowActionSheet(false);
+          onDelete?.(id);
+          onClose();
+        }}
+        onRename={(id, newName) => {
+          onRename?.(id, newName);
+        }}
+        onExport={() => {
+          handleShare();
+        }}
+        onOpenInNativeApp={(targetItem) => {
+          openInNativeApp(targetItem);
+        }}
+        onToggleStar={(targetItem) => {
+          setIsStarred((prev) => !prev);
+          onToggleStar?.(targetItem);
+        }}
+      />
     </Modal>
   );
 }
 
-// Backward compatibility alias export
 export const DriveFilePreviewModal = DriveFilePreviewScreen;
-

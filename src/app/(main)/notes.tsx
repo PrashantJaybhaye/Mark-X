@@ -29,10 +29,8 @@ export default function NotesScreen() {
         RNStatusBar.setBarStyle("dark-content");
       }
 
-      // 1. Instantly show local notes (zero latency)
       loadNotes().then((local) => setNotes(local ?? []));
 
-      // 2. Pull from Firestore in background and merge (cross-device sync)
       pullAndMergeNotesFromFirestore().then((merged) => {
         if (merged) setNotes(merged);
       });
@@ -47,7 +45,6 @@ export default function NotesScreen() {
     });
   };
 
-  // 2-Column spacing (20px outer margin on each side, 12px gutter between columns)
   const columnWidth = (windowWidth - 40 - 12) / 2;
 
   const handleToggleViewMode = () => {
@@ -97,7 +94,6 @@ export default function NotesScreen() {
     setActiveDialog(null);
   }, [selectedNote]);
 
-  // Filter notes by search query if user searches
   const filteredNotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return notes;
@@ -106,7 +102,6 @@ export default function NotesScreen() {
     );
   }, [notes, searchQuery]);
 
-  // Distribute notes into two columns for grid masonry (pinned items first)
   const sortedNotes = useMemo(() => {
     return [...filteredNotes].sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned));
   }, [filteredNotes]);
@@ -118,9 +113,8 @@ export default function NotesScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-
       <SafeAreaView edges={["top"]} className="flex-1">
-        {/* Top Header Bar */}
+        {}
         <NotesHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -129,17 +123,17 @@ export default function NotesScreen() {
           onAddNote={handleAddNote}
         />
 
-        {/* Scrollable Content Body */}
+        {}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: 100,
           }}
         >
-          {/* 1. Stacked Cards Banner */}
+          {}
           <NotesStackedBanner notes={notes} onPress={handleAddNote} onNotePress={handleEditNote} />
 
-          {/* 2. Bottom Notes Area (Grid & List View Modes) */}
+          {}
           <View className="px-5 pt-1">
             {filteredNotes.length === 0 ? (
               <NotesEmptyState

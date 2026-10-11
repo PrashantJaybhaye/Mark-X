@@ -24,7 +24,6 @@ export default function VerifyEmailScreen() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Auto-dismiss status message after 4s
   useEffect(() => {
     if (!statusMessage) return;
     const timer = setTimeout(() => {
@@ -34,7 +33,6 @@ export default function VerifyEmailScreen() {
     return () => clearTimeout(timer);
   }, [statusMessage]);
 
-  // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setInterval(() => {
@@ -101,7 +99,7 @@ export default function VerifyEmailScreen() {
     <View className="flex-1 bg-[#1A1A24]">
       <StatusBar style="light" />
 
-      {/* High-Performance Instant Background Image */}
+      {}
       <View className="absolute inset-0">
         <Image
           source={require("../../../assets/images/VerifyBG.webp")}
@@ -113,13 +111,13 @@ export default function VerifyEmailScreen() {
         <View className="absolute inset-0 bg-black/40" />
       </View>
 
-      {/* Bottom Sheet Modal */}
+      {}
       <View className="flex-1 justify-end">
         <View
           className="bg-[#1C1C1E] rounded-t-[40px] px-7 pt-6 w-full"
           style={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
         >
-          {/* Close Button */}
+          {}
           <View className="items-end w-full mb-4">
             <TouchableOpacity
               onPress={handleClose}
@@ -136,7 +134,7 @@ export default function VerifyEmailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Typography Header */}
+          {}
           <Text
             allowFontScaling={false}
             className="text-[34px] text-white tracking-[0.6px] leading-[38px] mb-2.5"
@@ -153,7 +151,7 @@ export default function VerifyEmailScreen() {
             We sent you a verification link to your email address.
           </Text>
 
-          {/* Email Display */}
+          {}
           <View className="w-full mb-3">
             <Text
               allowFontScaling={false}
@@ -174,7 +172,7 @@ export default function VerifyEmailScreen() {
             </View>
           </View>
 
-          {/* Spam / Junk Notice */}
+          {}
           <Text
             allowFontScaling={false}
             className="text-[13px] text-[#8E8E93] leading-[18px] mt-1 mb-2"
@@ -183,7 +181,7 @@ export default function VerifyEmailScreen() {
             Didn&apos;t receive the email? Please check your Spam folder.
           </Text>
 
-          {/* Status Message */}
+          {}
           <View className="min-h-[24px] justify-center items-center mb-4">
             <Text
               allowFontScaling={false}
@@ -196,7 +194,7 @@ export default function VerifyEmailScreen() {
             </Text>
           </View>
 
-          {/* Action Buttons */}
+          {}
           <TouchableOpacity
             onPress={handleCheckVerification}
             disabled={isChecking}

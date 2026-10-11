@@ -44,7 +44,6 @@ if (Platform.OS !== "web") {
   });
 }
 
-
 interface AuthContextType {
   user: FirebaseAuthTypes.User | null;
   loading: boolean;
@@ -63,9 +62,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Normalizes an email identifier: trims whitespace and lowercases.
- */
 export function normalizeEmail(identifier: string): string {
   return identifier.trim().toLowerCase();
 }
@@ -96,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         syncUserMetadata(currentUser);
         forceSyncAllStats().catch(console.warn);
 
-        // Snapchat-style real-time device sync & remote revocation listener
         try {
           const deviceId = await getPersistentDeviceId();
           deviceIdRef.current = deviceId;
@@ -130,7 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Presence heartbeat: refresh lastActive on app foreground
   useEffect(() => {
     if (!user) return;
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -170,13 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: name,
         });
       }
-      // Send email verification to the newly registered user
+
       try {
         await sendEmailVerification(userCredential.user);
       } catch (e) {
         console.warn("Could not send verification email:", e);
       }
-      // Ensure state holds the real class instance with prototypes intact
+
       await userCredential.user.reload();
       const updatedUser = auth.currentUser || userCredential.user;
       setUser(updatedUser);
@@ -185,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    // 1. Web environment with window / DOM popup support
+
     if (Platform.OS === "web" && typeof signInWithPopup === "function") {
       const provider = new GoogleAuthProvider();
       provider.addScope("profile");
@@ -195,7 +189,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // 2. Native (iOS / Android) environment using native GoogleSignin
     try {
       await GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,

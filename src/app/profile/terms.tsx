@@ -17,15 +17,11 @@ import { IosDialog } from "../../components/common/IosDialog";
 import type { IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type DialogState = {
   title: string;
   message: string;
   actions?: IosDialogAction[];
 } | null;
-
-// ─── Section helper ───────────────────────────────────────────────────────────
 
 function Section({
   title,
@@ -53,8 +49,6 @@ function Section({
     </>
   );
 }
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TermsScreen() {
   const router = useRouter();
@@ -116,7 +110,7 @@ export default function TermsScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Nav header */}
+      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
@@ -131,7 +125,7 @@ export default function TermsScreen() {
             <Ionicons name="chevron-back" size={24} color="#111111" />
           </TouchableOpacity>
 
-          {/* Centered title — absolutely positioned so it never shifts with the back button */}
+          {}
           <View
             style={{ position: "absolute", left: 0, right: 0 }}
             className="items-center justify-center"
@@ -145,7 +139,7 @@ export default function TermsScreen() {
             </Text>
           </View>
 
-          {/* Spacer to balance the back button */}
+          {}
           <View className="w-10 h-10" />
         </View>
       </View>
@@ -158,7 +152,7 @@ export default function TermsScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* Brand + document title */}
+        {}
         <Text
           className="text-[24px] text-[#000000] text-center tracking-[0.18em] mb-3"
           style={{ fontFamily: "Outfit_700Bold" }}
@@ -172,7 +166,7 @@ export default function TermsScreen() {
           TERMS OF SERVICE
         </Text>
 
-        {/* Source link */}
+        {}
         <View className="flex-row items-center flex-wrap mb-2">
           <Text
             className="text-[14px] text-[#111111]"
@@ -197,7 +191,7 @@ export default function TermsScreen() {
           Last Updated: September 20, 2026
         </Text>
 
-        {/* Intro */}
+        {}
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-5"
           style={{ fontFamily: "Outfit_400Regular" }}
@@ -216,7 +210,7 @@ export default function TermsScreen() {
           exist to protect both your privacy and the stability of our platform.
         </Text>
 
-        {/* Core commitment */}
+        {}
         <Text
           className="text-[14px] text-[#000000] leading-[22px] mb-7"
           style={{ fontFamily: "Outfit_700Bold" }}
@@ -291,7 +285,7 @@ export default function TermsScreen() {
           data are handled.
         </Section>
 
-        {/* Contact footer */}
+        {}
         <View className="border-t border-[#E5E7EB] pt-6 items-center">
           <TouchableOpacity
             onPress={handleContactSupport}

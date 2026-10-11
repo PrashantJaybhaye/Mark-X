@@ -47,8 +47,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
   const lastBackgroundTime = useRef<number | null>(null);
   const isAuthenticatingRef = useRef<boolean>(false);
 
-  // Clears the authenticating flag with a brief delay so an AppState
-  // change on biometric dialog dismiss doesn't re-lock the app.
   const clearAuthFlag = () =>
     setTimeout(() => { isAuthenticatingRef.current = false; }, 500);
 
@@ -57,7 +55,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
     setCapability(cap);
   };
 
-  // Initial load
   useEffect(() => {
     let isMounted = true;
 
@@ -75,7 +72,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
         setIsBiometricsEnabledState(enabled);
         setLockTimeoutMinutesState(prefs.lockTimeoutMinutes ?? 0);
 
-        // If enabled and user is logged in, lock initially upon opening app
         if (enabled && user) {
           setIsLockedState(true);
         } else if (!user) {
@@ -95,10 +91,9 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  // AppState listener for background / foreground transitions
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      // Don't trigger background lock while the system biometric dialog is active
+
       if (isAuthenticatingRef.current || isSystemBypassActive) return;
 
       if (nextAppState === "background") {
@@ -118,7 +113,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Reset stale background timestamp when user logs out
     if (!user) {
       lastBackgroundTime.current = null;
     }
@@ -131,7 +125,7 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
 
   const unlockApp = async (): Promise<BiometricAuthResult> => {
     if (!capability?.hasHardware || !capability?.isEnrolled) {
-      // Fallback: unlock if hardware became unavailable
+
       setIsLockedState(false);
       return { success: true };
     }
@@ -181,7 +175,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Require biometric confirmation before toggling security state
     isAuthenticatingRef.current = true;
     try {
       const authResult = await authenticateWithBiometrics({
@@ -203,7 +196,6 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
       setIsBiometricsEnabledState(enabled);
       await saveUserPreferences({ isBiometricsEnabled: enabled });
 
-      // If disabled, unlock immediately
       if (!enabled) {
         setIsLockedState(false);
       }

@@ -18,7 +18,7 @@ const STORAGE_KEYS = {
 
 export interface UserPreferences {
   isBiometricsEnabled?: boolean;
-  lockTimeoutMinutes?: number; // 0 = immediately upon leaving app, 1, 5, 15 minutes
+  lockTimeoutMinutes?: number;
   stats?: {
     notesCount: number;
     galleryCount: number;
@@ -27,37 +27,26 @@ export interface UserPreferences {
   };
 }
 
-/**
- * Returns a user-scoped key so multiple users on the same device don't see each other's data.
- */
 function getScopedKey(baseKey: string): string {
   const uid = auth.currentUser?.uid;
   return uid ? `${baseKey}_${uid}` : baseKey;
 }
 
-/**
- * Retrieves or generates a persistent encryption key stored in the device's secure enclave.
- */
 async function getEncryptionKey(): Promise<string> {
   const KEY_NAME = "MARK_X_ENCRYPTION_KEY";
   let key = await SecureStore.getItemAsync(KEY_NAME);
   if (!key) {
-    key = generateUUID() + generateUUID(); // Simple 64-char random key
+    key = generateUUID() + generateUUID();
     await SecureStore.setItemAsync(KEY_NAME, key);
   }
   return key;
 }
 
-/**
- * Loads and parses JSON data from AsyncStorage with automatic user scoping and legacy migration.
- * Transparently decrypts data encrypted with AES.
- */
 async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
+  const scopedKey = getScopedKey(baseKey);
   try {
-    const scopedKey = getScopedKey(baseKey);
     let raw = await AsyncStorage.getItem(scopedKey);
 
-    // Migrate legacy un-scoped data to user-scoped key if available
     if (raw === null && auth.currentUser?.uid) {
       raw = await AsyncStorage.getItem(baseKey);
       if (raw !== null) {
@@ -69,34 +58,46 @@ async function loadItem<T>(baseKey: string, defaultValue: T): Promise<T> {
     if (raw && raw.startsWith("ENC::")) {
       const ciphertext = raw.substring(5);
       const encKey = await getEncryptionKey();
-      const bytes = CryptoJS.AES.decrypt(ciphertext, encKey);
-      raw = bytes.toString(CryptoJS.enc.Utf8);
+      try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, encKey);
+        const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+        if (!decryptedStr) {
+          await AsyncStorage.removeItem(scopedKey);
+          return defaultValue;
+        }
+        raw = decryptedStr;
+      } catch (decErr) {
+        await AsyncStorage.removeItem(scopedKey);
+        return defaultValue;
+      }
     }
 
-    return raw ? JSON.parse(raw) : defaultValue;
+    if (!raw) return defaultValue;
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      await AsyncStorage.removeItem(scopedKey);
+      return defaultValue;
+    }
   } catch (error) {
-    console.warn(`[StorageService] Failed to load ${baseKey}:`, error);
+    await AsyncStorage.removeItem(scopedKey).catch(() => {});
     return defaultValue;
   }
 }
 
-/**
- * Serializes, encrypts, and saves JSON data to user-scoped AsyncStorage.
- */
 async function saveItem<T>(baseKey: string, value: T): Promise<void> {
   try {
     const key = getScopedKey(baseKey);
     const jsonStr = JSON.stringify(value);
     const encKey = await getEncryptionKey();
     const ciphertext = CryptoJS.AES.encrypt(jsonStr, encKey).toString();
-    
+
     await AsyncStorage.setItem(key, "ENC::" + ciphertext);
   } catch (error) {
     console.warn(`[StorageService] Failed to save ${baseKey}:`, error);
   }
 }
-
-// Drive Items
 
 function parseSizeToBytes(sizeStr?: string): number {
   if (!sizeStr) return 0;
@@ -117,13 +118,11 @@ export async function recalculateTotalUsedStorageGB(): Promise<number> {
   try {
     let totalBytes = 0;
 
-    // 1. Gallery pins (image/video file sizes)
     const pins = await loadCachedGalleryPins();
     for (const pin of pins) {
       totalBytes += pin.fileSize || (pin.mediaType === "video" ? 14800000 : 2800000);
     }
 
-    // 2. Drive items
     const driveItems = await loadDriveItems();
     for (const item of driveItems) {
       if (item.size) {
@@ -131,14 +130,12 @@ export async function recalculateTotalUsedStorageGB(): Promise<number> {
       }
     }
 
-    // 3. Notes
     const notes = await loadNotes();
     for (const note of notes) {
       totalBytes += (note.title?.length || 0) + (note.body?.length || 0);
     }
 
     const rawGB = totalBytes / (1024 * 1024 * 1024);
-    // If files/notes exist, guarantee at least 0.01 GB so small items don't round down to 0.00 GB
     const usedGB = totalBytes > 0 ? Math.max(0.01, parseFloat(rawGB.toFixed(3))) : 0;
     await updateStats({ usedStorageGB: usedGB });
     return usedGB;
@@ -153,9 +150,8 @@ async function updateStats(updates: Partial<NonNullable<UserPreferences["stats"]
   const currentStats = current.stats || { notesCount: 0, galleryCount: 0, driveCount: 0, usedStorageGB: 0 };
   const newStats = { ...currentStats, ...updates };
   await saveUserPreferences({ stats: newStats });
-  
+
   if (auth.currentUser?.uid) {
-    // Only update specific modified fields in Firestore (never overwrites other counters!)
     updateUserStats(auth.currentUser.uid, updates).catch(console.warn);
   }
 }
@@ -185,12 +181,14 @@ export const saveDriveItems = async (items: DriveItem[]) => {
   await recalculateTotalUsedStorageGB();
 };
 
-// Gallery Pins
-export const loadCachedGalleryPins = (): Promise<GalleryPin[]> =>
-  loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
+export const loadCachedGalleryPins = async (): Promise<GalleryPin[]> => {
+  const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
+  return [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+};
 
 export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
-  await saveItem(STORAGE_KEYS.GALLERY_PINS, pins);
+  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  await saveItem(STORAGE_KEYS.GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();
 };
 
@@ -207,7 +205,6 @@ export const updateGalleryStats = async (delta: number) => {
   await recalculateTotalUsedStorageGB();
 };
 
-// Notes
 export const loadNotes = () => loadItem<NoteItem[]>(STORAGE_KEYS.NOTES, []);
 export const saveNotes = async (notes: NoteItem[]) => {
   await saveItem(STORAGE_KEYS.NOTES, notes);
@@ -235,7 +232,6 @@ export const deleteNoteById = async (id: string): Promise<void> => {
   await saveNotes((await loadNotes()).filter((n) => n.id !== id));
 };
 
-// User Preferences
 export const loadUserPreferences = () =>
   loadItem<UserPreferences>(STORAGE_KEYS.USER_PREFERENCES, {
     isBiometricsEnabled: false,

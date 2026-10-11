@@ -39,7 +39,7 @@ export function StorageHeroCardSkeleton() {
 
   return (
     <View className="w-full mb-4 relative">
-      {/* --- 1. Back Peeking Card Skeleton --- */}
+      {}
       <View className="w-full bg-[#FFFFFF] rounded-[24px] pt-4 pb-16 px-5 flex-row justify-between items-start border border-black/[0.04]">
         <View className="flex-1 mr-3">
           <Animated.View
@@ -64,7 +64,7 @@ export function StorageHeroCardSkeleton() {
         </View>
       </View>
 
-      {/* --- 2. Front Overlapping Card Skeleton --- */}
+      {}
       <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
         <View className="flex-row justify-between items-start mb-1">
           <View>
@@ -84,7 +84,7 @@ export function StorageHeroCardSkeleton() {
           />
         </View>
 
-        {/* Action Button Pills Skeletons */}
+        {}
         <View className="flex-row items-center pt-1">
           <Animated.View
             style={{ opacity: pulseAnim }}
@@ -149,14 +149,13 @@ export function StorageHeroCard({
     "User";
   const firstName = rawName.trim().split(/\s+/)[0];
 
-  // Parse dynamic storage numbers for high-end typography
   const [whole, decimal = "00"] = usedStorage.includes(".")
     ? usedStorage.split(".")
     : [usedStorage, "00"];
 
   return (
     <View className="w-full mb-4 relative">
-      {/* --- 1. Back Peeking Card (Mark-X Cloud Tier) --- */}
+      {}
       <View className="w-full bg-[#FFFFFF] rounded-[24px] pt-4 pb-16 px-5 flex-row justify-between items-start border border-black/[0.04]">
         <View className="flex-1 mr-3">
           <Text
@@ -195,11 +194,11 @@ export function StorageHeroCard({
         </View>
       </View>
 
-      {/* --- 2. Front Overlapping Card (Signature Coral Card) --- */}
+      {}
       <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
-        {/* Top Metric Header Row */}
+        {}
         <View className="flex-row justify-between items-start mb-1">
-          {/* Large Storage Balance */}
+          {}
           <View>
             <Text
               allowFontScaling={false}
@@ -241,7 +240,7 @@ export function StorageHeroCard({
             )}
           </View>
 
-          {/* Right Status Capsule */}
+          {}
           <View className="flex-row items-center bg-black/15 px-2.5 py-1 rounded-full border border-white/20 mt-1 mb-10">
             <Ionicons name="cloud-done-outline" size={13} color="rgba(255,255,255,0.9)" style={{ marginRight: 4 }} />
             <Text
@@ -254,9 +253,9 @@ export function StorageHeroCard({
           </View>
         </View>
 
-        {/* Action Button Pills */}
+        {}
         <View className="flex-row items-center pt-1">
-          {/* Upload File Pill */}
+          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onUploadFile}
@@ -272,7 +271,7 @@ export function StorageHeroCard({
             </Text>
           </TouchableOpacity>
 
-          {/* Add Photo Pill */}
+          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onAddPhoto}
@@ -288,7 +287,7 @@ export function StorageHeroCard({
             </Text>
           </TouchableOpacity>
 
-          {/* More Options Pill */}
+          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onManageStorage}

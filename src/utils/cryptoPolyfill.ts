@@ -1,6 +1,5 @@
 import * as Crypto from 'expo-crypto';
 
-// Polyfill global.crypto.getRandomValues for Expo Go
 if (typeof global.crypto !== 'object') {
   // @ts-ignore
   global.crypto = {};

@@ -26,7 +26,6 @@ import { safePickImage } from "../../services/nativePickerService";
 import { updateUserMetadata } from "../../services/userService";
 import { triggerHaptic } from "../../utils/haptics";
 
-// ================= LIST ITEM ROW =================
 interface ProfileItemRowProps {
   iconName: keyof typeof Ionicons.glyphMap;
   label: string;
@@ -74,7 +73,6 @@ function ProfileItemRow({
   );
 }
 
-// ================= REUSABLE FIELD INPUT MODAL =================
 interface InputDialogProps {
   visible: boolean;
   onClose: () => void;
@@ -148,7 +146,6 @@ function InputDialog({
   );
 }
 
-// ================= MAIN SCREEN =================
 export default function PersonalInfoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -159,14 +156,12 @@ export default function PersonalInfoScreen() {
     "edit_name" | "edit_username" | "remove_photo" | null
   >(null);
 
-  // Profile fields
   const [displayName, setDisplayName] = useState(user?.displayName || "");
   const defaultUsername = user?.email
     ? user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "")
     : "user";
   const [username, setUsername] = useState(defaultUsername);
 
-  // Draft states
   const [draftName, setDraftName] = useState("");
   const [draftUsername, setDraftUsername] = useState("");
 
@@ -179,7 +174,6 @@ export default function PersonalInfoScreen() {
     Platform.OS === "android" ? (RNStatusBar.currentHeight || 24) : 16
   );
 
-  // Load saved extras from user-scoped storage
   useEffect(() => {
     async function loadExtras() {
       if (!user?.uid) return;
@@ -341,7 +335,6 @@ export default function PersonalInfoScreen() {
     onPress?: () => void;
   }
 
-  // Tab configurations
   const personalItems: ProfileItemConfig[] = [
     {
       icon: "person-outline",
@@ -395,7 +388,7 @@ export default function PersonalInfoScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Top Navigation Bar */}
+      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F0F0F0]"
@@ -431,7 +424,7 @@ export default function PersonalInfoScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {/* Profile Hero Row */}
+        {}
         <View className="flex-row items-center mb-6">
           <View className="relative mr-4">
             <TouchableOpacity
@@ -497,7 +490,7 @@ export default function PersonalInfoScreen() {
           </View>
         </View>
 
-        {/* Segmented Tabs */}
+        {}
         <View className="bg-[#F2F2F7] rounded-xl p-[3px] flex-row mb-6">
           {(
             [
@@ -531,7 +524,7 @@ export default function PersonalInfoScreen() {
           })}
         </View>
 
-        {/* Tab Items List */}
+        {}
         <View>
           {activeItems.map((item, index) => (
             <ProfileItemRow
@@ -546,7 +539,7 @@ export default function PersonalInfoScreen() {
         </View>
       </ScrollView>
 
-      {/* Edit Name Modal */}
+      {}
       <InputDialog
         visible={activeModal === "edit_name"}
         onClose={() => setActiveModal(null)}
@@ -561,7 +554,7 @@ export default function PersonalInfoScreen() {
         isLoading={isSaving}
       />
 
-      {/* Edit Username Modal */}
+      {}
       <InputDialog
         visible={activeModal === "edit_username"}
         onClose={() => setActiveModal(null)}
@@ -583,7 +576,7 @@ export default function PersonalInfoScreen() {
         isLoading={isSaving}
       />
 
-      {/* Remove Photo Confirmation Modal */}
+      {}
       <IosDialog
         visible={activeModal === "remove_photo"}
         onClose={() => setActiveModal(null)}

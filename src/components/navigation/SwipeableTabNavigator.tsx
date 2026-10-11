@@ -33,7 +33,7 @@ function SwipeableTabView({
   const swipedToIndex = useRef<number | null>(null);
 
   useEffect(() => {
-    // If navigation change was initiated by swipe gesture, ScrollView is already in position
+
     if (swipedToIndex.current === state.index) {
       swipedToIndex.current = null;
       return;
@@ -41,7 +41,7 @@ function SwipeableTabView({
     swipedToIndex.current = null;
 
     const targetX = state.index * windowWidth;
-    // Jump directly without animating linearly across intermediate pages (Instagram-style)
+
     scrollViewRef.current?.scrollTo({ x: targetX, animated: false });
   }, [state.index, windowWidth]);
 

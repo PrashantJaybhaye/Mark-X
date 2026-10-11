@@ -82,9 +82,6 @@ export interface FirestoreDevice {
   lastActive?: Timestamp | any;
 }
 
-/**
- * Registers / refreshes this device's heartbeat under `users/{userId}/devices/{deviceId}`.
- */
 export async function syncCurrentDevice(
   userId: string,
   deviceId: string,
@@ -115,9 +112,6 @@ export async function syncCurrentDevice(
   }
 }
 
-/**
- * Updates the lastActive timestamp for the current device session.
- */
 export async function touchDeviceHeartbeat(
   userId: string,
   deviceId: string
@@ -131,10 +125,6 @@ export async function touchDeviceHeartbeat(
   }
 }
 
-/**
- * Listens in real-time to the current device's session document in Firestore.
- * If another device revokes this session (deleting the document), onRevoked() triggers immediately.
- */
 export function listenCurrentDeviceRevocation(
   userId: string,
   deviceId: string,
@@ -171,9 +161,6 @@ export function listenCurrentDeviceRevocation(
   }
 }
 
-/**
- * Subscribes to real-time active devices in Firestore for the current user.
- */
 export function subscribeActiveDevices(
   userId: string,
   onUpdate: (devices: FirestoreDevice[]) => void
@@ -204,9 +191,6 @@ export function subscribeActiveDevices(
   }
 }
 
-/**
- * Removes a remote device from active devices in Firestore.
- */
 export async function removeActiveDevice(
   userId: string,
   deviceId: string
@@ -220,10 +204,6 @@ export async function removeActiveDevice(
   }
 }
 
-
-/**
- * Formats a Firestore timestamp into a relative time string ("Active now", "15m ago", "Yesterday").
- */
 export function formatDeviceActivity(timestamp: any): string {
   if (!timestamp) return "Active recently";
   try {

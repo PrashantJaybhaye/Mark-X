@@ -5,7 +5,6 @@ const NOTIFICATION_ID = 'upload_foreground';
 
 let activeUploads = 0;
 
-// Notifee headless foreground task
 notifee.registerForegroundService(() => new Promise(() => {}));
 
 async function ensureChannel() {

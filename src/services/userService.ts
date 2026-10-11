@@ -30,10 +30,6 @@ export interface UserMetadata {
   };
 }
 
-/**
- * Synchronizes user authentication metadata to Cloud Firestore under `users/{userId}`.
- * Preserves existing data using { merge: true }.
- */
 export async function syncUserMetadata(
   user: FirebaseAuthTypes.User,
   isNewUser: boolean = false
@@ -73,9 +69,6 @@ export async function syncUserMetadata(
   }
 }
 
-/**
- * Updates specific fields in user metadata (e.g. displayName, photoURL).
- */
 export async function updateUserMetadata(
   uid: string,
   updates: Partial<Omit<UserMetadata, "uid">>
@@ -97,9 +90,6 @@ export async function updateUserMetadata(
   }
 }
 
-/**
- * Updates individual user stats fields atomically in Firestore without overwriting other counters.
- */
 export async function updateUserStats(
   uid: string,
   statsUpdates: Partial<{
@@ -138,9 +128,6 @@ export async function updateUserStats(
   }
 }
 
-/**
- * Subscribes to real-time user stats updates from Firestore.
- */
 export function subscribeUserStats(
   uid: string,
   onUpdate: (stats: NonNullable<UserMetadata["stats"]>) => void
@@ -162,9 +149,6 @@ export function subscribeUserStats(
   }
 }
 
-/**
- * Fetches user metadata document from Firestore.
- */
 export async function getUserMetadata(
   uid: string
 ): Promise<UserMetadata | null> {
@@ -182,4 +166,3 @@ export async function getUserMetadata(
     return null;
   }
 }
-

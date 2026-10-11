@@ -27,9 +27,6 @@ function DriveFileListComponent({
 }: DriveFileListProps) {
   const query = searchQuery.trim().toLowerCase();
 
-  /**
-   * Pre-calculate folder child item counts map: folderId -> count
-   */
   const childCountMap = useMemo(() => {
     const map: Record<string, number> = {};
     for (const item of files) {
@@ -40,28 +37,23 @@ function DriveFileListComponent({
     return map;
   }, [files]);
 
-  /**
-   * Filter and sort files.
-   */
   const filteredFiles = useMemo(() => {
     let result = files;
 
-    // If searching, search across everything
     if (query) {
       result = result.filter((file) => file.name.toLowerCase().includes(query));
     } else {
-      // Filter by folder hierarchy when not searching
+
       result = result.filter((file) => {
         if (!currentFolderId) {
-          return !file.parentId; // Root level items
+          return !file.parentId;
         }
         return file.parentId === currentFolderId;
       });
     }
 
-    // Sort files by name (or folders first then files)
     result = [...result].sort((a, b) => {
-      // Keep folders at top
+
       if (a.isFolder && !b.isFolder) return -1;
       if (!a.isFolder && b.isFolder) return 1;
 
@@ -72,9 +64,6 @@ function DriveFileListComponent({
     return result;
   }, [files, currentFolderId, query, sortOrder]);
 
-  /**
-   * Stable item press handler.
-   */
   const handleItemPress = useCallback(
     (item: DriveItem) => {
       onItemPress?.(item);
@@ -82,9 +71,6 @@ function DriveFileListComponent({
     [onItemPress]
   );
 
-  /**
-   * Stable options handler.
-   */
   const handleOptionsPress = useCallback(
     (item: DriveItem) => {
       onOptionsPress?.(item);
@@ -92,9 +78,6 @@ function DriveFileListComponent({
     [onOptionsPress]
   );
 
-  /**
-   * FlatList render function with stable memoized row item.
-   */
   const renderItem: ListRenderItem<DriveItem> = useCallback(
     ({ item }) => {
       const count = item.isFolder ? childCountMap[item.id] || 0 : undefined;
@@ -113,9 +96,6 @@ function DriveFileListComponent({
 
   const keyExtractor = useCallback((item: DriveItem) => item.id, []);
 
-  /**
-   * Empty state logic.
-   */
   const listEmpty = useMemo(() => {
     if (query) {
       return (

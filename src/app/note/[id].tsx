@@ -29,7 +29,6 @@ import {
 import { syncNoteToFirestore, deleteNoteFromFirestore } from "../../services/notesSyncService";
 import { triggerHaptic } from "../../utils/haptics";
 
-
 const BLOCK_TYPOGRAPHY: Record<string, { fontFamily: string; fontSize: number; lineHeight: number; color: string; includeFontPadding: boolean }> = {
   title: { fontFamily: "Outfit_700Bold", fontSize: 24, lineHeight: 28, color: "#111111", includeFontPadding: false },
   heading: { fontFamily: "Outfit_700Bold", fontSize: 20, lineHeight: 25, color: "#1C1C1E", includeFontPadding: false },
@@ -118,12 +117,12 @@ function parseFormattedText(rawText: string) {
   let text = "";
   const formats: FormatRange[] = [];
   const parts = rawText.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|<u>[^<]+<\/u>)/g);
-  
+
   for (const part of parts) {
     if (!part) continue;
     let type: "bold" | "italic" | "underline" | "strikethrough" | null = null;
     let content = part;
-    
+
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) { type = "bold"; content = part.slice(2, -2); }
     else if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) { type = "strikethrough"; content = part.slice(2, -2); }
     else if (part.startsWith("<u>") && part.endsWith("</u>") && part.length >= 7) { type = "underline"; content = part.slice(3, -4); }
@@ -134,7 +133,7 @@ function parseFormattedText(rawText: string) {
     }
     text += content;
   }
-  
+
   return { text, formats };
 }
 
@@ -337,12 +336,12 @@ export default function NoteDetailScreen() {
   const handleBack = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     Keyboard.dismiss();
-    
+
     if (hasUnsavedChanges.current) {
       setActiveDialog("unsaved");
       return;
     }
-    
+
     router.back();
   };
 
@@ -378,8 +377,6 @@ export default function NoteDetailScreen() {
     latestTitleRef.current = nextTitle;
     hasUnsavedChanges.current = true;
   };
-
-  // Removed automatic unmount save to ensure explicit saving
 
   const handleUndo = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
@@ -489,16 +486,16 @@ export default function NoteDetailScreen() {
         updated[activeBlockIndex] = { ...cur, type: cur.type === listType ? "paragraph" : listType };
       } else if (["bold", "italic", "underline", "strikethrough"].includes(type)) {
         const key = type as "bold" | "italic" | "underline" | "strikethrough";
-        
+
         const { start, end } = activeSelection;
         const selStart = Math.min(start, end);
         const selEnd = Math.max(start, end);
-        
+
         if (selStart !== selEnd) {
           const length = selEnd - selStart;
           const formats = cur.formats ? [...cur.formats] : [];
           const isFullyFormatted = formats.some(f => f.type === key && f.start <= selStart && f.start + f.length >= selEnd);
-          
+
           if (isFullyFormatted) {
             const newFormats = [];
             for (const f of formats) {
@@ -608,7 +605,7 @@ export default function NoteDetailScreen() {
       if (updated[index]) {
         const cur = updated[index];
         const oldText = cur.text;
-        
+
         let start = 0;
         while (start < oldText.length && start < text.length && oldText[start] === text[start]) start++;
         let oldEnd = oldText.length - 1;
@@ -616,7 +613,7 @@ export default function NoteDetailScreen() {
         while (oldEnd >= start && newEnd >= start && oldText[oldEnd] === text[newEnd]) {
           oldEnd--; newEnd--;
         }
-        
+
         const removedLen = oldEnd - start + 1;
         const addedLen = newEnd - start + 1;
         const delta = addedLen - removedLen;
@@ -629,7 +626,6 @@ export default function NoteDetailScreen() {
             fStart += delta;
             fEnd += delta;
           } else if (start >= fEnd) {
-            // no change
           } else {
             if (addedLen > 0 && removedLen === 0) {
               fEnd += addedLen;

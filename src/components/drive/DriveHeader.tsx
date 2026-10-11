@@ -30,7 +30,7 @@ export function DriveHeader({
 }: DriveHeaderProps) {
   return (
     <View className="bg-white border-b border-[#E6E8EC]">
-      {/* 1. Top Safe Container + Redesigned Floating Search Bar */}
+      {}
       <View
         className="px-4 pb-2.5"
         style={{
@@ -38,10 +38,10 @@ export function DriveHeader({
         }}
       >
         <View className="flex-row items-center bg-[#F0F2F5] border border-[#E2E8F0] rounded-full px-4 h-[48px]">
-          {/* Left: Search Icon */}
+          {}
           <Ionicons name="search" size={19} color="#5F6368" />
 
-          {/* Center: Search Input */}
+          {}
           <TextInput
             placeholder="Search files & folders..."
             placeholderTextColor="#70757A"
@@ -53,7 +53,7 @@ export function DriveHeader({
             clearButtonMode="while-editing"
           />
 
-          {/* Right: Clear button when search query exists */}
+          {}
           {search.length > 0 && (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -70,11 +70,11 @@ export function DriveHeader({
         </View>
       </View>
 
-      {/* 2. Tabs Switcher Row: "Drive" | "Folders" + Sort & Layout Controls */}
+      {}
       <View className="flex-row items-center justify-between px-4 pt-1">
-        {/* Left: Drive & Folders Tabs */}
+        {}
         <View className="flex-row items-center gap-6">
-          {/* Tab 1: My Drive */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -97,7 +97,7 @@ export function DriveHeader({
             )}
           </TouchableOpacity>
 
-          {/* Tab 2: Folders */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -121,9 +121,9 @@ export function DriveHeader({
           </TouchableOpacity>
         </View>
 
-        {/* Right: Sort & Grid/List View Mode Controls */}
+        {}
         <View className="flex-row items-center pb-1 gap-1.5">
-          {/* Sort Order Button */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -140,7 +140,7 @@ export function DriveHeader({
             />
           </TouchableOpacity>
 
-          {/* Grid / List Layout Switcher Button */}
+          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {

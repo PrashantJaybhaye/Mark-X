@@ -155,7 +155,7 @@ export function GalleryPinOptionsSheet({
         onRequestClose={() => animateClose()}
       >
         <View className="flex-1 justify-end">
-          {/* Animated Backdrop Fade Overlay */}
+          {}
           <TouchableWithoutFeedback onPress={() => animateClose()}>
             <Animated.View
               style={{
@@ -170,7 +170,7 @@ export function GalleryPinOptionsSheet({
             />
           </TouchableWithoutFeedback>
 
-          {/* Animated Sheet Container */}
+          {}
           <TouchableWithoutFeedback>
             <Animated.View
               className="bg-[#F5F4F0] rounded-t-[32px] px-5 pt-4 shadow-2xl relative border-t border-black/[0.05]"
@@ -179,7 +179,7 @@ export function GalleryPinOptionsSheet({
                 paddingBottom: Math.max(insets.bottom, 20) + 8,
               }}
             >
-              {/* Centered Floating Preview Thumbnail Card */}
+              {}
               <View className="items-center mb-1">
                 <View className="-mt-24 rounded-[22px] shadow-2xl overflow-hidden bg-[#E7E4DC]">
                   <Image
@@ -195,9 +195,9 @@ export function GalleryPinOptionsSheet({
                 </View>
               </View>
 
-              {/* 2 Main Action Cards Row */}
+              {}
               <View className="flex-row gap-3 my-4">
-                {/* Save / Bookmark Card */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.75}
                   onPress={handleSave}
@@ -214,7 +214,7 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {/* Remove Pin Card */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.75}
                   onPress={handleRemovePress}
@@ -232,9 +232,9 @@ export function GalleryPinOptionsSheet({
                 </TouchableOpacity>
               </View>
 
-              {/* List Action Rows Below */}
+              {}
               <View className="gap-0.5 mt-1">
-                {/* Export / Download */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleExport}
@@ -246,7 +246,7 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {/* Media Details */}
+                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleInfo}
@@ -258,7 +258,7 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {/* Author Info */}
+                {}
                 <View className="flex-row items-center py-3.5 px-2 rounded-xl">
                   <Ionicons name="person-outline" size={22} color="#70757A" style={{ marginRight: 16 }} />
                   <Text allowFontScaling={false} className="text-[15.5px] font-outfit-medium text-[#70757A]">
@@ -271,7 +271,7 @@ export function GalleryPinOptionsSheet({
         </View>
       </Modal>
 
-      {/* Confirmation iOS Modal for Remove Pin */}
+      {}
       <IosDialog
         visible={showRemoveConfirm}
         title="Remove Pin"
@@ -292,7 +292,7 @@ export function GalleryPinOptionsSheet({
         onClose={handleCancelRemove}
       />
 
-      {/* Download / Export Media Success iOS Dialog */}
+      {}
       <IosDialog
         visible={showExportSuccess}
         title="Saved to Device"
@@ -318,12 +318,3 @@ export function GalleryPinOptionsSheet({
 }
 
 export const ApplePhotoOptionsSheet = GalleryPinOptionsSheet;
-
-
-
-
-
-
-
-
-

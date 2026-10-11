@@ -7,12 +7,12 @@ export interface GalleryPin {
   fileName?: string;
   mediaType?: "image" | "video";
   duration?: number;
-  aspectRatio: number; // width / height (e.g. 0.65 to 1.3)
+  aspectRatio: number;
   likes: number;
   isLiked?: boolean;
   saved?: boolean;
   uploadStatus?: "uploading" | "synced" | "failed";
-  // Rich media metadata
+
   width?: number;
   height?: number;
   fileSize?: number;
@@ -25,9 +25,6 @@ export interface GalleryPin {
 
 export const DEFAULT_BLURHASH = "L6PZfSi_.AyE_3t7t7R**0o#DGR4";
 
-/**
- * Generates a compressed 350px JPEG thumbnail locally for instant grid loading.
- */
 export async function createLocalThumbnail(localUri: string, width = 350): Promise<string> {
   if (!localUri || typeof localUri !== "string") return localUri;
   if (localUri.endsWith(".mp4") || localUri.endsWith(".mov") || localUri.endsWith(".webm")) {
@@ -48,14 +45,9 @@ export async function createLocalThumbnail(localUri: string, width = 350): Promi
   }
 }
 
-/**
- * Transforms an image URL into a low-bandwidth grid thumbnail URL (350px WebP).
- * Reduces image payload size by ~90-95% for fast masonry grid rendering.
- */
 export function getGridThumbnailUrl(url: string, width = 350, quality = 80): string {
   if (!url || typeof url !== "string") return url;
-  
-  // Local file URIs and data URLs don't need CDN transformations
+
   if (
     url.startsWith("file://") ||
     url.startsWith("ph://") ||
@@ -65,13 +57,11 @@ export function getGridThumbnailUrl(url: string, width = 350, quality = 80): str
     return url;
   }
 
-  // Videos don't support image resizing query params
   const cleanUrl = url.split("?")[0].toLowerCase();
   if (cleanUrl.endsWith(".mp4") || cleanUrl.endsWith(".mov") || cleanUrl.endsWith(".webm")) {
     return url;
   }
 
-  // Append Cloudflare Image Resizing parameters (width, webp format, quality)
   const hasQuery = url.includes("?");
   const separator = hasQuery ? "&" : "?";
 
@@ -90,10 +80,6 @@ export function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-/**
- * Derives or generates a unique time-based file name (e.g. 1726838846565.jpg or 1726838846565.mp4).
- * Millisecond timestamps are always unique.
- */
 export function generateShortFileName(options: {
   fileName?: string;
   uri?: string;
@@ -105,7 +91,6 @@ export function generateShortFileName(options: {
   const isVideo = options.mediaType === "video";
   const defaultExt = isVideo ? ".mp4" : ".jpg";
 
-  // 1. If explicit fileName is ALREADY a valid millisecond timestamp (12-14 digits)
   if (options.fileName && typeof options.fileName === "string") {
     const trimmed = options.fileName.trim();
     const baseWithoutExt = trimmed.replace(/\.[^/.]+$/, "");
@@ -117,7 +102,6 @@ export function generateShortFileName(options: {
     }
   }
 
-  // 2. If createdAt timestamp exists, use its unique millisecond time
   if (options.createdAt) {
     if (typeof options.createdAt.toMillis === "function") {
       return `${options.createdAt.toMillis()}${defaultExt}`;
@@ -134,13 +118,11 @@ export function generateShortFileName(options: {
     }
   }
 
-  // 3. If ID contains timestamp digits (e.g. pin-1726838846565), extract them
   const digits = (options.id || "").replace(/\D/g, "");
   if (digits.length >= 12) {
     return `${digits.slice(-13)}${defaultExt}`;
   }
 
-  // 4. Default: Always unique millisecond time
   return `${Date.now()}${defaultExt}`;
 }
 
@@ -200,4 +182,3 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
     updatedAt: pin.updatedAt,
   };
 }
-

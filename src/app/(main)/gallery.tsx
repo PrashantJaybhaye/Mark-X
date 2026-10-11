@@ -30,11 +30,11 @@ import { safePickMultipleImages } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
 import { loadCachedGalleryPins, saveCachedGalleryPins } from "../../services/storageService";
-import { 
+import {
   fetchGalleryPinsPage,
   GALLERY_PAGE_LIMIT,
-  addGalleryPinToServer, 
-  deleteGalleryPinFromServer, 
+  addGalleryPinToServer,
+  deleteGalleryPinFromServer,
   updateGalleryPinInServer,
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
@@ -44,12 +44,10 @@ export default function GalleryScreen() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
 
-  // 2-column masonry grid layout parameters
   const gutter = 6;
   const sideMargin = 8;
   const columnWidth = (windowWidth - sideMargin * 2 - gutter) / 2;
 
-  // Gallery state
   const [pins, setPins] = useState<GalleryPin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -58,7 +56,6 @@ export default function GalleryScreen() {
   const [optionsPin, setOptionsPin] = useState<GalleryPin | null>(null);
   const [infoPin, setInfoPin] = useState<GalleryPin | null>(null);
 
-  // References & animations
   const scrollViewRef = useRef<ScrollView>(null);
   const lastDocRef = useRef<any>(null);
   const isNavigatingRef = useRef(false);
@@ -72,7 +69,6 @@ export default function GalleryScreen() {
     };
   }, []);
 
-  // Background image prefetcher for seamless scrolling
   const prefetchPinImages = useCallback((pinList: GalleryPin[]) => {
     pinList.forEach((pin) => {
       if (pin.imageUrl && (pin.imageUrl.startsWith("http://") || pin.imageUrl.startsWith("https://"))) {
@@ -82,7 +78,6 @@ export default function GalleryScreen() {
     });
   }, [columnWidth]);
 
-  // Helper: update a single pin across state and local storage cache
   const updatePinState = useCallback((id: string, updates: Partial<GalleryPin>) => {
     setPins((prev) => {
       const updated = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
@@ -91,7 +86,6 @@ export default function GalleryScreen() {
     });
   }, []);
 
-  // Upload a media pin to cloud storage and sync Firestore with retry capability
   const uploadAndSyncPin = useCallback(async (pin: GalleryPin) => {
     updatePinState(pin.id, { uploadStatus: "uploading" });
 
@@ -99,7 +93,7 @@ export default function GalleryScreen() {
       const isVideo = pin.mediaType === "video";
       const mime = pin.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
       const safeFileName = pin.fileName || `${pin.id}.${isVideo ? "mp4" : "jpg"}`;
-      
+
       const res = await executeUploadWithRetry(
         {
           id: pin.id,
@@ -129,7 +123,6 @@ export default function GalleryScreen() {
     }
   }, [updatePinState]);
 
-
   const loadFirstPage = useCallback(async (showSkeleton = false) => {
     if (showSkeleton && isMountedRef.current) setIsLoading(true);
     try {
@@ -141,7 +134,6 @@ export default function GalleryScreen() {
       await saveCachedGalleryPins(result.pins);
       prefetchPinImages(result.pins);
 
-      // Proactively pre-buffer the next page in background if more items exist
       if (result.hasMore && result.lastVisibleDoc) {
         fetchGalleryPinsPage(result.lastVisibleDoc, GALLERY_PAGE_LIMIT).then((nextResult) => {
           if (!isMountedRef.current || nextResult.pins.length === 0) return;
@@ -165,7 +157,6 @@ export default function GalleryScreen() {
     }
   }, [prefetchPinImages]);
 
-  // Load next batch of 12 items on scroll
   const handleLoadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore || !lastDocRef.current) return;
     if (isMountedRef.current) setIsLoadingMore(true);
@@ -193,7 +184,6 @@ export default function GalleryScreen() {
     }
   }, [isLoadingMore, hasMore, prefetchPinImages]);
 
-  
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 1200;
@@ -202,7 +192,6 @@ export default function GalleryScreen() {
     }
   }, [hasMore, isLoadingMore, isLoading, isRefreshing, handleLoadMore]);
 
-  // Auto-resume any interrupted uploads (e.g. if user closed app while uploading)
   const resumeInterruptedUploads = useCallback((currentPins: GalleryPin[]) => {
     const interrupted = currentPins.filter(
       (p) => p.uploadStatus === "uploading" && p.imageUrl && !p.imageUrl.startsWith("http")
@@ -284,7 +273,6 @@ export default function GalleryScreen() {
     };
   }, [loadFirstPage, resumeInterruptedUploads]);
 
-  // Retry failed uploads
   const failedPins = useMemo(() => pins.filter((p) => p.uploadStatus === "failed"), [pins]);
   const handleRetryFailedUploads = useCallback(() => {
     if (failedPins.length === 0) return;
@@ -292,7 +280,6 @@ export default function GalleryScreen() {
     failedPins.forEach(uploadAndSyncPin);
   }, [failedPins, uploadAndSyncPin]);
 
-  // Navigate to pin detail
   const handleSelectPin = useCallback((pin: GalleryPin) => {
     if (pin.uploadStatus === "failed") {
       handleRetryFailedUploads();
@@ -311,7 +298,6 @@ export default function GalleryScreen() {
     });
   }, [router, handleRetryFailedUploads]);
 
-  // Masonry column balancing (Saved pins at top)
   const { leftPins, rightPins } = useMemo(() => {
     const left: GalleryPin[] = [];
     const right: GalleryPin[] = [];
@@ -343,7 +329,6 @@ export default function GalleryScreen() {
     return { leftPins: left, rightPins: right };
   }, [pins, columnWidth]);
 
-  // Bookmark / Save toggle
   const handleSaveToggle = async (pinId: string) => {
     const pin = pins.find((p) => p.id === pinId);
     if (!pin) return;
@@ -352,7 +337,6 @@ export default function GalleryScreen() {
     await updateGalleryPinInServer(pinId, { saved: newSaved });
   };
 
-  // Hide pin
   const handleHidePin = async (pinId: string) => {
     setPins((prev) => {
       const updated = prev.filter((p) => p.id !== pinId);
@@ -362,7 +346,6 @@ export default function GalleryScreen() {
     await deleteGalleryPinFromServer(pinId);
   };
 
-  // Manual refresh
   const handleRefreshPress = async () => {
     if (isRefreshing) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -385,7 +368,6 @@ export default function GalleryScreen() {
     }
   };
 
-  // Pick and upload up to 5 media items
   const handleAddPhoto = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     const results = await safePickMultipleImages(5);
@@ -447,13 +429,13 @@ export default function GalleryScreen() {
       <StatusBar style="dark" />
 
       <SafeAreaView edges={["top"]} className="flex-1 bg-white">
-        {/* Top Header: Logo + Actions */}
+        {}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#F2F2F2]">
           <View className="justify-center">
             <MarkXLogo width={115} height={16} color="#111111" />
           </View>
 
-          {/* Action Pill: Refresh & Add */}
+          {}
           <View className="flex-row items-center bg-[#F0F2F4] border border-[#E5E7EB] rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
               activeOpacity={0.7}
@@ -476,7 +458,7 @@ export default function GalleryScreen() {
           </View>
         </View>
 
-        {/* 2-Column Pinterest-Style Masonry Feed */}
+        {}
         <ScrollView
           ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
@@ -497,7 +479,7 @@ export default function GalleryScreen() {
           ) : (
             <>
               <View className="flex-row w-full" style={{ gap: gutter }}>
-                {/* Left Column */}
+                {}
                 <View style={{ width: columnWidth }}>
                   {leftPins.map((pin) => (
                     <GalleryPinCard
@@ -510,7 +492,7 @@ export default function GalleryScreen() {
                   ))}
                 </View>
 
-                {/* Right Column */}
+                {}
                 <View style={{ width: columnWidth }}>
                   {rightPins.map((pin) => (
                     <GalleryPinCard
@@ -524,7 +506,7 @@ export default function GalleryScreen() {
                 </View>
               </View>
 
-              {/* Infinite Scroll 12-Item Batch Indicator */}
+              {}
               {isLoadingMore && (
                 <View className="py-6 items-center justify-center">
                   <ActivityIndicator size="small" color="#111111" />
@@ -535,7 +517,7 @@ export default function GalleryScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Pin Options Bottom Sheet */}
+      {}
       <GalleryPinOptionsSheet
         pin={optionsPin}
         visible={!!optionsPin}
@@ -545,7 +527,7 @@ export default function GalleryScreen() {
         onInfo={(pin) => setInfoPin(pin)}
       />
 
-      {/* Pin Media Info Sheet */}
+      {}
       <GalleryPinInfoSheet
         visible={!!infoPin}
         pin={infoPin}

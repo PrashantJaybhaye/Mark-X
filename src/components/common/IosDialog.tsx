@@ -26,9 +26,6 @@ export interface IosDialogProps {
   onClose?: () => void;
 }
 
-/**
- * Pixel-perfect, reusable iOS Alert Dialog modal matching Mark-X design language.
- */
 export function IosDialog({
   visible,
   title,
@@ -66,7 +63,7 @@ export function IosDialog({
         <View className="flex-1 bg-black/40 items-center justify-center px-8">
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
             <View className="w-[272px] bg-[#F2F2F2] rounded-[14px] overflow-hidden shadow-2xl">
-              {/* Content Area */}
+              {}
               <View className="pt-5 px-4 pb-4 items-center">
                 <Text
                   className="text-[17px] text-[#000000] text-center mb-1.5"
@@ -85,10 +82,10 @@ export function IosDialog({
                 {children}
               </View>
 
-              {/* Hairline Divider */}
+              {}
               <View className="h-[0.5px] bg-[#3C3C43]/20" />
 
-              {/* Actions Area */}
+              {}
               <View className={actions.length === 2 ? "flex-row h-[44px]" : ""}>
                 {actions.map((action, idx) => (
                   <React.Fragment key={action.text}>
