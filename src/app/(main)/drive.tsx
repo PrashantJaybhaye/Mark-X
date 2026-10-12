@@ -15,7 +15,7 @@ import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
 import { DriveFileOptionsSheet } from "../../components/drive/DriveFileOptionsSheet";
 import { DriveFilePreviewScreen } from "../../components/drive/DriveFilePreviewScreen";
-import { UploadStatusToast } from "../../components/drive/UploadStatusToast";
+import { UploadStatusToast, ToastStatusType } from "../../components/drive/UploadStatusToast";
 
 import { DriveItem, DriveFileCategory, getFileCategory } from "../../utils/driveFileTypes";
 import { safePickDocument, safePickImage } from "../../services/nativePickerService";
@@ -114,11 +114,26 @@ export default function DriveScreen() {
   const [isToastOpen, setIsToastOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [toastDetail, setToastDetail] = useState("");
+  const [toastType, setToastType] = useState<ToastStatusType>("success");
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const triggerToast = (name: string, _category: any, detail: string) => {
+  const triggerToast = (name: string, typeOrCategory: ToastStatusType | any, detail: string) => {
     setFileName(name);
     setToastDetail(detail);
+    if (
+      typeOrCategory === "uploading" ||
+      typeOrCategory === "success" ||
+      typeOrCategory === "delete" ||
+      typeOrCategory === "folder" ||
+      typeOrCategory === "star" ||
+      typeOrCategory === "rename" ||
+      typeOrCategory === "export" ||
+      typeOrCategory === "error"
+    ) {
+      setToastType(typeOrCategory);
+    } else {
+      setToastType("success");
+    }
     setIsToastOpen(true);
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -207,7 +222,7 @@ export default function DriveScreen() {
       };
 
       updateFilesAndPersist((prev) => [newItem, ...prev]);
-      triggerToast(newItem.name, category, "Uploading to Cloud Storage...");
+      triggerToast(newItem.name, "uploading", "Uploading to Cloud Storage...");
 
       saveDriveItemToServer(newItem).catch((err) =>
         console.warn("[Drive] Firebase metadata write error:", err)
@@ -223,13 +238,13 @@ export default function DriveScreen() {
                   : f
               )
             );
-            triggerToast(newItem.name, category, "Saved to Cloud Storage");
+            triggerToast(newItem.name, "success", "Saved to Cloud Storage");
           } else {
             console.warn("[Drive] Cloudflare upload error:", cfRes.error);
             updateFilesAndPersist((prev) =>
               prev.map((f) => (f.id === newItem.id ? { ...f, uploading: false } : f))
             );
-            triggerToast(newItem.name, category, "Saved locally");
+            triggerToast(newItem.name, "success", "Saved locally");
           }
         })
         .catch((err) => {
@@ -275,7 +290,7 @@ export default function DriveScreen() {
     );
     triggerToast(
       item.name,
-      item.category,
+      "star",
       nextStarred ? "Added to Starred" : "Removed from Starred"
     );
   };
@@ -293,7 +308,7 @@ export default function DriveScreen() {
         return f;
       })
     );
-    triggerToast(`Renamed to "${newName}"`, "document", "Name updated & synced");
+    triggerToast(`Renamed to "${newName}"`, "rename", "Name updated & synced");
   };
 
   const handleDeleteFile = (id: string) => {
@@ -320,19 +335,19 @@ export default function DriveScreen() {
       return prev.filter((f) => !idsToDelete.has(f.id));
     });
     if (fileToDelete) {
-      triggerToast(`Deleted "${fileToDelete.name}"`, fileToDelete.category, "Removed from Drive & Cloud");
+      triggerToast(`Deleted "${fileToDelete.name}"`, "delete", "Removed from Drive & Cloud");
     }
   };
 
   const handleShareFile = async (item: DriveItem) => {
     if (item.isFolder) {
-      triggerToast("Cannot Export", "folder", "Folders cannot be exported as a single file");
+      triggerToast("Cannot Export", "error", "Folders cannot be exported as a single file");
       return;
     }
-    triggerToast(`Exporting "${item.name}"...`, item.category, "Preparing file attachment");
+    triggerToast(`Exporting "${item.name}"...`, "export", "Preparing file attachment");
     const result = await exportDriveFile(item);
     if (!result.success && result.error) {
-      triggerToast("Export Failed", item.category, result.error);
+      triggerToast("Export Failed", "error", result.error);
     }
   };
 
@@ -421,6 +436,7 @@ export default function DriveScreen() {
         visible={isToastOpen}
         fileName={fileName}
         detail={toastDetail}
+        type={toastType}
         onClose={() => setIsToastOpen(false)}
         bottomInset={0}
       />
