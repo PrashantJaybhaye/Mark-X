@@ -1,6 +1,6 @@
-import React from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Text, TouchableOpacity, View } from "react-native";
 import { triggerHaptic } from "../../utils/haptics";
 
 export type ToastStatusType =
@@ -14,6 +14,72 @@ export type ToastStatusType =
   | "error"
   | "info";
 
+interface ToastVisuals {
+  iconName?: keyof typeof Ionicons.glyphMap;
+  color: string;
+  isSpinner?: boolean;
+}
+
+export function getToastVisuals(
+  type?: ToastStatusType,
+  fileName?: string,
+  detail?: string
+): ToastVisuals {
+  const lowerDetail = (detail || "").toLowerCase();
+  const lowerName = (fileName || "").toLowerCase();
+
+  // 1. In-progress upload
+  if (type === "uploading" || lowerDetail.includes("uploading") || lowerName.includes("uploading")) {
+    return { isSpinner: true, color: "#1A73E8" };
+  }
+
+  // 2. Folder operations
+  if (type === "folder" || lowerDetail.includes("folder created") || lowerName.startsWith("new folder")) {
+    return { iconName: "folder-open-outline", color: "#F59E0B" }; // Amber / Google Drive folder
+  }
+
+  // 3. Star toggle
+  if (type === "star" || lowerDetail.includes("starred")) {
+    if (lowerDetail.includes("removed")) {
+      return { iconName: "star-outline", color: "#5F6368" };
+    }
+    return { iconName: "star", color: "#FBBC04" }; // Google Drive gold star
+  }
+
+  // 4. Rename
+  if (type === "rename" || lowerName.startsWith("renamed") || lowerDetail.includes("name updated")) {
+    return { iconName: "pencil", color: "#1A73E8" }; // Google blue
+  }
+
+  // 5. Export / Share
+  if (type === "export" || lowerDetail.includes("export") || lowerDetail.includes("attachment")) {
+    return { iconName: "share-social", color: "#4F46E5" }; // Indigo
+  }
+
+  // 6. Delete
+  if (type === "delete" || lowerName.startsWith("deleted") || lowerDetail.includes("removed from drive")) {
+    return { iconName: "trash", color: "#D93025" }; // Google red
+  }
+
+  // 7. Error
+  if (
+    type === "error" ||
+    lowerDetail.includes("failed") ||
+    lowerName.includes("error") ||
+    lowerName.includes("cannot")
+  ) {
+    return { iconName: "alert-circle", color: "#D93025" }; // Google red
+  }
+
+  // 8. Info
+  if (type === "info") {
+    return { iconName: "information-circle", color: "#1A73E8" };
+  }
+
+  // 9. Success (Solid checkmark-circle for clear, premium completion UX)
+  return { iconName: "checkmark-circle-outline", color: "#1E8E3E" }; // Google green
+}
+
 interface UploadStatusToastProps {
   visible: boolean;
   fileName: string;
@@ -23,136 +89,83 @@ interface UploadStatusToastProps {
   bottomInset?: number;
 }
 
-function resolveToastIcon(
-  type?: ToastStatusType,
-  fileName = "",
-  detail = ""
-): {
-  iconName: keyof typeof Ionicons.glyphMap;
-  color: string;
-  bgColor: string;
-  isLoading?: boolean;
-} {
-  const combined = `${fileName} ${detail}`.toLowerCase();
-
-  if (type === "delete" || combined.includes("delete") || combined.includes("removed")) {
-    return {
-      iconName: "trash-outline",
-      color: "#FF453A",
-      bgColor: "bg-red-500/10",
-    };
-  }
-
-  if (
-    type === "error" ||
-    combined.includes("failed") ||
-    combined.includes("error") ||
-    combined.includes("cannot")
-  ) {
-    return {
-      iconName: "alert-circle-outline",
-      color: "#FF453A",
-      bgColor: "bg-red-500/10",
-    };
-  }
-
-  if (
-    type === "uploading" ||
-    combined.includes("uploading") ||
-    combined.includes("preparing")
-  ) {
-    return {
-      iconName: "cloud-upload-outline",
-      color: "#1A73E8",
-      bgColor: "bg-blue-500/10",
-      isLoading: true,
-    };
-  }
-
-  if (
-    type === "folder" ||
-    combined.includes("folder created") ||
-    combined.includes("folder")
-  ) {
-    return {
-      iconName: "folder-outline",
-      color: "#F59E0B",
-      bgColor: "bg-amber-500/10",
-    };
-  }
-
-  if (type === "star" || combined.includes("starred")) {
-    const isUnstar = combined.includes("removed");
-    return {
-      iconName: isUnstar ? "star-outline" : "star",
-      color: "#FFB800",
-      bgColor: "bg-yellow-500/10",
-    };
-  }
-
-  if (
-    type === "rename" ||
-    combined.includes("renamed") ||
-    combined.includes("name updated")
-  ) {
-    return {
-      iconName: "create-outline",
-      color: "#1A73E8",
-      bgColor: "bg-blue-500/10",
-    };
-  }
-
-  if (type === "export" || combined.includes("export")) {
-    return {
-      iconName: "share-outline",
-      color: "#6366F1",
-      bgColor: "bg-indigo-500/10",
-    };
-  }
-
-  return {
-    iconName: "checkmark-circle-outline",
-    color: "#1E8E3E",
-    bgColor: "bg-green-500/10",
-  };
-}
-
 export function UploadStatusToast({
   visible,
   fileName,
   detail,
-  type,
+  type = "success",
   onClose,
   bottomInset = 0,
 }: UploadStatusToastProps) {
-  if (!visible) return null;
+  const [rendered, setRendered] = useState(visible);
+  const translateY = useRef(new Animated.Value(70)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
-  const { iconName, color, bgColor, isLoading } = resolveToastIcon(type, fileName, detail);
+  const visuals = getToastVisuals(type, fileName, detail);
+
+  useEffect(() => {
+    if (visible) {
+      setRendered(true);
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          friction: 8,
+          tension: 70,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(translateY, {
+          toValue: 70,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setRendered(false);
+      });
+    }
+  }, [visible, translateY, opacity]);
+
+  if (!rendered) return null;
 
   return (
-    <View
-      className="bg-white border-t border-[#E5E5EA] rounded-t-2xl px-4 py-2.5 flex-row items-center justify-between"
+    <Animated.View
       style={{
         position: "absolute",
         left: 0,
         right: 0,
         bottom: bottomInset,
-        elevation: 6,
+        transform: [{ translateY }],
+        opacity,
+        elevation: 8,
         zIndex: 50,
       }}
+      className="bg-white border-t border-[#E5E5EA] rounded-t-2xl px-4 py-2.5 flex-row items-center justify-between shadow-lg shadow-black/10"
     >
+      {/* Left: Bare contextual icon / spinner + Text */}
       <View className="flex-row items-center flex-1 mr-3">
-        <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${bgColor}`}>
-          {isLoading ? (
-            <ActivityIndicator size="small" color={color} />
-          ) : (
-            <Ionicons name={iconName} size={20} color={color} />
-          )}
-        </View>
+        {visuals.isSpinner ? (
+          <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator size="small" color={visuals.color} />
+          </View>
+        ) : (
+          <Ionicons name={visuals.iconName!} size={22} color={visuals.color} />
+        )}
 
-        <View className="flex-1">
+        <View className="flex-1 ml-3">
           <Text className="text-[13.5px] font-outfit-semibold text-[#1F1F1F]" numberOfLines={1}>
-            {fileName || "Task complete"}
+            {fileName || "1 upload complete"}
           </Text>
           <Text className="text-[11.5px] font-outfit text-[#5F6368] mt-0.5" numberOfLines={1}>
             {detail || 'Saved to "My Drive"'}
@@ -160,6 +173,7 @@ export function UploadStatusToast({
         </View>
       </View>
 
+      {/* Right: Close X + Chevron Up */}
       <View className="flex-row items-center gap-3">
         <TouchableOpacity
           activeOpacity={0.7}
@@ -180,6 +194,6 @@ export function UploadStatusToast({
           <Ionicons name="chevron-up" size={20} color="#444746" />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 }
