@@ -156,6 +156,12 @@ export function subscribeLatestGalleryPins(
       primaryQuery,
       handleSnapshot,
       (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
         if (error?.message?.includes("index")) {
           console.warn("[GalleryServerService] Composite index pending for listener. Falling back to createdAt order.");
           const fallbackQuery = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));

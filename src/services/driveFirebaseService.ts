@@ -22,7 +22,7 @@ async function cleanupLocalDiskFile(uri?: string) {
   if (!uri || !uri.startsWith("file://")) return;
   try {
     const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (fileInfo.exists) {
+    if (fileInfo?.exists) {
       await FileSystem.deleteAsync(uri, { idempotent: true });
     }
   } catch (err) {
@@ -320,7 +320,13 @@ export function subscribeToDriveServer(
         await saveDriveItems(merged);
         onUpdate(merged);
       },
-      (error) => {
+      (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
         console.warn("[DriveFirebaseService] Real-time listener error:", error);
       }
     );
@@ -392,7 +398,7 @@ export async function exportDriveFile(
     }
 
     const fileInfo = await FileSystem.getInfoAsync(localShareUri);
-    if (!fileInfo.exists) {
+    if (!fileInfo?.exists) {
       if (item.cloudflareUrl && item.cloudflareUrl !== localShareUri) {
         const cleanName = (item.name || "export_file").replace(/[^a-zA-Z0-9._-]/g, "_");
         const cachePath = `${FileSystem.cacheDirectory}export_${Date.now()}_${cleanName}`;

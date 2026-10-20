@@ -5,7 +5,7 @@ export async function deleteTempFile(fileUri: string | null | undefined): Promis
   if (!fileUri || !fileUri.startsWith("file://")) return;
   try {
     const exists = await FileSystem.getInfoAsync(fileUri);
-    if (exists.exists) {
+    if (exists?.exists) {
       await FileSystem.deleteAsync(fileUri, { idempotent: true });
     }
   } catch (_err) {}
@@ -21,7 +21,7 @@ async function recursiveMeasureDirectory(dirUri: string): Promise<number> {
       const itemUri = `${formattedDir}${name}`;
       const info = await FileSystem.getInfoAsync(itemUri);
 
-      if (!info.exists) continue;
+      if (!info?.exists) continue;
 
       if (info.isDirectory) {
         totalBytes += await recursiveMeasureDirectory(itemUri);
@@ -45,7 +45,7 @@ export async function getAppCacheSize(): Promise<{ sizeMB: number; sizeBytes: nu
     if (docDir) {
       const legacyAssets = `${docDir}cached_assets/`;
       const assetsInfo = await FileSystem.getInfoAsync(legacyAssets);
-      if (assetsInfo.exists) {
+      if (assetsInfo?.exists) {
         totalBytes += await recursiveMeasureDirectory(legacyAssets);
       }
     }
@@ -66,7 +66,7 @@ async function recursiveCleanDirectory(dirUri: string): Promise<number> {
       const itemUri = `${formattedDir}${name}`;
       const info = await FileSystem.getInfoAsync(itemUri);
 
-      if (!info.exists) continue;
+      if (!info?.exists) continue;
 
       if (info.isDirectory) {
         bytesCleared += await recursiveCleanDirectory(itemUri);
@@ -93,7 +93,7 @@ export async function clearAppCache(): Promise<{ clearedMB: number; clearedBytes
     if (docDir) {
       const legacyAssets = `${docDir}cached_assets/`;
       const assetsInfo = await FileSystem.getInfoAsync(legacyAssets);
-      if (assetsInfo.exists) {
+      if (assetsInfo?.exists) {
         totalBytesCleared += await recursiveCleanDirectory(legacyAssets);
       }
     }

@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -50,7 +50,13 @@ import { getUserMetadata, subscribeUserStats } from "../../services/userService"
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
+
+  // Responsive padding for curved displays & safe areas:
+  // Math.max(insets.left, insets.right, 20) keeps elements inside the flat viewable plane on curved screens
+  const horizontalPadding = Math.max(insets.left, insets.right, 20);
+  const bottomScrollPadding = Math.max(insets.bottom, 16) + 76;
 
   const [usedStorage, setUsedStorage] = useState("0.00");
   const [galleryCount, setGalleryCount] = useState(0);
@@ -269,9 +275,12 @@ export default function HomeScreen() {
       </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
+        <View
+          className="flex-row items-center justify-between pt-6 pb-3"
+          style={{ paddingHorizontal: horizontalPadding }}
+        >
           <View className="justify-center">
-            <MarkXLogo width={110} height={15} color="#111111" />
+            <MarkXLogo width={115} height={16} color="#111111" />
           </View>
 
           <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
@@ -293,26 +302,26 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View className="px-4 pt-3 pb-1">
-          <StorageHeroCard
-            usedStorage={usedStorage}
-            isStatsLoading={isStatsLoading}
-            onUploadFile={handleUploadFile}
-            onAddPhoto={handleAddPhoto}
-          />
-        </View>
-
         <ScrollView
           showsVerticalScrollIndicator={false}
           bounces={true}
           alwaysBounceVertical={true}
           overScrollMode="always"
           contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingTop: 4,
-            paddingBottom: 40,
+            paddingHorizontal: horizontalPadding,
+            paddingTop: 6,
+            paddingBottom: bottomScrollPadding,
           }}
         >
+          <View className="w-full mb-1">
+            <StorageHeroCard
+              usedStorage={usedStorage}
+              isStatsLoading={isStatsLoading}
+              onUploadFile={handleUploadFile}
+              onAddPhoto={handleAddPhoto}
+            />
+          </View>
+
           <View className="w-full gap-3.5">
             <View className="flex-row gap-3.5">
               <FeatureCard

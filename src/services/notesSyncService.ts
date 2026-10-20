@@ -94,6 +94,12 @@ export function subscribeToNotesServer(
         onUpdate(serverNotes);
       },
       (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
         console.warn("[NotesSyncService] Snapshot error:", error);
       }
     );

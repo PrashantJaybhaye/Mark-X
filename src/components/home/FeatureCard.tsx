@@ -51,8 +51,10 @@ export function FeatureCard({
     >
       <View className="flex-row items-center justify-between mb-1.5">
         <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
           allowFontScaling={false}
-          className="text-[14px] text-[#111111]"
+          className="text-[14px] text-[#111111] flex-1 mr-1"
           style={{ fontFamily: "Outfit_600SemiBold" }}
         >
           {title}
@@ -70,6 +72,8 @@ export function FeatureCard({
           />
         ) : (
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             allowFontScaling={false}
             className="text-[20px] text-[#111111] leading-tight"
             style={{ fontFamily: "Outfit_700Bold" }}

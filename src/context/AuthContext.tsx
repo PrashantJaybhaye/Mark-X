@@ -59,6 +59,8 @@ interface AuthContextType {
   sendVerificationEmail: () => Promise<void>;
   reloadUser: () => Promise<boolean>;
   signOut: () => Promise<void>;
+  isSessionRevoked: boolean;
+  dismissSessionRevoked: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,6 +72,8 @@ export function normalizeEmail(identifier: string): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSessionRevoked, setIsSessionRevoked] = useState(false);
+  const dismissSessionRevoked = () => setIsSessionRevoked(false);
 
   const signOut = async () => {
     if (Platform.OS !== "web") {
@@ -112,7 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             deviceId,
             () => {
               console.warn("[AuthContext] This device was logged out remotely.");
-              firebaseSignOut(auth);
+              setIsSessionRevoked(true);
+              signOut().catch(console.warn);
             }
           );
         } catch (e) {
@@ -144,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const signIn = async (identifier: string, pass: string) => {
+    setIsSessionRevoked(false);
     const email = normalizeEmail(identifier);
     if (!email.includes("@")) {
       throw new Error("Please enter a valid email address.");
@@ -262,6 +268,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sendVerificationEmail,
         reloadUser,
         signOut,
+        isSessionRevoked,
+        dismissSessionRevoked,
       }}
     >
       {children}

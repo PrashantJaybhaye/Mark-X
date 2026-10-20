@@ -146,12 +146,22 @@ export function listenCurrentDeviceRevocation(
           return;
         }
 
-        if (!docSnap.exists()) {
+        const isRevoked =
+          !docSnap ||
+          (typeof docSnap.exists === "function" ? !docSnap.exists() : !docSnap.exists);
+
+        if (isRevoked) {
           console.warn("[deviceSyncService] Session revoked remotely from another device.");
           onRevoked();
         }
       },
-      (error) => {
+      (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
         console.warn("[deviceSyncService] Error listening to device revocation:", error);
       }
     );
@@ -181,7 +191,13 @@ export function subscribeActiveDevices(
         });
         onUpdate(list);
       },
-      (error) => {
+      (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
         console.warn("[deviceSyncService] Error subscribing to active devices:", error);
       }
     );

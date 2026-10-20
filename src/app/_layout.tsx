@@ -24,6 +24,7 @@ import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
 import { AnimatedSplashScreen } from "../components/splash/AnimatedSplashScreen";
 import { IncomingShareModal } from "../components/common/IncomingShareModal";
+import { IosDialog } from "../components/common/IosDialog";
 import "../services/BackgroundUploadService";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -100,6 +101,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
 }
 
 function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
+  const { isSessionRevoked, dismissSessionRevoked } = useAuth();
   const [isDecisionComplete, setIsDecisionComplete] = useState(false);
 
   if (!isFontsReady) {
@@ -131,6 +133,20 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
         </Stack>
         <BiometricLockGate />
         <IncomingShareModal />
+        <IosDialog
+          visible={isSessionRevoked}
+          title="Session Terminated"
+          message="This device was logged out remotely from another session. Please sign in again."
+          actions={[
+            {
+              text: "OK",
+              bold: true,
+              style: "default",
+              onPress: dismissSessionRevoked,
+            },
+          ]}
+          onClose={dismissSessionRevoked}
+        />
       </ThemeProvider>
     </AnimatedSplashScreen>
   );

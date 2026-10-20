@@ -135,14 +135,29 @@ export function subscribeUserStats(
   if (!uid) return () => {};
   try {
     const userDocRef = doc(db, "users", uid);
-    return onSnapshot(userDocRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as UserMetadata;
-        if (data.stats) {
-          onUpdate(data.stats);
+    return onSnapshot(
+      userDocRef,
+      (snap) => {
+        if (
+          snap &&
+          (typeof snap.exists === "function" ? snap.exists() : snap.exists)
+        ) {
+          const data = snap.data() as UserMetadata;
+          if (data && data.stats) {
+            onUpdate(data.stats);
+          }
         }
+      },
+      (error: any) => {
+        if (
+          error?.code === "firestore/permission-denied" ||
+          error?.message?.includes("permission-denied")
+        ) {
+          return;
+        }
+        console.warn("[UserService] Failed to subscribe to user stats:", error);
       }
-    });
+    );
   } catch (e) {
     console.warn("[UserService] Failed to subscribe to user stats:", e);
     return () => {};
@@ -157,7 +172,10 @@ export async function getUserMetadata(
   try {
     const userDocRef = doc(db, "users", uid);
     const snap = await getDoc(userDocRef);
-    if (snap.exists()) {
+    if (
+      snap &&
+      (typeof snap.exists === "function" ? snap.exists() : snap.exists)
+    ) {
       return snap.data() as UserMetadata;
     }
     return null;

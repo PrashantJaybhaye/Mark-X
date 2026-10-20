@@ -20,7 +20,12 @@ import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { clearAppCache, getAppCacheSize } from "../../services/cacheCleaner";
-import { getOrFetchCachedImage, forceRefetchCachedImage } from "../../services/cachedImageService";
+import {
+  getOrFetchCachedImage,
+  forceRefetchCachedImage,
+  checkAndSyncDailyImage,
+  recordBannerSyncedToday,
+} from "../../services/cachedImageService";
 
 const PROFILE_BANNER_URL = "https://repo-asset.vercel.app/mark/profile-banner.webp";
 
@@ -76,6 +81,12 @@ export default function ProfileScreen() {
       }
     });
 
+    checkAndSyncDailyImage(PROFILE_BANNER_URL, "profile-banner.webp", (newUri) => {
+      if (isMounted && newUri) {
+        setBannerUri(newUri);
+      }
+    });
+
     return () => {
       isMounted = false;
       if (bannerTapTimerRef.current) {
@@ -99,14 +110,14 @@ export default function ProfileScreen() {
       forceRefetchCachedImage(PROFILE_BANNER_URL, "profile-banner.webp").then((newUri) => {
         setBannerUri(`${newUri}?t=${Date.now()}`);
         setIsRefetchingBanner(false);
-        showDialog("Banner Refetched", "Profile banner refetching in sometimes.");
+        recordBannerSyncedToday("profile-banner.webp");
       });
     } else {
       bannerTapTimerRef.current = setTimeout(() => {
         bannerTapCountRef.current = 0;
       }, 2500);
     }
-  }, [showDialog]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -116,6 +127,10 @@ export default function ProfileScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
+
+      checkAndSyncDailyImage(PROFILE_BANNER_URL, "profile-banner.webp", (newUri) => {
+        setBannerUri(newUri);
+      });
 
       return () => {
         setIsFocused(false);

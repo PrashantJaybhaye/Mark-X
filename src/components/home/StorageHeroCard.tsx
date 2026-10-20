@@ -93,7 +93,7 @@ export function StorageHeroCardSkeleton() {
           />
           <Animated.View
             style={{ opacity: pulseAnim }}
-            className="w-[36px] h-[36px] rounded-full bg-[#2B140F]/40 ml-auto"
+            className="w-[36px] h-[36px] shrink-0 rounded-full bg-[#2B140F]/40"
           />
         </View>
       </View>
@@ -172,8 +172,10 @@ export function StorageHeroCard({
           </Text>
         </View>
 
-        <View className="shrink-0 items-end justify-center pt-0.5">
+        <View className="shrink-0 items-end justify-center pt-0.5 max-w-[55%]">
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             allowFontScaling={false}
             className="text-[13px] text-[#111111] tracking-tight text-right"
             style={{ fontFamily: "Outfit_700Bold" }}
@@ -249,12 +251,13 @@ export function StorageHeroCard({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onUploadFile}
-            className="flex-row items-center bg-[#2B140F]/60 active:bg-[#2B140F]/80 px-3.5 h-[36px] rounded-full mr-2"
+            className="flex-1 min-w-0 flex-row items-center justify-center bg-[#2B140F]/60 active:bg-[#2B140F]/80 px-2.5 h-[36px] rounded-full mr-2"
           >
             <Ionicons name="add-circle" size={16} color="#FFFFFF" />
             <Text
+              numberOfLines={1}
               allowFontScaling={false}
-              className="text-[13px] text-white ml-1.5"
+              className="text-[13px] text-white ml-1.5 shrink"
               style={{ fontFamily: "Outfit_600SemiBold" }}
             >
               Upload file
@@ -264,12 +267,13 @@ export function StorageHeroCard({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onAddPhoto}
-            className="flex-row items-center bg-[#2B140F]/60 active:bg-[#2B140F]/80 px-3.5 h-[36px] rounded-full mr-2"
+            className="flex-1 min-w-0 flex-row items-center justify-center bg-[#2B140F]/60 active:bg-[#2B140F]/80 px-2.5 h-[36px] rounded-full mr-2"
           >
             <Ionicons name="images" size={15} color="#FFFFFF" />
             <Text
+              numberOfLines={1}
               allowFontScaling={false}
-              className="text-[13px] text-white ml-1.5"
+              className="text-[13px] text-white ml-1.5 shrink"
               style={{ fontFamily: "Outfit_600SemiBold" }}
             >
               Add photo
@@ -279,7 +283,7 @@ export function StorageHeroCard({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onManageStorage}
-            className="w-[36px] h-[36px] rounded-full bg-[#2B140F]/60 active:bg-[#2B140F]/80 items-center justify-center ml-auto"
+            className="w-[36px] h-[36px] shrink-0 rounded-full bg-[#2B140F]/60 active:bg-[#2B140F]/80 items-center justify-center"
           >
             <Ionicons name="ellipsis-horizontal" size={16} color="#FFFFFF" />
           </TouchableOpacity>
