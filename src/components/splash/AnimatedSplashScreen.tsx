@@ -4,7 +4,6 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withDelay,
   Easing,
   runOnJS,
 } from "react-native-reanimated";
@@ -15,11 +14,13 @@ import { triggerHaptic } from "../../utils/haptics";
 interface AnimatedSplashScreenProps {
   isReady: boolean;
   children: React.ReactNode;
+  onAnimationComplete?: () => void;
 }
 
 export function AnimatedSplashScreen({
   isReady,
   children,
+  onAnimationComplete,
 }: AnimatedSplashScreenProps) {
   const [animationFinished, setAnimationFinished] = useState(false);
   const [isDrawingDone, setIsDrawingDone] = useState(false);
@@ -28,36 +29,26 @@ export function AnimatedSplashScreen({
   const scale = useSharedValue(1);
   const subtitleOpacity = useSharedValue(0);
 
+  const finishSplash = useCallback(() => {
+    setAnimationFinished(true);
+    onAnimationComplete?.();
+  }, [onAnimationComplete]);
+
   useEffect(() => {
     if (isReady) {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [isReady]);
 
-  useEffect(() => {
-    subtitleOpacity.value = withDelay(
-      750,
-      withTiming(1, {
-        duration: 400,
-        easing: Easing.out(Easing.quad),
-      })
-    );
-  }, [subtitleOpacity]);
-
   const handleDrawingComplete = useCallback(() => {
     setIsDrawingDone(true);
-    subtitleOpacity.value = withTiming(1, {
-      duration: 200,
-      easing: Easing.out(Easing.quad),
-    });
+    subtitleOpacity.value = withTiming(1, { duration: 250 });
   }, [subtitleOpacity]);
 
   useEffect(() => {
-    const fallbackTimer = setTimeout(() => {
-      setIsDrawingDone(true);
-    }, 1600);
+    const fallbackTimer = setTimeout(handleDrawingComplete, 1600);
     return () => clearTimeout(fallbackTimer);
-  }, []);
+  }, [handleDrawingComplete]);
 
   useEffect(() => {
     if (!isReady || !isDrawingDone) return;
@@ -70,25 +61,20 @@ export function AnimatedSplashScreen({
         easing: Easing.out(Easing.cubic),
       });
 
-      opacity.value = withDelay(
-        50,
-        withTiming(
-          0,
-          {
-            duration: 350,
-            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-          },
-          (finished) => {
-            if (finished) {
-              runOnJS(setAnimationFinished)(true);
-            }
-          }
-        )
+      opacity.value = withTiming(
+        0,
+        {
+          duration: 350,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        },
+        (finished) => {
+          if (finished) runOnJS(finishSplash)();
+        }
       );
-    }, 850);
+    }, 700);
 
     return () => clearTimeout(timeout);
-  }, [isReady, isDrawingDone, opacity, scale]);
+  }, [isReady, isDrawingDone, finishSplash, opacity, scale]);
 
   const animatedContainerStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

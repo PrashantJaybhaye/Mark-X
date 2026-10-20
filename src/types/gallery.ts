@@ -3,6 +3,8 @@ export interface GalleryPin {
   author?: string;
   authorAvatar?: string;
   imageUrl: string;
+  thumbnailUrl?: string;
+  localUri?: string;
   fileName?: string;
   mediaType?: "image" | "video";
   duration?: number;

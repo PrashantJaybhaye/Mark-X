@@ -34,6 +34,7 @@ import { createLocalThumbnail, formatBytes, GalleryPin } from "../../utils/galle
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
 import { emitDriveToast } from "../../services/driveToastService";
 import { useAuth } from "../../context/AuthContext";
+import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { FileCategoryIcon } from "../drive/FileCategoryIcon";
 
@@ -49,12 +50,18 @@ const isMediaFile = (fileName: string, mimeType: string) => {
   );
 };
 
-export function IncomingShareModal() {
+export interface IncomingShareModalProps {
+  isSplashComplete?: boolean;
+}
+
+export function IncomingShareModal({ isSplashComplete = true }: IncomingShareModalProps) {
   const { user } = useAuth();
+  const { isLocked } = useBiometrics();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [payload, setPayload] = useState<SharedDataPayload | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isModalMounted, setIsModalMounted] = useState(false);
 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -114,12 +121,25 @@ export function IncomingShareModal() {
   }, [user]);
 
   useEffect(() => {
-    if (payload) {
+    if (!payload || !user || !isSplashComplete || isLocked) {
+      if (!payload) {
+        setIsModalMounted(false);
+        backdropOpacity.setValue(0);
+        slideAnim.setValue(SCREEN_HEIGHT);
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setIsModalMounted(true);
       setActiveStackIndex(0);
+      backdropOpacity.setValue(0);
+      slideAnim.setValue(SCREEN_HEIGHT);
+
       Animated.parallel([
         Animated.timing(backdropOpacity, {
           toValue: 1,
-          duration: 220,
+          duration: 240,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
@@ -128,14 +148,13 @@ export function IncomingShareModal() {
           friction: 12,
           useNativeDriver: true,
         }),
-      ]).start();
-    } else {
-      backdropOpacity.setValue(0);
-      slideAnim.setValue(SCREEN_HEIGHT);
-    }
-  }, [payload]);
+      ]).start(() => triggerHaptic(Haptics.ImpactFeedbackStyle.Light));
+    }, 200);
 
-  if (!payload || !user) {
+    return () => clearTimeout(timer);
+  }, [payload, user, isSplashComplete, isLocked]);
+
+  if (!payload || !user || !isModalMounted) {
     return null;
   }
 
@@ -154,6 +173,7 @@ export function IncomingShareModal() {
       }),
     ]).start(() => {
       clearShare().catch(() => undefined);
+      setIsModalMounted(false);
       setPayload(null);
       if (callback) {
         callback();

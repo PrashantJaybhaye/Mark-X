@@ -184,13 +184,23 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     return flash === "on" ? "flash" : "flash-off";
   };
 
-  const updateCachedPinStatus = async (pinId: string, status: "synced" | "failed", url?: string) => {
+  const updateCachedPinStatus = async (
+    pinId: string,
+    status: "synced" | "failed",
+    url?: string,
+    localUri?: string
+  ) => {
     try {
       const currentCached = await loadCachedGalleryPins();
       await saveCachedGalleryPins(
         currentCached.map((p) =>
           p.id === pinId
-            ? { ...p, uploadStatus: status, ...(url ? { imageUrl: url } : {}) }
+            ? {
+                ...p,
+                uploadStatus: status,
+                ...(url ? { imageUrl: url } : {}),
+                ...(localUri ? { localUri } : {}),
+              }
             : p
         )
       );
@@ -221,6 +231,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
       fileName: shortFileName,
       author: user?.displayName || "You",
       imageUrl: media.uri,
+      localUri: media.uri,
       mediaType: type,
       aspectRatio: calculatedRatio,
       width: actualWidth,
@@ -252,9 +263,10 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
       if (res.success && res.url) {
         await updateGalleryPinInServer(newPin.id, {
           imageUrl: res.url,
+          localUri: media.uri,
           uploadStatus: "synced",
         });
-        await updateCachedPinStatus(newPin.id, "synced", res.url);
+        await updateCachedPinStatus(newPin.id, "synced", res.url, media.uri);
       } else {
         await updateCachedPinStatus(newPin.id, "failed");
       }

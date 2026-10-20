@@ -106,14 +106,15 @@ export default function GalleryScreen() {
       );
 
       if (res.success && res.url) {
+        const localUri = pin.localUri || (pin.imageUrl?.startsWith("file://") ? pin.imageUrl : undefined);
         loadCachedGalleryPins().then((cached) => {
           const updated = cached.map((p) =>
-            p.id === pin.id ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const } : p
+            p.id === pin.id ? { ...p, imageUrl: res.url!, localUri, uploadStatus: "synced" as const } : p
           );
           saveCachedGalleryPins(updated);
         });
-        updatePinState(pin.id, { imageUrl: res.url, uploadStatus: "synced" });
-        await updateGalleryPinInServer(pin.id, { imageUrl: res.url, uploadStatus: "synced" });
+        updatePinState(pin.id, { imageUrl: res.url, localUri, uploadStatus: "synced" });
+        await updateGalleryPinInServer(pin.id, { imageUrl: res.url, localUri, uploadStatus: "synced" });
       } else {
         updatePinState(pin.id, { uploadStatus: "failed" });
       }
@@ -128,11 +129,19 @@ export default function GalleryScreen() {
     try {
       const result = await fetchGalleryPinsPage(null, GALLERY_PAGE_LIMIT);
       if (!isMountedRef.current) return;
-      setPins(result.pins);
+      const cached = await loadCachedGalleryPins();
+      const localUriMap = new Map<string, string>();
+      for (const p of cached) {
+        if (p.localUri) localUriMap.set(p.id, p.localUri);
+      }
+      const mergedPins = result.pins.map((p) =>
+        localUriMap.has(p.id) ? { ...p, localUri: localUriMap.get(p.id) } : p
+      );
+      setPins(mergedPins);
       lastDocRef.current = result.lastVisibleDoc;
       setHasMore(result.hasMore);
-      await saveCachedGalleryPins(result.pins);
-      prefetchPinImages(result.pins);
+      await saveCachedGalleryPins(mergedPins);
+      prefetchPinImages(mergedPins);
 
       if (result.hasMore && result.lastVisibleDoc) {
         fetchGalleryPinsPage(result.lastVisibleDoc, GALLERY_PAGE_LIMIT).then((nextResult) => {
@@ -143,7 +152,9 @@ export default function GalleryScreen() {
 
           setPins((prev) => {
             const existingIds = new Set(prev.map((p) => p.id));
-            const newItems = nextResult.pins.filter((p) => !existingIds.has(p.id));
+            const newItems = nextResult.pins
+              .filter((p) => !existingIds.has(p.id))
+              .map((p) => (localUriMap.has(p.id) ? { ...p, localUri: localUriMap.get(p.id) } : p));
             const updated = [...prev, ...newItems];
             saveCachedGalleryPins(updated);
             return updated;
@@ -262,7 +273,14 @@ export default function GalleryScreen() {
         prefetchPinImages(latestPins);
         setPins((prev) => {
           const map = new Map(prev.map((p) => [p.id, p]));
-          latestPins.forEach((item) => map.set(item.id, { ...(map.get(item.id) || {}), ...item }));
+          latestPins.forEach((item) => {
+            const existing = map.get(item.id);
+            map.set(item.id, {
+              ...(existing || {}),
+              ...item,
+              localUri: item.localUri || existing?.localUri,
+            });
+          });
           return Array.from(map.values());
         });
         setIsLoading(false);
@@ -396,6 +414,7 @@ export default function GalleryScreen() {
           fileName,
           author: auth.currentUser?.displayName || "You",
           imageUrl: result.uri,
+          localUri: result.uri,
           thumbnailUrl,
           mediaType: isVideo ? "video" : "image",
           ...(isVideo && typeof result.duration === "number" ? { duration: result.duration } : {}),

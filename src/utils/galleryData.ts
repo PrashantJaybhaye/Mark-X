@@ -4,6 +4,7 @@ export interface GalleryPin {
   authorAvatar?: string;
   imageUrl: string;
   thumbnailUrl?: string;
+  localUri?: string;
   fileName?: string;
   mediaType?: "image" | "video";
   duration?: number;
@@ -164,6 +165,7 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
     id: pin.id,
     imageUrl: pin.imageUrl,
     thumbnailUrl,
+    localUri: pin.localUri || (pin.imageUrl?.startsWith("file://") ? pin.imageUrl : undefined),
     fileName,
     mediaType: pin.mediaType || "image",
     duration: pin.duration,

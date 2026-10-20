@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  StyleSheet,
   StatusBar as RNStatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,7 +21,8 @@ import * as Haptics from "expo-haptics";
 import { IosDialog } from "../../components/common/IosDialog";
 import { exportMediaToDevice } from "../../services/mediaExportService";
 
-import { GalleryPin, formatBytes, normalizeGalleryPin } from "../../utils/galleryData";
+import { GalleryPin, formatBytes, normalizeGalleryPin, DEFAULT_BLURHASH } from "../../utils/galleryData";
+import { resolvePlayableVideoUri } from "../../services/videoCacheService";
 import { triggerHaptic } from "../../utils/haptics";
 import {
   loadCachedGalleryPins,
@@ -37,11 +39,15 @@ import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoShee
 
 function InlineVideoPlayer({
   sourceUrl,
+  posterUrl,
+  blurHash,
   fileName,
   isMuted,
   onDoubleTap,
 }: {
   sourceUrl: string;
+  posterUrl?: string;
+  blurHash?: string;
   fileName: string;
   isMuted: boolean;
   onDoubleTap: () => void;
@@ -50,11 +56,11 @@ function InlineVideoPlayer({
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showPoster, setShowPoster] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(true);
 
+  const posterFadeAnim = useRef(new Animated.Value(1)).current;
   const playIconAnim = useRef(new Animated.Value(0)).current;
-  const skeletonAnim = useRef(new Animated.Value(0.2)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
   const lastTapRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,56 +70,64 @@ function InlineVideoPlayer({
     p.play();
   });
 
-  useEffect(() => {
-    if (showSkeleton) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(skeletonAnim, { toValue: 0.7, duration: 800, useNativeDriver: true }),
-          Animated.timing(skeletonAnim, { toValue: 0.2, duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-    }
-  }, [showSkeleton]);
-
-  const hideSkeletonSmoothly = useCallback(() => {
-    if (!showSkeleton) return;
-    Animated.timing(fadeAnim, {
+  const hidePosterSmoothly = useCallback(() => {
+    if (!showPoster) return;
+    Animated.timing(posterFadeAnim, {
       toValue: 0,
-      duration: 300,
+      duration: 250,
       useNativeDriver: true,
     }).start(() => {
-      setShowSkeleton(false);
-      skeletonAnim.stopAnimation();
+      setShowPoster(false);
+      setIsBuffering(false);
     });
-  }, [showSkeleton]);
+  }, [showPoster, posterFadeAnim]);
 
   useEffect(() => {
     if (!player) return;
     player.muted = isMuted;
 
+    if (player.status === "readyToPlay" || player.playing) {
+      hidePosterSmoothly();
+      setIsBuffering(false);
+    }
+
+    const statusSub = player.addListener("statusChange", (e) => {
+      if (e.status === "readyToPlay") {
+        hidePosterSmoothly();
+        setIsBuffering(false);
+      } else if (e.status === "loading") {
+        setIsBuffering(true);
+      }
+    });
+
     const timeSub = player.addListener("timeUpdate", (e) => {
       setCurrentTime(e.currentTime);
       if (e.currentTime > 0) {
-        hideSkeletonSmoothly();
+        hidePosterSmoothly();
+        setIsBuffering(false);
       }
     });
+
     const sourceSub = player.addListener("sourceLoad", (e) => {
       if (e.duration) setDuration(e.duration);
-      hideSkeletonSmoothly();
+      hidePosterSmoothly();
     });
+
     const playSub = player.addListener("playingChange", (e) => {
       setIsPlaying(e.isPlaying);
       if (e.isPlaying) {
-        hideSkeletonSmoothly();
+        hidePosterSmoothly();
+        setIsBuffering(false);
       }
     });
 
     return () => {
+      statusSub.remove();
       timeSub.remove();
       sourceSub.remove();
       playSub.remove();
     };
-  }, [player, isMuted, hideSkeletonSmoothly]);
+  }, [player, isMuted, hidePosterSmoothly]);
 
   const togglePlayPause = () => {
     if (!player) return;
@@ -163,23 +177,37 @@ function InlineVideoPlayer({
         nativeControls={false}
       />
 
-      {showSkeleton && (
+      {showPoster && (
         <Animated.View
-          className="absolute inset-0 z-10 bg-[#E5E5EA]"
-          style={{ opacity: fadeAnim }}
+          style={[StyleSheet.absoluteFill, { opacity: posterFadeAnim, zIndex: 10 }]}
           pointerEvents="none"
         >
-          <Animated.View
-            className="w-full h-full bg-[#C7C7CC]"
-            style={{ opacity: skeletonAnim }}
-          />
+          {posterUrl ? (
+            <Image
+              source={{ uri: posterUrl }}
+              placeholder={{ blurhash: blurHash || DEFAULT_BLURHASH }}
+              style={{ width: "100%", height: "100%" }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View className="w-full h-full bg-[#1C1C1E]" />
+          )}
+
+          {isBuffering && (
+            <View className="absolute inset-0 items-center justify-center">
+              <View className="w-12 h-12 rounded-full bg-black/45 items-center justify-center backdrop-blur-md border border-white/15 shadow-lg">
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            </View>
+          )}
         </Animated.View>
       )}
 
       <TouchableOpacity
         activeOpacity={1}
         onPress={handlePress}
-        className="absolute inset-0 items-center justify-center"
+        className="absolute inset-0 items-center justify-center z-20"
       >
         {showPlayIcon && (
           <Animated.View
@@ -207,7 +235,7 @@ function InlineVideoPlayer({
       </TouchableOpacity>
 
       {duration > 0 && (
-        <View className="absolute bottom-2 left-6 right-6 h-1 rounded-full bg-black/10 overflow-hidden">
+        <View className="absolute bottom-2 left-6 right-6 h-1 rounded-full bg-black/10 overflow-hidden z-20">
           <View
             className="h-full bg-[#007AFF] rounded-full"
             style={{ width: `${progressPercent}%` }}
@@ -242,8 +270,24 @@ export default function GalleryDetailPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessageDialog, setExportMessageDialog] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [playableVideoUri, setPlayableVideoUri] = useState<string>(() => {
+    return pin?.localUri || pin?.imageUrl || "";
+  });
   const bookmarkScale = useRef(new Animated.Value(1)).current;
   const lastTapRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!pin || pin.mediaType !== "video") return;
+    let isMounted = true;
+    resolvePlayableVideoUri(pin).then((resolved) => {
+      if (isMounted && resolved) {
+        setPlayableVideoUri(resolved);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [pin?.id, pin?.imageUrl, pin?.localUri, pin?.mediaType]);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -273,7 +317,10 @@ export default function GalleryDetailPage() {
 
       const remotePin = serverPins.find((p) => p.id === id);
       if (remotePin) {
-        setPin(remotePin);
+        setPin({
+          ...remotePin,
+          localUri: remotePin.localUri || foundCached?.localUri,
+        });
       } else if (!foundCached) {
         setPin(null);
       }
@@ -452,7 +499,9 @@ export default function GalleryDetailPage() {
             style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
           >
             <InlineVideoPlayer
-              sourceUrl={pin.imageUrl}
+              sourceUrl={playableVideoUri || pin.imageUrl}
+              posterUrl={pin.thumbnailUrl || pin.imageUrl}
+              blurHash={pin.blurHash}
               fileName={pin.fileName || "temp.mp4"}
               isMuted={isMuted}
               onDoubleTap={handleSaveToggle}

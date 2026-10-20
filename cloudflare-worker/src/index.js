@@ -1,19 +1,24 @@
 /**
  * Mark-X Storage Worker
- * Handles direct R2 uploads and serves media as an ultra-fast CDN.
+ * Handles direct R2 uploads and serves media as an ultra-fast Edge CDN.
+ * Features:
+ * - Cloudflare Edge Caching (caches.default) for sub-10ms repeat hits.
+ * - HTTP Range Requests (206 Partial Content) for instant video streaming and scrubbing.
+ * - HEAD method support for video players inspecting duration/content-length.
  */
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Auth-Key, Authorization",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Auth-Key, Authorization, Range",
+  "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, ETag",
 };
 
 const jsonResponse = (data, status = 200) =>
   Response.json(data, { status, headers: CORS_HEADERS });
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     // Handle CORS preflight
@@ -63,7 +68,6 @@ export default {
 
         if (contentType.includes("multipart/form-data")) {
           const formData = await request.formData();
-          // Find any uploaded file field
           const file =
             formData.get("file") ||
             formData.get("photo") ||
@@ -78,7 +82,6 @@ export default {
           mimeType = file.type || mimeType;
           originalName = file.name || originalName;
         } else {
-          // Direct binary stream
           fileData = await request.arrayBuffer();
           mimeType = contentType.split(";")[0].trim() || mimeType;
         }
@@ -95,7 +98,6 @@ export default {
           );
         }
 
-        // Determine extension
         let ext = originalName.includes(".") ? originalName.split(".").pop().toLowerCase() : "";
         if (!ext) {
           if (mimeType.includes("png")) ext = "png";
@@ -111,7 +113,6 @@ export default {
         const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
         const key = `pins/${Date.now()}-${uniqueId}.${ext}`;
 
-        // Store into Cloudflare R2
         await env.MARK_X_BUCKET.put(key, fileData, {
           httpMetadata: {
             contentType: mimeType,
@@ -135,9 +136,9 @@ export default {
     }
 
     // ==========================================
-    // 2. Media Delivery Handler (GET /*)
+    // 2. Media Delivery Handler (GET & HEAD /*)
     // ==========================================
-    if (request.method === "GET") {
+    if (request.method === "GET" || request.method === "HEAD") {
       const key = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 
       if (!key) {
@@ -148,8 +149,51 @@ export default {
         return jsonResponse({ error: "R2 bucket binding is not configured" }, 500);
       }
 
+      const cache = caches.default;
+      const rangeHeader = request.headers.get("range");
+
+      // Check Edge Cache for standard GET requests without range
+      if (request.method === "GET" && !rangeHeader) {
+        try {
+          const cachedResponse = await cache.match(request);
+          if (cachedResponse) {
+            const hitResponse = new Response(cachedResponse.body, cachedResponse);
+            hitResponse.headers.set("X-Cache", "HIT");
+            return hitResponse;
+          }
+        } catch (_e) {}
+      }
+
+      // Handle HEAD request for media inspection
+      if (request.method === "HEAD") {
+        try {
+          const object = await env.MARK_X_BUCKET.head(key);
+          if (!object) {
+            return new Response("Object Not Found", { status: 404, headers: CORS_HEADERS });
+          }
+
+          const headers = new Headers();
+          object.writeHttpMetadata(headers);
+          headers.set("etag", object.httpEtag);
+          headers.set("Accept-Ranges", "bytes");
+          headers.set("Content-Length", object.size.toString());
+          headers.set("Cache-Control", "public, max-age=31536000, immutable");
+          Object.entries(CORS_HEADERS).forEach(([k, v]) => headers.set(k, v));
+
+          return new Response(null, { headers });
+        } catch (err) {
+          console.error("Worker head error:", err);
+          return new Response("Internal Server Error", { status: 500, headers: CORS_HEADERS });
+        }
+      }
+
+      // Handle GET request with Range & Edge Caching
       try {
-        const object = await env.MARK_X_BUCKET.get(key);
+        const getOptions = rangeHeader
+          ? { range: request.headers, onlyIf: request.headers }
+          : { onlyIf: request.headers };
+
+        const object = await env.MARK_X_BUCKET.get(key, getOptions);
 
         if (!object) {
           return new Response("Object Not Found", {
@@ -164,10 +208,30 @@ export default {
         const headers = new Headers();
         object.writeHttpMetadata(headers);
         headers.set("etag", object.httpEtag);
+        headers.set("Accept-Ranges", "bytes");
         headers.set("Cache-Control", "public, max-age=31536000, immutable");
         Object.entries(CORS_HEADERS).forEach(([k, v]) => headers.set(k, v));
 
-        return new Response(object.body, { headers });
+        let status = 200;
+        if (object.range) {
+          status = 206;
+          const offset = object.range.offset ?? 0;
+          const length = object.range.length ?? (object.size - offset);
+          const end = offset + length - 1;
+          headers.set("Content-Range", `bytes ${offset}-${end}/${object.size}`);
+          headers.set("Content-Length", length.toString());
+        } else {
+          headers.set("Content-Length", object.size.toString());
+        }
+
+        const response = new Response(object.body, { status, headers });
+
+        // Cache 200 responses at Cloudflare Edge in background
+        if (status === 200 && !rangeHeader && ctx?.waitUntil) {
+          ctx.waitUntil(cache.put(request, response.clone()));
+        }
+
+        return response;
       } catch (err) {
         console.error("Worker fetch error:", err);
         return new Response("Internal Server Error", { status: 500, headers: CORS_HEADERS });

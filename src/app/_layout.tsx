@@ -103,6 +103,7 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
 function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
   const { isSessionRevoked, dismissSessionRevoked } = useAuth();
   const [isDecisionComplete, setIsDecisionComplete] = useState(false);
+  const [isSplashComplete, setIsSplashComplete] = useState(false);
 
   if (!isFontsReady) {
     return null;
@@ -111,7 +112,10 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
   const isAppReady = isDecisionComplete;
 
   return (
-    <AnimatedSplashScreen isReady={isAppReady}>
+    <AnimatedSplashScreen
+      isReady={isAppReady}
+      onAnimationComplete={() => setIsSplashComplete(true)}
+    >
       <ThemeProvider value={DefaultTheme}>
         <StatusBar style="dark" />
         <NavigationGuard onDecisionComplete={() => setIsDecisionComplete(true)} />
@@ -132,7 +136,7 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           />
         </Stack>
         <BiometricLockGate />
-        <IncomingShareModal />
+        <IncomingShareModal isSplashComplete={isSplashComplete} />
         <IosDialog
           visible={isSessionRevoked}
           title="Session Terminated"

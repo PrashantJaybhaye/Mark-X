@@ -28,22 +28,13 @@ import {
   CameraCardArt,
 } from "../../components/home/HomeVisuals";
 import { StorageHeroCard } from "../../components/home/StorageHeroCard";
-import { safePickDocument, safePickImage } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { useAuth } from "../../context/AuthContext";
 import {
-  loadDriveItems,
-  saveDriveItems,
   loadUserPreferences,
   saveUserPreferences,
-  loadCachedGalleryPins,
-  saveCachedGalleryPins,
   recalculateTotalUsedStorageGB,
 } from "../../services/storageService";
-import { addGalleryPinToServer, updateGalleryPinInServer } from "../../services/galleryFirebaseService";
-import { uploadFileToMarkx } from "../../services/cloudflareStorage";
-import { getFileCategory, DriveItem } from "../../utils/driveFileTypes";
-import { GalleryPin, formatBytes } from "../../utils/galleryData";
 import { auth } from "../../services/firebase";
 import { getUserMetadata, subscribeUserStats } from "../../services/userService";
 
@@ -134,104 +125,19 @@ export default function HomeScreen() {
     }, [refreshCounts])
   );
 
-  const handleUploadFile = async () => {
+  const handleUploadFile = () => {
     triggerHaptic();
-    const file = await safePickDocument();
-    if (file) {
-      const category = getFileCategory(file.name, file.mimeType);
-      const newItem: DriveItem = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: file.name || "Uploaded Document",
-        category,
-        size: formatBytes(file.size),
-        updatedAt: "Just now",
-        uri: file.uri,
-        mimeType: file.mimeType,
-      };
-      const existing = await loadDriveItems();
-      await saveDriveItems([newItem, ...existing]);
-      await refreshCounts();
-    }
+    router.navigate("/(main)/drive");
   };
 
-  const updateCachedPinStatus = async (pinId: string, status: "synced" | "failed", url?: string) => {
-    try {
-      const currentCached = await loadCachedGalleryPins();
-      await saveCachedGalleryPins(
-        currentCached.map((p) =>
-          p.id === pinId
-            ? { ...p, uploadStatus: status, ...(url ? { imageUrl: url } : {}) }
-            : p
-        )
-      );
-    } catch (err) {
-      console.warn("[HomeScreen] Could not update cached pin status:", err);
-    }
-  };
-
-  const handleAddPhoto = async () => {
+  const handleAddPhoto = () => {
     triggerHaptic();
-    const img = await safePickImage();
-    if (!img?.uri) return;
-
-    await _uploadMediaToGallery(img);
+    router.navigate("/(main)/gallery");
   };
 
-  const handleCapturePhoto = async () => {
+  const handleCapturePhoto = () => {
     triggerHaptic();
     router.push('/camera');
-  };
-
-  const _uploadMediaToGallery = async (img: any) => {
-
-    const isVideo = img.type === "video";
-    const defaultMime = isVideo ? "video/mp4" : "image/jpeg";
-    const timestampNow = Date.now();
-    const shortFileName = `${timestampNow}${isVideo ? ".mp4" : ".jpg"}`;
-    const newPinId = `pin-${timestampNow}`;
-    const calculatedRatio = img.width && img.height ? Math.max(Math.min(img.width / img.height, 1.4), 0.6) : 0.75;
-    const fileSize = img.fileSize || (isVideo ? 14800000 : 2800000);
-
-    const newPin: GalleryPin = {
-      id: newPinId,
-      fileName: shortFileName,
-      author: user?.displayName || "You",
-      imageUrl: img.uri,
-      mediaType: isVideo ? "video" : "image",
-      duration: img.duration,
-      aspectRatio: calculatedRatio,
-      width: img.width || (calculatedRatio >= 1 ? 1920 : 1080),
-      height: img.height || Math.round((img.width || 1080) / calculatedRatio),
-      fileSize,
-      fileSizeFormatted: formatBytes(fileSize),
-      mimeType: img.mimeType || defaultMime,
-      likes: 0,
-      isLiked: false,
-      saved: false,
-      uploadStatus: "uploading",
-    };
-
-    await addGalleryPinToServer(newPin);
-
-    uploadFileToMarkx(img.uri, img.mimeType || defaultMime, shortFileName)
-      .then(async (res) => {
-        if (res.success && res.url) {
-          await updateGalleryPinInServer(newPin.id, {
-            imageUrl: res.url,
-            uploadStatus: "synced",
-          });
-          await updateCachedPinStatus(newPin.id, "synced", res.url);
-        } else {
-          console.warn("[HomeUpload] Upload failed:", res.error);
-          await updateCachedPinStatus(newPin.id, "failed");
-        }
-      })
-      .catch(async (err) => {
-        console.error("[HomeUpload] Error:", err);
-        await updateCachedPinStatus(newPin.id, "failed");
-      });
-
-    await refreshCounts();
   };
 
   return (
