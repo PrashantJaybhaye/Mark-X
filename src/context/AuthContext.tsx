@@ -20,6 +20,7 @@ import {
   signInWithPopup,
 } from "@react-native-firebase/auth";
 import { Platform, AppState } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
 import {
   GoogleSignin,
   isErrorWithCode,
@@ -74,6 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (Platform.OS !== "web") {
       try {
         await GoogleSignin.signOut();
+      } catch {}
+      try {
+        const cacheDir = FileSystem.cacheDirectory;
+        if (cacheDir) {
+          await FileSystem.deleteAsync(`${cacheDir}cached_assets/`, { idempotent: true }).catch(() => {});
+          await FileSystem.deleteAsync(`${cacheDir}shared_incoming/`, { idempotent: true }).catch(() => {});
+        }
       } catch {}
     }
     await firebaseSignOut(auth);

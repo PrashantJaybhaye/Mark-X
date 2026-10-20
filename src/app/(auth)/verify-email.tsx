@@ -134,7 +134,7 @@ export default function VerifyEmailScreen() {
           <Text
             allowFontScaling={false}
             className="text-[34px] text-white tracking-[0.6px] leading-[38px] mb-2.5"
-            style={{ fontFamily: "Anton_400Regular" }}
+            style={{ fontFamily: "Outfit_700Bold" }}
           >
             VERIFY YOUR EMAIL
           </Text>

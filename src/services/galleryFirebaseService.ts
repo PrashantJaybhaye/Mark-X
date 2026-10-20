@@ -18,7 +18,7 @@ import {
   updateGalleryStats,
   syncGalleryStats,
   saveCachedGalleryPins,
-  loadCachedGalleryPins
+  loadCachedGalleryPins,
 } from "./storageService";
 
 export const GALLERY_PAGE_LIMIT = 12;
@@ -35,26 +35,42 @@ function getGalleryCollectionRef() {
   return collection(db, "users", uid, "gallery");
 }
 
+function getGalleryDocRef(pinId: string) {
+  return doc(getGalleryCollectionRef(), pinId);
+}
+
+function parseDocPin(docSnap: FirebaseFirestoreTypes.QueryDocumentSnapshot): GalleryPin {
+  return normalizeGalleryPin({ id: docSnap.id, ...docSnap.data() });
+}
+
 function sanitizeForServer(obj: Record<string, any>): Record<string, any> {
   const clean: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      clean[key] = value;
-    }
+    if (value !== undefined) clean[key] = value;
   }
   return clean;
+}
+
+async function updateLocalCache(mutator: (cached: GalleryPin[]) => GalleryPin[]): Promise<void> {
+  try {
+    const cached = await loadCachedGalleryPins();
+    await saveCachedGalleryPins(mutator(cached));
+  } catch (err) {
+    console.warn("[GalleryServerService] Local cache sync warning:", err);
+  }
 }
 
 export async function fetchGalleryPinsFromServer(): Promise<GalleryPin[]> {
   try {
     const colRef = getGalleryCollectionRef();
     let q = query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"));
-    let snapshot;
+    let snapshot: FirebaseFirestoreTypes.QuerySnapshot;
+
     try {
       snapshot = await getDocs(q);
     } catch (indexErr: any) {
       if (indexErr?.message?.includes("index")) {
-        console.warn("[GalleryServerService] Composite index needed (saved DESC, createdAt DESC). Falling back to createdAt order.");
+        console.warn("[GalleryServerService] Composite index needed. Falling back to createdAt order.");
         q = query(colRef, orderBy("createdAt", "desc"));
         snapshot = await getDocs(q);
       } else {
@@ -62,14 +78,7 @@ export async function fetchGalleryPinsFromServer(): Promise<GalleryPin[]> {
       }
     }
 
-    const pins: GalleryPin[] = [];
-
-    for (const docSnap of snapshot.docs) {
-      const rawData = docSnap.data();
-      const normalized = normalizeGalleryPin({ id: docSnap.id, ...rawData });
-      pins.push(normalized);
-    }
-
+    const pins = snapshot.docs.map(parseDocPin);
     await saveCachedGalleryPins(pins);
     await syncGalleryStats(pins.length);
 
@@ -86,41 +95,36 @@ export async function fetchGalleryPinsPage(
 ): Promise<PaginatedPinsResult> {
   try {
     const colRef = getGalleryCollectionRef();
-    let q = query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), limit(pageSize));
-    if (lastDoc) {
-      q = query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize));
-    }
+    const buildQuery = (useSavedIndex = true) => {
+      if (useSavedIndex) {
+        return lastDoc
+          ? query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize))
+          : query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), limit(pageSize));
+      }
+      return lastDoc
+        ? query(colRef, orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize))
+        : query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
+    };
 
-    let snapshot;
+    let snapshot: FirebaseFirestoreTypes.QuerySnapshot;
     try {
-      snapshot = await getDocs(q);
+      snapshot = await getDocs(buildQuery(true));
     } catch (indexErr: any) {
       if (indexErr?.message?.includes("index")) {
         console.warn("[GalleryServerService] Composite index pending. Falling back to createdAt pagination.");
-        let fallbackQ = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
-        if (lastDoc) {
-          fallbackQ = query(colRef, orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize));
-        }
-        snapshot = await getDocs(fallbackQ);
+        snapshot = await getDocs(buildQuery(false));
       } else {
         throw indexErr;
       }
     }
 
-    const pins: GalleryPin[] = [];
-
-    for (const docSnap of snapshot.docs) {
-      const rawData = docSnap.data();
-      pins.push(normalizeGalleryPin({ id: docSnap.id, ...rawData }));
-    }
-
+    const pins = snapshot.docs.map(parseDocPin);
     const lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1] || null;
-    const hasMore = snapshot.docs.length === pageSize;
 
     return {
       pins,
       lastVisibleDoc,
-      hasMore,
+      hasMore: snapshot.docs.length === pageSize,
     };
   } catch (error) {
     console.warn("[GalleryServerService] Paginated fetch failed:", error);
@@ -141,45 +145,31 @@ export function subscribeLatestGalleryPins(
 
   try {
     const colRef = collection(db, "users", uid, "gallery");
-    const q = query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), limit(pageSize));
+    const handleSnapshot = (snapshot: FirebaseFirestoreTypes.QuerySnapshot) => {
+      onUpdate(snapshot.docs.map(parseDocPin));
+    };
+
     let fallbackUnsub: (() => void) | null = null;
+    const primaryQuery = query(colRef, orderBy("saved", "desc"), orderBy("createdAt", "desc"), limit(pageSize));
 
     const primaryUnsub = onSnapshot(
-      q,
-      (snapshot) => {
-        const pins: GalleryPin[] = [];
-        snapshot.forEach((docSnap: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
-          pins.push(normalizeGalleryPin({ id: docSnap.id, ...docSnap.data() }));
-        });
-        onUpdate(pins);
-      },
+      primaryQuery,
+      handleSnapshot,
       (error: any) => {
         if (error?.message?.includes("index")) {
-          console.warn("[GalleryServerService] Composite index pending for real-time listener. Falling back to createdAt order.");
-          const fallbackQ = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
-          fallbackUnsub = onSnapshot(
-            fallbackQ,
-            (snapshot) => {
-              const pins: GalleryPin[] = [];
-              snapshot.forEach((docSnap: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
-                pins.push(normalizeGalleryPin({ id: docSnap.id, ...docSnap.data() }));
-              });
-              onUpdate(pins);
-            },
-            (fallbackErr) => {
-              if (onError) onError(fallbackErr);
-            }
-          );
+          console.warn("[GalleryServerService] Composite index pending for listener. Falling back to createdAt order.");
+          const fallbackQuery = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
+          fallbackUnsub = onSnapshot(fallbackQuery, handleSnapshot, onError);
           return;
         }
         console.warn("[GalleryServerService] Subscription error:", error);
-        if (onError) onError(error);
+        onError?.(error);
       }
     );
 
     return () => {
       primaryUnsub();
-      if (fallbackUnsub) fallbackUnsub();
+      fallbackUnsub?.();
     };
   } catch (err) {
     console.warn("[GalleryServerService] Exception setting up gallery listener:", err);
@@ -195,82 +185,45 @@ export function subscribeGalleryPins(
 }
 
 export async function addGalleryPinToServer(pin: GalleryPin): Promise<void> {
-  try {
-    const colRef = getGalleryCollectionRef();
-    const docRef = doc(colRef, pin.id);
+  const normalized = normalizeGalleryPin(pin);
+  await updateLocalCache((cached) => [normalized, ...cached.filter((p) => p.id !== normalized.id)]);
 
-    const normalized = normalizeGalleryPin(pin);
-    const cleanPin = sanitizeForServer({
-      id: normalized.id,
-      imageUrl: normalized.imageUrl,
-      fileName: normalized.fileName,
-      mediaType: normalized.mediaType,
-      duration: normalized.duration,
-      aspectRatio: normalized.aspectRatio,
-      width: normalized.width,
-      height: normalized.height,
-      fileSize: normalized.fileSize,
-      fileSizeFormatted: normalized.fileSizeFormatted,
-      mimeType: normalized.mimeType,
-      author: normalized.author,
-      likes: normalized.likes,
-      isLiked: normalized.isLiked,
-      saved: normalized.saved,
-    });
+  const docRef = getGalleryDocRef(normalized.id);
+  await setDoc(docRef, {
+    ...sanitizeForServer(normalized),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 
-    try {
-      const currentCached = await loadCachedGalleryPins();
-      const filtered = currentCached.filter((p) => p.id !== normalized.id);
-      await saveCachedGalleryPins([normalized, ...filtered]);
-    } catch (cacheErr) {
-      console.warn("[GalleryServerService] Error updating local cache on add:", cacheErr);
-    }
-
-    await setDoc(docRef, {
-      ...cleanPin,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    updateGalleryStats(1).catch(console.warn);
-  } catch (error) {
-    console.error("[GalleryServerService] Add failed:", error);
-    throw error;
-  }
+  updateGalleryStats(1).catch(console.warn);
 }
 
 export async function updateGalleryPinInServer(pinId: string, updates: Partial<GalleryPin>): Promise<void> {
-  try {
-    const colRef = getGalleryCollectionRef();
-    const docRef = doc(colRef, pinId);
+  await updateLocalCache((cached) => cached.map((p) => (p.id === pinId ? { ...p, ...updates } : p)));
 
-    const cleanUpdates = sanitizeForServer(updates);
-
-    await setDoc(docRef, {
-      ...cleanUpdates,
+  const docRef = getGalleryDocRef(pinId);
+  await setDoc(
+    docRef,
+    {
+      ...sanitizeForServer(updates),
       updatedAt: serverTimestamp(),
-    }, { merge: true });
-  } catch (error) {
-    console.error("[GalleryServerService] Update failed:", error);
-    throw error;
-  }
+    },
+    { merge: true }
+  );
 }
 
 export async function deleteGalleryPinFromServer(pinId: string): Promise<void> {
-  try {
-    const colRef = getGalleryCollectionRef();
-    const docRef = doc(colRef, pinId);
+  const docRef = getGalleryDocRef(pinId);
+  await deleteDoc(docRef);
 
-    await deleteDoc(docRef);
-
-    const cached = await loadCachedGalleryPins();
+  let remainingCount = 0;
+  await updateLocalCache((cached) => {
     const updated = cached.filter((p) => p.id !== pinId);
-    await saveCachedGalleryPins(updated);
-    await syncGalleryStats(updated.length);
-  } catch (error) {
-    console.error("[GalleryServerService] Delete failed:", error);
-    throw error;
-  }
+    remainingCount = updated.length;
+    return updated;
+  });
+
+  await syncGalleryStats(remainingCount);
 }
 
 export const fetchGalleryPinsFromFirestore = fetchGalleryPinsFromServer;

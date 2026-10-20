@@ -3,7 +3,6 @@ export * from "./biometricsService";
 export * from "./cachedImageService";
 export * from "./cacheCleaner";
 export * from "./cloudflareStorage";
-export * from "./cryptoService";
 export * from "./deviceSyncService";
 export * from "./firebase";
 export * from "./galleryFirebaseService";

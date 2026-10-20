@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 
-const CACHE_FOLDER = `${FileSystem.documentDirectory}cached_assets/`;
+const CACHE_FOLDER = `${FileSystem.cacheDirectory || FileSystem.documentDirectory}cached_assets/`;
 
 export async function getOrFetchCachedImage(
   remoteUrl: string,

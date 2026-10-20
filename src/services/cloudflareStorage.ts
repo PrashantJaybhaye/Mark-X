@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { auth } from "./firebase";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_CLOUDFLARE_WORKER_URL?.replace(/\/+$/, "");
 const UPLOAD_SECRET = process.env.EXPO_PUBLIC_CLOUDFLARE_UPLOAD_SECRET;
@@ -36,6 +37,17 @@ export async function uploadFileToMarkx(
     const headers: Record<string, string> = {};
     if (UPLOAD_SECRET) {
       headers["X-Auth-Key"] = UPLOAD_SECRET;
+    }
+
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        if (idToken) {
+          headers["Authorization"] = `Bearer ${idToken}`;
+        }
+        headers["X-User-Id"] = currentUser.uid;
+      } catch {}
     }
 
     const task = FileSystem.createUploadTask(

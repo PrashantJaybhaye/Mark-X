@@ -286,27 +286,26 @@ export default function GalleryDetailPage() {
     };
   }, [id, router]);
 
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const updatePin = useCallback((updates: Partial<GalleryPin>) => {
-    if (!pin) return;
+  const updatePin = useCallback(async (updates: Partial<GalleryPin>) => {
+    if (!pin?.id) return;
+    const targetId = pin.id;
 
     setPin((prev) => (prev ? { ...prev, ...updates } : null));
 
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
+    try {
+      const cached = await loadCachedGalleryPins();
+      const updated = cached.map((p) => (p.id === targetId ? { ...p, ...updates } : p));
+      await saveCachedGalleryPins(updated);
+    } catch (err) {
+      console.warn("[id.tsx] Error updating cached pins:", err);
     }
 
-    syncTimeoutRef.current = setTimeout(async () => {
-      try {
-        await updateGalleryPinInServer(pin.id, updates);
-        const cached = await loadCachedGalleryPins();
-        await saveCachedGalleryPins(cached.map((p) => (p.id === pin.id ? { ...p, ...updates } : p)));
-      } catch (err) {
-        console.warn(err);
-      }
-    }, 800);
-  }, [pin]);
+    try {
+      await updateGalleryPinInServer(targetId, updates);
+    } catch (err) {
+      console.warn("[id.tsx] Error syncing pin update to server:", err);
+    }
+  }, [pin?.id]);
 
   const animateBookmarkBounce = () => {
     bookmarkScale.setValue(0.7);

@@ -77,3 +77,5 @@ export function getKindLabel(item: DriveItem): string {
   if (item.category === "image") return `Image (${ext || "IMG"})`;
   return item.mimeType || `${item.category.toUpperCase()} File`;
 }
+
+export { formatBytes } from "./galleryData";

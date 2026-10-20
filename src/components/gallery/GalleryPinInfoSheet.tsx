@@ -215,6 +215,7 @@ export function GalleryPinInfoSheet({
                   </Text>
                   <Text
                     numberOfLines={1}
+                    ellipsizeMode="middle"
                     allowFontScaling={false}
                     className="text-[13px] font-outfit text-[#70757A] mt-0.5"
                   >
@@ -248,11 +249,16 @@ export function GalleryPinInfoSheet({
 
                   <View className="mt-3 pt-3 border-t border-black/[0.06] gap-2">
                     {fileSpecs.map((spec) => (
-                      <View key={spec.label} className="flex-row justify-between items-center py-1">
-                        <Text allowFontScaling={false} className="text-[13px] font-outfit text-[#70757A]">
+                      <View key={spec.label} className="flex-row justify-between items-center py-1 gap-3">
+                        <Text allowFontScaling={false} className="text-[13px] font-outfit text-[#70757A] shrink-0">
                           {spec.label}
                         </Text>
-                        <Text allowFontScaling={false} className="text-[13px] font-outfit-semibold text-[#1F1F1F]">
+                        <Text
+                          allowFontScaling={false}
+                          numberOfLines={1}
+                          ellipsizeMode={spec.label === "File Name" ? "middle" : "tail"}
+                          className="text-[13px] font-outfit-semibold text-[#1F1F1F] text-right flex-1"
+                        >
                           {spec.value}
                         </Text>
                       </View>

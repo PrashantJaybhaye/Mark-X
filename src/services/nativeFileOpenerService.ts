@@ -1,7 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Platform, Alert } from "react-native";
-import ReactNativeBlobUtil from "react-native-blob-util";
 import { DriveItem } from "../utils/driveFileTypes";
 import { triggerHaptic } from "../utils/haptics";
 
@@ -79,32 +78,6 @@ export async function openInNativeApp(item: DriveItem): Promise<boolean> {
     }
 
     const mimeType = getMimeTypeForFile(item.name, item.mimeType);
-    const cleanPath = decodeURIComponent(localUri.replace(/^file:\/\//, ""));
-
-    if (Platform.OS === "android" && ReactNativeBlobUtil?.android?.actionViewIntent) {
-      try {
-        await ReactNativeBlobUtil.android.actionViewIntent(cleanPath, mimeType);
-        return true;
-      } catch (androidErr: any) {
-        if (androidErr?.code === "ENOAPP" || androidErr?.message?.includes("No app")) {
-          Alert.alert(
-            "No App Found",
-            `No app installed to open ${getRecommendedAppName(item.name)}. Please install Google Slides or Microsoft PowerPoint from the Play Store.`
-          );
-          return false;
-        }
-        console.warn("[NativeFileOpener] actionViewIntent fallback:", androidErr);
-      }
-    }
-
-    if (Platform.OS === "ios" && ReactNativeBlobUtil?.ios?.openDocument) {
-      try {
-        ReactNativeBlobUtil.ios.openDocument(cleanPath);
-        return true;
-      } catch (iosErr) {
-        console.warn("[NativeFileOpener] iOS openDocument fallback:", iosErr);
-      }
-    }
 
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(localUri, {

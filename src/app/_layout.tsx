@@ -18,12 +18,12 @@ import {
   Outfit_700Bold,
   Outfit_900Black,
 } from "@expo-google-fonts/outfit";
-import { Anton_400Regular } from "@expo-google-fonts/anton";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import { BiometricsProvider } from "../context/BiometricsContext";
 import { BiometricLockGate } from "../components/security/BiometricLockGate";
 import { AnimatedSplashScreen } from "../components/splash/AnimatedSplashScreen";
+import { IncomingShareModal } from "../components/common/IncomingShareModal";
 import "../services/BackgroundUploadService";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -130,6 +130,7 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           />
         </Stack>
         <BiometricLockGate />
+        <IncomingShareModal />
       </ThemeProvider>
     </AnimatedSplashScreen>
   );
@@ -142,7 +143,6 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     Outfit_700Bold,
     Outfit_900Black,
-    Anton_400Regular,
   });
 
   const isFontsReady = !!(fontsLoaded || fontError);

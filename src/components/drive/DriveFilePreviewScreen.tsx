@@ -217,6 +217,16 @@ export function DriveFilePreviewScreen({
       await Clipboard.setStringAsync(textContent);
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 2000);
+
+      // Auto-clear sensitive clipboard content after 60 seconds
+      setTimeout(async () => {
+        try {
+          const current = await Clipboard.getStringAsync();
+          if (current === textContent) {
+            await Clipboard.setStringAsync("");
+          }
+        } catch {}
+      }, 60000);
     }
   };
 

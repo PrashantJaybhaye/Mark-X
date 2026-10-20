@@ -1,3 +1,0 @@
-import * as Crypto from "expo-crypto";
-
-export const generateUUID = (): string => Crypto.randomUUID();

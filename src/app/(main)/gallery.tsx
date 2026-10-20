@@ -217,19 +217,25 @@ export default function GalleryScreen() {
           if (prev.length === 0) return normalized;
           const cachedMap = new Map(cached.map((p) => [p.id, p]));
           let hasNewBookmark = false;
-          const updatedList = prev.map((p) => {
-            const updated = cachedMap.get(p.id);
-            if (updated) {
-              if (!p.saved && updated.saved) hasNewBookmark = true;
-              return { ...p, ...updated };
-            }
-            return p;
-          });
+          const updatedList = prev
+            .filter((p) => cachedMap.has(p.id))
+            .map((p) => {
+              const updated = cachedMap.get(p.id);
+              if (updated) {
+                if (!p.saved && updated.saved) hasNewBookmark = true;
+                return { ...p, ...updated, saved: !!updated.saved };
+              }
+              return p;
+            });
+
+          const prevIds = new Set(prev.map((p) => p.id));
+          const newPins = normalized.filter((p) => !prevIds.has(p.id));
+          const finalList = newPins.length > 0 ? [...newPins, ...updatedList] : updatedList;
 
           if (hasNewBookmark) {
             setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
           }
-          return updatedList;
+          return finalList;
         });
       });
     }, [resumeInterruptedUploads])

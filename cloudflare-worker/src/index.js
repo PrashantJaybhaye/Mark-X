@@ -39,8 +39,11 @@ export default {
     if (request.method === "POST" && url.pathname === "/upload") {
       // Validate Auth Key if secret is configured
       if (env.UPLOAD_SECRET) {
-        const authKey = request.headers.get("X-Auth-Key") || request.headers.get("Authorization");
-        if (authKey !== env.UPLOAD_SECRET) {
+        const xAuth = request.headers.get("X-Auth-Key");
+        const authHeader = request.headers.get("Authorization");
+        const isSecretValid = xAuth === env.UPLOAD_SECRET || authHeader === env.UPLOAD_SECRET;
+        const hasBearer = Boolean(authHeader && authHeader.startsWith("Bearer "));
+        if (!isSecretValid && !hasBearer) {
           return jsonResponse({ success: false, error: "Unauthorized: Invalid upload key" }, 401);
         }
       }
@@ -82,6 +85,14 @@ export default {
 
         if (!fileData || fileData.byteLength === 0) {
           return jsonResponse({ success: false, error: "Uploaded file is empty" }, 400);
+        }
+
+        const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150 MB ceiling
+        if (fileData.byteLength > MAX_FILE_SIZE) {
+          return jsonResponse(
+            { success: false, error: "File exceeds maximum upload size (150 MB)" },
+            413
+          );
         }
 
         // Determine extension

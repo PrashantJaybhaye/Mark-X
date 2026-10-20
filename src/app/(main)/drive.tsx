@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -39,8 +39,9 @@ import {
 import { openInNativeApp } from "../../services/nativeFileOpenerService";
 import { safePickDocument } from "../../services/nativePickerService";
 import { loadDriveItems, saveDriveItems } from "../../services/storageService";
-import { DriveItem, getFileCategory, getFileDisplayName } from "../../utils/driveFileTypes";
+import { DriveItem, formatBytes, getFileCategory, getFileDisplayName } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
+import { subscribeDriveToast } from "../../services/driveToastService";
 
 export default function DriveScreen() {
   const insets = useSafeAreaInsets();
@@ -66,6 +67,20 @@ export default function DriveScreen() {
   const [toastType, setToastType] = useState<ToastStatusType>("success");
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fabBottomAnim = useRef(new Animated.Value(14)).current;
+  const params = useLocalSearchParams<{ toastFileName?: string; toastDetail?: string }>();
+
+  useEffect(() => {
+    if (params.toastFileName) {
+      triggerToast(params.toastFileName, "uploading", params.toastDetail || "Uploading to Cloud Storage...");
+    }
+  }, [params.toastFileName, params.toastDetail]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeDriveToast((name, type, detail) => {
+      triggerToast(name, type, detail);
+    });
+    return unsubscribe;
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -73,7 +88,14 @@ export default function DriveScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-    }, [])
+      loadDriveItems().then((stored) => {
+        const realItems = (stored || []).filter((item) => !item.id.startsWith("test-"));
+        setFiles(realItems);
+      });
+      if (params.toastFileName) {
+        triggerToast(params.toastFileName, "uploading", params.toastDetail || "Uploading to Cloud Storage...");
+      }
+    }, [params.toastFileName, params.toastDetail])
   );
 
   useEffect(() => {
@@ -216,7 +238,7 @@ export default function DriveScreen() {
       id: generateUniqueId(),
       name: file.name || "Uploaded Document",
       category,
-      size: file.size ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB",
+      size: formatBytes(file.size) || "1.2 MB",
       updatedAt: String(Date.now()),
       uri: permanentUri,
       mimeType: file.mimeType,

@@ -8,9 +8,7 @@ export async function deleteTempFile(fileUri: string | null | undefined): Promis
     if (exists.exists) {
       await FileSystem.deleteAsync(fileUri, { idempotent: true });
     }
-  } catch (err) {
-
-  }
+  } catch (_err) {}
 }
 
 async function recursiveMeasureDirectory(dirUri: string): Promise<number> {
@@ -31,8 +29,7 @@ async function recursiveMeasureDirectory(dirUri: string): Promise<number> {
         totalBytes += info.size || 0;
       }
     }
-  } catch (error) {
-  }
+  } catch (_error) {}
   return totalBytes;
 }
 
@@ -41,7 +38,16 @@ export async function getAppCacheSize(): Promise<{ sizeMB: number; sizeBytes: nu
   try {
     const cacheDir = FileSystem.cacheDirectory;
     if (cacheDir) {
-      totalBytes = await recursiveMeasureDirectory(cacheDir);
+      totalBytes += await recursiveMeasureDirectory(cacheDir);
+    }
+
+    const docDir = FileSystem.documentDirectory;
+    if (docDir) {
+      const legacyAssets = `${docDir}cached_assets/`;
+      const assetsInfo = await FileSystem.getInfoAsync(legacyAssets);
+      if (assetsInfo.exists) {
+        totalBytes += await recursiveMeasureDirectory(legacyAssets);
+      }
     }
   } catch (error) {
     console.warn("[CacheCleaner] Error measuring cache size:", error);
@@ -70,8 +76,7 @@ async function recursiveCleanDirectory(dirUri: string): Promise<number> {
         await FileSystem.deleteAsync(itemUri, { idempotent: true }).catch(() => {});
       }
     }
-  } catch (error) {
-  }
+  } catch (_error) {}
   return bytesCleared;
 }
 
@@ -81,7 +86,16 @@ export async function clearAppCache(): Promise<{ clearedMB: number; clearedBytes
   try {
     const cacheDir = FileSystem.cacheDirectory;
     if (cacheDir) {
-      totalBytesCleared = await recursiveCleanDirectory(cacheDir);
+      totalBytesCleared += await recursiveCleanDirectory(cacheDir);
+    }
+
+    const docDir = FileSystem.documentDirectory;
+    if (docDir) {
+      const legacyAssets = `${docDir}cached_assets/`;
+      const assetsInfo = await FileSystem.getInfoAsync(legacyAssets);
+      if (assetsInfo.exists) {
+        totalBytesCleared += await recursiveCleanDirectory(legacyAssets);
+      }
     }
 
     await Image.clearDiskCache().catch(() => {});
