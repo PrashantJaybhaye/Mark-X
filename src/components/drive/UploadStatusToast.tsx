@@ -28,56 +28,47 @@ export function getToastVisuals(
   const lowerDetail = (detail || "").toLowerCase();
   const lowerName = (fileName || "").toLowerCase();
 
-  // 1. In-progress upload
   if (type === "uploading" || lowerDetail.includes("uploading") || lowerName.includes("uploading")) {
     return { isSpinner: true, color: "#1A73E8" };
   }
 
-  // 2. Folder operations
   if (type === "folder" || lowerDetail.includes("folder created") || lowerName.startsWith("new folder")) {
-    return { iconName: "folder-open-outline", color: "#F59E0B" }; // Amber / Google Drive folder
+    return { iconName: "folder-open-outline", color: "#F59E0B" };
   }
 
-  // 3. Star toggle
   if (type === "star" || lowerDetail.includes("starred")) {
     if (lowerDetail.includes("removed")) {
       return { iconName: "star-outline", color: "#5F6368" };
     }
-    return { iconName: "star", color: "#FBBC04" }; // Google Drive gold star
+    return { iconName: "star", color: "#FBBC04" };
   }
 
-  // 4. Rename
   if (type === "rename" || lowerName.startsWith("renamed") || lowerDetail.includes("name updated")) {
-    return { iconName: "pencil", color: "#1A73E8" }; // Google blue
+    return { iconName: "pencil", color: "#1A73E8" };
   }
 
-  // 5. Export / Share
   if (type === "export" || lowerDetail.includes("export") || lowerDetail.includes("attachment")) {
-    return { iconName: "share-social", color: "#4F46E5" }; // Indigo
+    return { iconName: "share-social", color: "#4F46E5" };
   }
 
-  // 6. Delete
   if (type === "delete" || lowerName.startsWith("deleted") || lowerDetail.includes("removed from drive")) {
-    return { iconName: "trash", color: "#D93025" }; // Google red
+    return { iconName: "trash", color: "#D93025" };
   }
 
-  // 7. Error
   if (
     type === "error" ||
     lowerDetail.includes("failed") ||
     lowerName.includes("error") ||
     lowerName.includes("cannot")
   ) {
-    return { iconName: "alert-circle", color: "#D93025" }; // Google red
+    return { iconName: "alert-circle", color: "#D93025" };
   }
 
-  // 8. Info
   if (type === "info") {
     return { iconName: "information-circle", color: "#1A73E8" };
   }
 
-  // 9. Success (Solid checkmark-circle for clear, premium completion UX)
-  return { iconName: "checkmark-circle-outline", color: "#1E8E3E" }; // Google green
+  return { iconName: "checkmark-circle-outline", color: "#1E8E3E" };
 }
 
 interface UploadStatusToastProps {
@@ -153,7 +144,6 @@ export function UploadStatusToast({
       }}
       className="bg-white border-t border-[#E5E5EA] rounded-t-2xl px-4 py-2.5 flex-row items-center justify-between shadow-lg shadow-black/10"
     >
-      {/* Left: Bare contextual icon / spinner + Text */}
       <View className="flex-row items-center flex-1 mr-3">
         {visuals.isSpinner ? (
           <View style={{ width: 22, height: 22, alignItems: "center", justifyContent: "center" }}>
@@ -173,7 +163,6 @@ export function UploadStatusToast({
         </View>
       </View>
 
-      {/* Right: Close X + Chevron Up */}
       <View className="flex-row items-center gap-3">
         <TouchableOpacity
           activeOpacity={0.7}

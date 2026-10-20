@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { View, ScrollView, useWindowDimensions, Platform, StatusBar as RNStatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
@@ -10,11 +10,17 @@ import { NoteItemCard, NoteItem } from "../../components/notes/NoteItemCard";
 import { NotesEmptyState } from "../../components/notes/NotesEmptyState";
 import { triggerHaptic } from "../../utils/haptics";
 import { loadNotes, saveNotes } from "../../services/storageService";
-import { pullAndMergeNotesFromFirestore, deleteNoteFromFirestore, syncNoteToFirestore } from "../../services/notesSyncService";
+import {
+  subscribeToNotesServer,
+  deleteNoteFromFirestore,
+  syncNoteToFirestore,
+} from "../../services/notesSyncService";
+import { useAuth } from "../../context/AuthContext";
 import { IosDialog } from "../../components/common/IosDialog";
 
 export default function NotesScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<NoteViewMode>("grid");
@@ -23,19 +29,34 @@ export default function NotesScreen() {
   const [activeDialog, setActiveDialog] = useState<"more" | "delete" | null>(null);
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       setStatusBarStyle("dark");
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-
-      loadNotes().then((local) => setNotes(local ?? []));
-
-      pullAndMergeNotesFromFirestore().then((merged) => {
-        if (merged) setNotes(merged);
-      });
     }, [])
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadNotes().then((local) => {
+      if (isMounted && local && local.length > 0) {
+        setNotes(local);
+      }
+    });
+
+    const unsubscribe = subscribeToNotesServer((syncedNotes) => {
+      if (isMounted && syncedNotes) {
+        setNotes(syncedNotes);
+      }
+    }, user?.uid);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [user?.uid]);
 
   const updateNotesAndPersist = (updater: (prev: NoteItem[]) => NoteItem[]) => {
     setNotes((prev) => {
@@ -77,10 +98,10 @@ export default function NotesScreen() {
     if (!selectedNote) return;
     triggerHaptic();
     updateNotesAndPersist((prev) => prev.filter((n) => n.id !== selectedNote.id));
-    deleteNoteFromFirestore(selectedNote.id);
+    deleteNoteFromFirestore(selectedNote.id, user?.uid);
     setSelectedNote(null);
     setActiveDialog(null);
-  }, [selectedNote]);
+  }, [selectedNote, user?.uid]);
 
   const handleTogglePin = React.useCallback(() => {
     if (!selectedNote) return;
@@ -89,10 +110,10 @@ export default function NotesScreen() {
     updateNotesAndPersist((prev) =>
       prev.map((n) => (n.id === updatedNote.id ? updatedNote : n))
     );
-    syncNoteToFirestore(updatedNote);
+    syncNoteToFirestore(updatedNote, user?.uid);
     setSelectedNote(null);
     setActiveDialog(null);
-  }, [selectedNote]);
+  }, [selectedNote, user?.uid]);
 
   const filteredNotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -114,7 +135,6 @@ export default function NotesScreen() {
       <StatusBar style="dark" />
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        {}
         <NotesHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -123,17 +143,14 @@ export default function NotesScreen() {
           onAddNote={handleAddNote}
         />
 
-        {}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: 100,
           }}
         >
-          {}
           <NotesStackedBanner notes={notes} onPress={handleAddNote} onNotePress={handleEditNote} />
 
-          {}
           <View className="px-5 pt-1">
             {filteredNotes.length === 0 ? (
               <NotesEmptyState

@@ -429,13 +429,11 @@ export default function GalleryScreen() {
       <StatusBar style="dark" />
 
       <SafeAreaView edges={["top"]} className="flex-1 bg-white">
-        {}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#F2F2F2]">
           <View className="justify-center">
             <MarkXLogo width={115} height={16} color="#111111" />
           </View>
 
-          {}
           <View className="flex-row items-center bg-[#F0F2F4] border border-[#E5E7EB] rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
               activeOpacity={0.7}
@@ -458,7 +456,6 @@ export default function GalleryScreen() {
           </View>
         </View>
 
-        {}
         <ScrollView
           ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
@@ -479,7 +476,6 @@ export default function GalleryScreen() {
           ) : (
             <>
               <View className="flex-row w-full" style={{ gap: gutter }}>
-                {}
                 <View style={{ width: columnWidth }}>
                   {leftPins.map((pin) => (
                     <GalleryPinCard
@@ -492,7 +488,6 @@ export default function GalleryScreen() {
                   ))}
                 </View>
 
-                {}
                 <View style={{ width: columnWidth }}>
                   {rightPins.map((pin) => (
                     <GalleryPinCard
@@ -506,7 +501,6 @@ export default function GalleryScreen() {
                 </View>
               </View>
 
-              {}
               {isLoadingMore && (
                 <View className="py-6 items-center justify-center">
                   <ActivityIndicator size="small" color="#111111" />
@@ -517,7 +511,6 @@ export default function GalleryScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {}
       <GalleryPinOptionsSheet
         pin={optionsPin}
         visible={!!optionsPin}
@@ -527,7 +520,6 @@ export default function GalleryScreen() {
         onInfo={(pin) => setInfoPin(pin)}
       />
 
-      {}
       <GalleryPinInfoSheet
         visible={!!infoPin}
         pin={infoPin}

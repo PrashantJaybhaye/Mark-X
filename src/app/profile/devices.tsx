@@ -242,7 +242,6 @@ export default function DevicesScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#EBEBEB]"
@@ -290,7 +289,6 @@ export default function DevicesScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {}
         <DeviceRow
           icon={getDeviceIcon(hardwareInfo.deviceType)}
           title={deviceLabel}
@@ -315,7 +313,6 @@ export default function DevicesScreen() {
 
         <View className="h-5" />
 
-        {}
         <View className="mb-6">
           <View className="flex-row items-center justify-between mb-1">
             <Text
@@ -388,7 +385,6 @@ export default function DevicesScreen() {
           )}
         </View>
 
-        {}
         <View className="mb-6">
           <Text
             className="text-[17px] text-[#222222] tracking-tight mb-1"
@@ -409,7 +405,6 @@ export default function DevicesScreen() {
         </View>
       </ScrollView>
 
-      {}
       <IosDialog
         visible={logoutTarget !== null}
         title="Log Out Device"

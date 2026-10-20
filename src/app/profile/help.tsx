@@ -163,7 +163,6 @@ export default function HelpScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
@@ -199,7 +198,6 @@ export default function HelpScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {}
         <View className="mt-1 mb-7">
           <Text
             className="text-[32px] text-[#111111] tracking-tight leading-[38px]"
@@ -209,7 +207,6 @@ export default function HelpScreen() {
           </Text>
         </View>
 
-        {}
         <Text
           className="text-[12px] text-[#71717A] uppercase tracking-wider mb-2.5 px-1"
           style={{ fontFamily: "Outfit_600SemiBold" }}
@@ -244,7 +241,6 @@ export default function HelpScreen() {
           ))}
         </View>
 
-        {}
         <Text
           className="text-[12px] text-[#71717A] uppercase tracking-wider mb-2.5 px-1"
           style={{ fontFamily: "Outfit_600SemiBold" }}
@@ -279,7 +275,6 @@ export default function HelpScreen() {
           ))}
         </View>
 
-        {}
         <View className="mb-6">
           <Text
             className="text-[22px] text-[#111111] mb-1.5"
@@ -295,7 +290,6 @@ export default function HelpScreen() {
           </Text>
         </View>
 
-        {}
         <TouchableOpacity
           onPress={handleContactSupport}
           activeOpacity={0.8}

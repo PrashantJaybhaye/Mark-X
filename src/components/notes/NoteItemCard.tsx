@@ -39,7 +39,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
         className="w-full bg-white rounded-[22px] p-4 mb-3 border border-black/[0.05] shadow-xs flex-row items-center justify-between"
       >
 
-        {}
         <View className="flex-1 mr-3 justify-center">
           <View className="flex-row items-center mb-0.5">
             <Text
@@ -82,7 +81,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
           </View>
         </View>
 
-        {}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleOptions}
@@ -102,7 +100,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
       className="w-full bg-white rounded-[24px] p-4 mb-3.5 border border-black/[0.05] shadow-sm shadow-black/[0.03] justify-between min-h-[160px]"
     >
 
-      {}
       <View className="flex-1 justify-start">
         <Text
           allowFontScaling={false}
@@ -124,7 +121,6 @@ export const NoteItemCard = React.memo(function NoteItemCard({
         ) : null}
       </View>
 
-      {}
       <View className="flex-row items-center justify-between pt-3 mt-1 border-t border-black/[0.04]">
         <Text
           allowFontScaling={false}

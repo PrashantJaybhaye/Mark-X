@@ -127,14 +127,12 @@ export function DrivePdfViewer({
         />
       ) : null}
 
-      {}
       {isLoading && (
         <View className="absolute inset-0 bg-white/70 items-center justify-center z-20">
           <ActivityIndicator size="large" color="#1A73E8" />
         </View>
       )}
 
-      {}
       <Modal
         visible={!!showJumpModal}
         transparent={true}

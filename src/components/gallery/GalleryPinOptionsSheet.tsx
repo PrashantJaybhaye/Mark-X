@@ -155,7 +155,6 @@ export function GalleryPinOptionsSheet({
         onRequestClose={() => animateClose()}
       >
         <View className="flex-1 justify-end">
-          {}
           <TouchableWithoutFeedback onPress={() => animateClose()}>
             <Animated.View
               style={{
@@ -170,7 +169,6 @@ export function GalleryPinOptionsSheet({
             />
           </TouchableWithoutFeedback>
 
-          {}
           <TouchableWithoutFeedback>
             <Animated.View
               className="bg-[#F5F4F0] rounded-t-[32px] px-5 pt-4 shadow-2xl relative border-t border-black/[0.05]"
@@ -179,7 +177,6 @@ export function GalleryPinOptionsSheet({
                 paddingBottom: Math.max(insets.bottom, 20) + 8,
               }}
             >
-              {}
               <View className="items-center mb-1">
                 <View className="-mt-24 rounded-[22px] shadow-2xl overflow-hidden bg-[#E7E4DC]">
                   <Image
@@ -195,9 +192,7 @@ export function GalleryPinOptionsSheet({
                 </View>
               </View>
 
-              {}
               <View className="flex-row gap-3 my-4">
-                {}
                 <TouchableOpacity
                   activeOpacity={0.75}
                   onPress={handleSave}
@@ -214,7 +209,6 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {}
                 <TouchableOpacity
                   activeOpacity={0.75}
                   onPress={handleRemovePress}
@@ -232,9 +226,7 @@ export function GalleryPinOptionsSheet({
                 </TouchableOpacity>
               </View>
 
-              {}
               <View className="gap-0.5 mt-1">
-                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleExport}
@@ -246,7 +238,6 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleInfo}
@@ -258,7 +249,6 @@ export function GalleryPinOptionsSheet({
                   </Text>
                 </TouchableOpacity>
 
-                {}
                 <View className="flex-row items-center py-3.5 px-2 rounded-xl">
                   <Ionicons name="person-outline" size={22} color="#70757A" style={{ marginRight: 16 }} />
                   <Text allowFontScaling={false} className="text-[15.5px] font-outfit-medium text-[#70757A]">
@@ -271,7 +261,6 @@ export function GalleryPinOptionsSheet({
         </View>
       </Modal>
 
-      {}
       <IosDialog
         visible={showRemoveConfirm}
         title="Remove Pin"
@@ -292,7 +281,6 @@ export function GalleryPinOptionsSheet({
         onClose={handleCancelRemove}
       />
 
-      {}
       <IosDialog
         visible={showExportSuccess}
         title="Saved to Device"

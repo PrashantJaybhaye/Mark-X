@@ -96,7 +96,6 @@ export function BiometricLockGate() {
       >
           <StatusBar style="dark" />
 
-          {}
           <View
             style={{
               flex: 1,
@@ -111,7 +110,6 @@ export function BiometricLockGate() {
               elevation: 10,
             }}
           >
-            {}
             <View
               style={{
                 width: "100%",
@@ -124,7 +122,6 @@ export function BiometricLockGate() {
               <MarkXLogo width={145} height={19} color="#111111" />
             </View>
 
-            {}
             <View className="flex-1 items-center justify-center px-6">
               <View className="items-center -mt-8">
                 <TouchableOpacity
@@ -153,7 +150,6 @@ export function BiometricLockGate() {
             </View>
           </View>
 
-          {}
           <View
             style={{
               paddingTop: 18,
@@ -163,7 +159,6 @@ export function BiometricLockGate() {
               justifyContent: "center",
             }}
           >
-            {}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleUnlock}
@@ -188,7 +183,6 @@ export function BiometricLockGate() {
               </Text>
             </TouchableOpacity>
 
-            {}
             <TouchableOpacity
               activeOpacity={0.6}
               onPress={handleEmergencyAccess}
@@ -208,7 +202,6 @@ export function BiometricLockGate() {
           </View>
       </View>
 
-      {}
       <IosDialog
         visible={isEmergencyModalVisible}
         title="Emergency Access"

@@ -388,7 +388,6 @@ export default function PersonalInfoScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F0F0F0]"
@@ -424,7 +423,6 @@ export default function PersonalInfoScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {}
         <View className="flex-row items-center mb-6">
           <View className="relative mr-4">
             <TouchableOpacity
@@ -490,7 +488,6 @@ export default function PersonalInfoScreen() {
           </View>
         </View>
 
-        {}
         <View className="bg-[#F2F2F7] rounded-xl p-[3px] flex-row mb-6">
           {(
             [
@@ -524,7 +521,6 @@ export default function PersonalInfoScreen() {
           })}
         </View>
 
-        {}
         <View>
           {activeItems.map((item, index) => (
             <ProfileItemRow
@@ -539,7 +535,6 @@ export default function PersonalInfoScreen() {
         </View>
       </ScrollView>
 
-      {}
       <InputDialog
         visible={activeModal === "edit_name"}
         onClose={() => setActiveModal(null)}
@@ -554,7 +549,6 @@ export default function PersonalInfoScreen() {
         isLoading={isSaving}
       />
 
-      {}
       <InputDialog
         visible={activeModal === "edit_username"}
         onClose={() => setActiveModal(null)}
@@ -576,7 +570,6 @@ export default function PersonalInfoScreen() {
         isLoading={isSaving}
       />
 
-      {}
       <IosDialog
         visible={activeModal === "remove_photo"}
         onClose={() => setActiveModal(null)}

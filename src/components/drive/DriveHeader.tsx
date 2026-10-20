@@ -3,13 +3,13 @@ import { View, TextInput, Platform, TouchableOpacity, Text } from "react-native"
 import { Ionicons } from "@expo/vector-icons";
 import { triggerHaptic } from "../../utils/haptics";
 
-export type DriveTabType = "drive" | "folders";
+export type DriveTabType = "drive";
 
 interface DriveHeaderProps {
   search: string;
   onSearchChange: (text: string) => void;
-  activeTab?: DriveTabType;
-  onTabChange?: (tab: DriveTabType) => void;
+  activeTab?: DriveTabType | string;
+  onTabChange?: (tab: any) => void;
   sortOrder?: "asc" | "desc";
   onToggleSort?: () => void;
   viewMode?: "list" | "grid";
@@ -20,8 +20,6 @@ interface DriveHeaderProps {
 export function DriveHeader({
   search,
   onSearchChange,
-  activeTab = "drive",
-  onTabChange,
   sortOrder = "asc",
   onToggleSort,
   viewMode = "list",
@@ -30,7 +28,6 @@ export function DriveHeader({
 }: DriveHeaderProps) {
   return (
     <View className="bg-white border-b border-[#E6E8EC]">
-      {}
       <View
         className="px-4 pb-2.5"
         style={{
@@ -38,10 +35,8 @@ export function DriveHeader({
         }}
       >
         <View className="flex-row items-center bg-[#F0F2F5] border border-[#E2E8F0] rounded-full px-4 h-[48px]">
-          {}
           <Ionicons name="search" size={19} color="#5F6368" />
 
-          {}
           <TextInput
             placeholder="Search files & folders..."
             placeholderTextColor="#70757A"
@@ -53,7 +48,6 @@ export function DriveHeader({
             clearButtonMode="while-editing"
           />
 
-          {}
           {search.length > 0 && (
             <TouchableOpacity
               activeOpacity={0.7}
@@ -70,60 +64,15 @@ export function DriveHeader({
         </View>
       </View>
 
-      {}
-      <View className="flex-row items-center justify-between px-4 pt-1">
-        {}
-        <View className="flex-row items-center gap-6">
-          {}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              triggerHaptic();
-              onTabChange?.("drive");
-            }}
-            className="items-center py-2"
-          >
-            <Text
-              className={`text-[15px] ${
-                activeTab === "drive"
-                  ? "text-[#0B57D0] font-outfit-semibold"
-                  : "text-[#5F6368] font-outfit-medium"
-              }`}
-            >
-              My Drive
-            </Text>
-            {activeTab === "drive" && (
-              <View className="h-[3px] w-full bg-[#0B57D0] rounded-t-full mt-1.5" />
-            )}
-          </TouchableOpacity>
+      <View className="flex-row items-center justify-between px-4 py-2">
+        <Text
+          className="text-[16px] text-[#1F1F1F] font-outfit-semibold"
+          style={{ fontFamily: "Outfit_600SemiBold" }}
+        >
+          My Drive
+        </Text>
 
-          {}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              triggerHaptic();
-              onTabChange?.("folders");
-            }}
-            className="items-center py-2"
-          >
-            <Text
-              className={`text-[15px] ${
-                activeTab === "folders"
-                  ? "text-[#0B57D0] font-outfit-semibold"
-                  : "text-[#5F6368] font-outfit-medium"
-              }`}
-            >
-              Folders
-            </Text>
-            {activeTab === "folders" && (
-              <View className="h-[3px] w-full bg-[#0B57D0] rounded-t-full mt-1.5" />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {}
-        <View className="flex-row items-center pb-1 gap-1.5">
-          {}
+        <View className="flex-row items-center gap-1.5">
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
@@ -140,7 +89,6 @@ export function DriveHeader({
             />
           </TouchableOpacity>
 
-          {}
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {

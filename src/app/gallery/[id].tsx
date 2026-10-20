@@ -447,7 +447,6 @@ export default function GalleryDetailPage() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {}
       <View className="flex-1 items-center justify-center px-2 py-4 bg-white">
         {isVideo ? (
           <View
@@ -476,7 +475,6 @@ export default function GalleryDetailPage() {
         )}
       </View>
 
-      {}
       <View pointerEvents="box-none" className="absolute top-0 left-0 right-0 z-30">
         <SafeAreaView edges={["top"]}>
           <View className="flex-row items-center justify-between px-4 py-2 pt-4">
@@ -492,7 +490,6 @@ export default function GalleryDetailPage() {
               <Ionicons name="chevron-back" size={22} color="#1C1C1E" />
             </TouchableOpacity>
 
-            {}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -549,7 +546,6 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
-      {}
       <View className="absolute bottom-0 left-0 right-0 z-30">
         <SafeAreaView edges={["bottom"]} className="bg-white/95 backdrop-blur-md border-t border-[#E5E5EA]">
           <View className="flex-row items-center justify-around py-3 px-2">
@@ -606,10 +602,8 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
-      {}
       <GalleryPinInfoSheet visible={infoVisible} pin={pin} onClose={() => setInfoVisible(false)} />
 
-      {}
       <GalleryPinOptionsSheet
         visible={optionsVisible}
         pin={pin}
@@ -619,7 +613,6 @@ export default function GalleryDetailPage() {
         onInfo={() => setInfoVisible(true)}
       />
 
-      {}
       <IosDialog
         visible={deleteDialogVisible}
         onClose={() => setDeleteDialogVisible(false)}
@@ -641,7 +634,6 @@ export default function GalleryDetailPage() {
         ]}
       />
 
-      {}
       <IosDialog
         visible={exportMessageDialog !== null}
         onClose={() => setExportMessageDialog(null)}

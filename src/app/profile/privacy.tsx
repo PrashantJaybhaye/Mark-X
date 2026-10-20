@@ -85,7 +85,6 @@ export default function PrivacyScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {}
       <View
         style={{ paddingTop: topInset + 8 }}
         className="bg-white px-4 pb-3.5 border-b border-[#F1F5F9]"
@@ -127,7 +126,6 @@ export default function PrivacyScreen() {
           paddingBottom: Math.max(insets.bottom + 32, 48),
         }}
       >
-        {}
         <Text
           className="text-[24px] text-[#000000] text-center tracking-[0.18em] mb-3"
           style={{ fontFamily: "Outfit_700Bold" }}
@@ -141,7 +139,6 @@ export default function PrivacyScreen() {
           PRIVACY POLICY
         </Text>
 
-        {}
         <View className="flex-row items-center flex-wrap mb-2">
           <Text
             className="text-[14px] text-[#111111]"
@@ -166,7 +163,6 @@ export default function PrivacyScreen() {
           Effective Date: September 26, 2026
         </Text>
 
-        {}
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-5"
           style={{ fontFamily: "Outfit_400Regular" }}

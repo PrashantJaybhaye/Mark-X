@@ -60,6 +60,12 @@ export function splitFileName(fileName: string, isFolder?: boolean): { base: str
   };
 }
 
+export function getFileDisplayName(fileName?: string, isFolder?: boolean): string {
+  if (!fileName) return "";
+  if (isFolder) return fileName;
+  return splitFileName(fileName, isFolder).base;
+}
+
 export function getKindLabel(item: DriveItem): string {
   if (item.isFolder) return "Folder";
   const ext = item.name.split(".").pop()?.toUpperCase();

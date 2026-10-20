@@ -180,10 +180,8 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {}
           <View className="h-11 mb-4" />
 
-          {}
           <View className="items-center mb-8 px-2">
             <Text
               allowFontScaling={false}
@@ -203,7 +201,6 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {}
           <View className="h-5 min-h-[20px] justify-center items-center mb-4 px-2">
             <Text
               allowFontScaling={false}
@@ -216,9 +213,7 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {}
           <View className="gap-3 mb-2">
-            {}
             {mode === "signup" && (
               <View className="gap-1.5">
                 <Text
@@ -247,7 +242,6 @@ export default function LoginScreen() {
               </View>
             )}
 
-            {}
             <View className="gap-1.5">
               <Text
                 allowFontScaling={false}
@@ -277,7 +271,6 @@ export default function LoginScreen() {
               />
             </View>
 
-            {}
             <View className="gap-1.5">
               <Text
                 allowFontScaling={false}
@@ -328,7 +321,6 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {}
           {mode === "signin" && (
             <View className="items-end mb-5">
               <TouchableOpacity
@@ -349,7 +341,6 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {}
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={isLoading}
@@ -371,7 +362,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          {}
           <View className="flex-row items-center gap-3.5 mb-4">
             <View className="flex-1 h-[1px] bg-white/[0.12]" />
             <Text
@@ -384,7 +374,6 @@ export default function LoginScreen() {
             <View className="flex-1 h-[1px] bg-white/[0.12]" />
           </View>
 
-          {}
           <View className="mb-5">
             <TouchableOpacity
               onPress={handleGoogleSignIn}
@@ -407,7 +396,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {}
           <View className="items-center py-1.5">
             <Pressable
               onPress={() =>
@@ -434,10 +422,8 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
-          {}
           <View className="flex-1 min-h-[20px]" />
 
-          {}
           <View className="items-center pt-2">
             <Text
               allowFontScaling={false}

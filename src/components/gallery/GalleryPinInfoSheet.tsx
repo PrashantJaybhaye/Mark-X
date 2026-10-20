@@ -189,11 +189,9 @@ export function GalleryPinInfoSheet({
               paddingBottom: Math.max(insets.bottom, 24),
             }}
           >
-            {}
             <View className="w-10 h-1.5 rounded-full bg-[#E0E0E0] self-center mb-4 mt-1" />
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
-              {}
               <View className="flex-row items-center gap-4 bg-[#F8F9FA] p-3.5 rounded-[24px] border border-black/[0.04] mb-4">
                 <View className="relative">
                   <Image
@@ -225,9 +223,7 @@ export function GalleryPinInfoSheet({
                 </View>
               </View>
 
-              {}
               <View className="gap-[2px] mb-2">
-                {}
                 <View className="bg-[#F0F4F9] rounded-t-[20px] rounded-b-[4px] px-4 py-3.5 flex-row items-center">
                   <Ionicons name="cloud-outline" size={22} color="#1F1F1F" style={{ marginRight: 14 }} />
                   <View className="flex-1">
@@ -241,7 +237,6 @@ export function GalleryPinInfoSheet({
                   </View>
                 </View>
 
-                {}
                 <View className="bg-[#F0F4F9] rounded-b-[20px] rounded-t-[4px] px-4 py-3.5">
                   <View className="flex-row items-center flex-1">
                     <Ionicons name="aperture-outline" size={20} color="#1F1F1F" style={{ marginRight: 14 }} />
@@ -251,7 +246,6 @@ export function GalleryPinInfoSheet({
                     </Text>
                   </View>
 
-                  {}
                   <View className="mt-3 pt-3 border-t border-black/[0.06] gap-2">
                     {fileSpecs.map((spec) => (
                       <View key={spec.label} className="flex-row justify-between items-center py-1">

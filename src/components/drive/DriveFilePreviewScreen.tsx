@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DriveFileCategory, DriveItem } from "../../utils/driveFileTypes";
+import { DriveFileCategory, DriveItem, getFileDisplayName } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 import { DrivePdfViewer } from "./DrivePdfViewer";
 import { FileCategoryIcon } from "./FileCategoryIcon";
@@ -78,6 +78,7 @@ interface DriveFilePreviewScreenProps {
   onClose: () => void;
   onDelete?: (id: string) => void;
   onRename?: (id: string, newName: string) => void;
+  onMove?: (item: DriveItem) => void;
   onOptionsPress?: (item: DriveItem) => void;
   onToggleStar?: (item: DriveItem) => void;
 }
@@ -90,6 +91,7 @@ export function DriveFilePreviewScreen({
   onClose,
   onDelete,
   onRename,
+  onMove,
   onOptionsPress,
   onToggleStar,
 }: DriveFilePreviewScreenProps) {
@@ -264,7 +266,6 @@ export function DriveFilePreviewScreen({
 
       return (
         <View className="flex-1 bg-[#1E1E1E] rounded-3xl overflow-hidden border border-[#2D2D2D]">
-          {}
           <View className="flex-row items-center justify-between px-4 py-3 bg-[#252526] border-b border-[#333333]">
             <View className="flex-row items-center space-x-2">
               <View className="px-2 py-0.5 rounded bg-[#333333]">
@@ -294,7 +295,6 @@ export function DriveFilePreviewScreen({
             </TouchableOpacity>
           </View>
 
-          {}
           <ScrollView className="flex-1 p-4 bg-[#1E1E1E]" showsVerticalScrollIndicator={true}>
             {lines.map((line, idx) => (
               <View key={idx} className="flex-row py-0.5">
@@ -350,7 +350,7 @@ export function DriveFilePreviewScreen({
           </View>
 
           <Text className="text-[20px] font-outfit-bold text-white text-center mb-1">
-            {item.name}
+            {getFileDisplayName(item.name, item.isFolder)}
           </Text>
           <Text className="text-[13px] font-outfit text-[#888888] text-center mb-6">
             Media File • {item.size || "Unknown Size"}
@@ -380,7 +380,7 @@ export function DriveFilePreviewScreen({
           </View>
 
           <Text className="text-[20px] font-outfit-bold text-[#1F1F1F] text-center mb-1.5 px-4" numberOfLines={2}>
-            {item.name}
+            {getFileDisplayName(item.name, item.isFolder)}
           </Text>
 
           <View className="flex-row items-center gap-2 mt-1 mb-5">
@@ -454,10 +454,8 @@ export function DriveFilePreviewScreen({
       <View className="flex-1 bg-[#1E1F22]" style={{ paddingTop: insets.top }}>
         <StatusBar style="light" />
 
-        {}
         <View className="bg-[#1E1F22] border-b border-[#2B2D31] z-10">
           <View className="flex-row items-center justify-between px-4 py-3.5 min-h-[64px]">
-            {}
             <View className="flex-row items-center flex-1 mr-2 space-x-1.5">
               <TouchableOpacity
                 onPress={() => {
@@ -471,11 +469,10 @@ export function DriveFilePreviewScreen({
               </TouchableOpacity>
 
               <Text className="flex-1 text-[18px] font-outfit-medium text-white ml-1" numberOfLines={1}>
-                {item.name}
+                {getFileDisplayName(item.name, item.isFolder)}
               </Text>
             </View>
 
-            {}
             <View className="flex-row items-center space-x-7">
               {isPdf && (
                 <TouchableOpacity
@@ -512,7 +509,6 @@ export function DriveFilePreviewScreen({
             </View>
           </View>
 
-          {}
           {isLoading && (
             <View className="h-[3px] w-full bg-[#2B2D31] overflow-hidden">
               <Animated.View
@@ -534,11 +530,9 @@ export function DriveFilePreviewScreen({
           )}
         </View>
 
-        {}
         <View className="flex-1 bg-[#121212]">{renderPreviewBody()}</View>
       </View>
 
-      {}
       <DrivePreviewActionSheet
         visible={showActionSheet}
         item={item}
@@ -552,6 +546,10 @@ export function DriveFilePreviewScreen({
         }}
         onRename={(id, newName) => {
           onRename?.(id, newName);
+        }}
+        onMove={(targetItem) => {
+          setShowActionSheet(false);
+          onMove?.(targetItem);
         }}
         onExport={() => {
           handleShare();

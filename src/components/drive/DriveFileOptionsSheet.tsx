@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { DriveItem, splitFileName, getKindLabel } from "../../utils/driveFileTypes";
+import { DriveItem, splitFileName, getKindLabel, getFileDisplayName } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 import { FileCategoryIcon } from "./FileCategoryIcon";
 import { IosDialog } from "../common/IosDialog";
@@ -33,6 +33,7 @@ export interface DriveFileOptionsSheetProps {
   onClose: () => void;
   onDelete?: (id: string) => void;
   onRename?: (id: string, newName: string) => void;
+  onMove?: (item: DriveItem) => void;
   onShare?: (item: DriveItem) => void;
   onExport?: (item: DriveItem) => void;
   onOpenInNativeApp?: (item: DriveItem) => void;
@@ -48,6 +49,7 @@ export function DriveFileOptionsSheet({
   onClose,
   onDelete,
   onRename,
+  onMove,
   onShare,
   onExport,
   onOpenInNativeApp,
@@ -226,6 +228,14 @@ export function DriveFileOptionsSheet({
     });
   };
 
+  const handleMovePress = () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    if (!currentItem) return;
+    animateClose(() => {
+      onMove?.(currentItem);
+    });
+  };
+
   const handleCloseDetails = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setShowInfoModal(false);
@@ -265,7 +275,6 @@ export function DriveFileOptionsSheet({
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           className="flex-1 justify-end"
         >
-          {}
           <TouchableWithoutFeedback
             onPress={() => {
               Keyboard.dismiss();
@@ -285,7 +294,6 @@ export function DriveFileOptionsSheet({
             />
           </TouchableWithoutFeedback>
 
-          {}
           <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
             <Animated.View
               className={`${sheetBgClass} rounded-t-[32px] px-5 pt-3 shadow-2xl relative border-t`}
@@ -294,12 +302,10 @@ export function DriveFileOptionsSheet({
                 paddingBottom: bottomPadding,
               }}
             >
-              {}
               <View className="items-center mb-3">
                 <View className={`w-10 h-1 rounded-full ${handleColor}`} />
               </View>
 
-              {}
               <View className={`flex-row items-center p-4 rounded-[24px] ${cardBgClass} border mb-3.5`}>
                 <View className={`w-12 h-12 rounded-2xl ${iconBoxBgClass} items-center justify-center mr-3.5`}>
                   <FileCategoryIcon
@@ -312,7 +318,7 @@ export function DriveFileOptionsSheet({
                 </View>
                 <View className="flex-1 pr-2">
                   <Text className={`text-[16px] font-outfit-bold ${textPrimaryClass}`} numberOfLines={1}>
-                    {currentItem.name}
+                    {getFileDisplayName(currentItem.name, currentItem.isFolder)}
                   </Text>
                   <Text className={`text-[12.5px] font-outfit-medium ${textSecondaryClass} mt-0.5`} numberOfLines={1}>
                     {`You opened • ${formatDriveTimestamp(currentItem.updatedAt)}`}
@@ -326,7 +332,6 @@ export function DriveFileOptionsSheet({
                     Rename {currentItem.isFolder ? "folder" : "document"}
                   </Text>
 
-                  {}
                   <View
                     className={`flex-row items-center rounded-2xl px-4 h-12 mb-3 border ${
                       isDark
@@ -392,9 +397,7 @@ export function DriveFileOptionsSheet({
                 </View>
               ) : (
                 <>
-                  {}
                   <View className="flex-row gap-2.5 mb-3.5">
-                    {}
                     <TouchableOpacity
                       activeOpacity={0.75}
                       onPress={handleToggleStar}
@@ -415,7 +418,6 @@ export function DriveFileOptionsSheet({
                       </Text>
                     </TouchableOpacity>
 
-                    {}
                     {!currentItem.isFolder && (
                       <TouchableOpacity
                         activeOpacity={0.75}
@@ -438,7 +440,6 @@ export function DriveFileOptionsSheet({
                       </TouchableOpacity>
                     )}
 
-                    {}
                     {!currentItem.isFolder && (
                       <TouchableOpacity
                         activeOpacity={0.75}
@@ -461,7 +462,6 @@ export function DriveFileOptionsSheet({
                       </TouchableOpacity>
                     )}
 
-                    {}
                     <TouchableOpacity
                       activeOpacity={0.75}
                       onPress={handleOpenDetails}
@@ -483,9 +483,7 @@ export function DriveFileOptionsSheet({
                     </TouchableOpacity>
                   </View>
 
-                  {}
                   <View className={`rounded-[24px] ${cardBgClass} border overflow-hidden`}>
-                    {}
                     <TouchableOpacity
                       activeOpacity={0.65}
                       onPress={handleStartRename}
@@ -500,7 +498,20 @@ export function DriveFileOptionsSheet({
                       <Ionicons name="chevron-forward" size={16} color={iconSubtleColor} />
                     </TouchableOpacity>
 
-                    {}
+                    <TouchableOpacity
+                      activeOpacity={0.65}
+                      onPress={handleMovePress}
+                      className={`flex-row items-center px-4 py-3.5 border-b ${dividerClass} ${cardActiveBgClass}`}
+                    >
+                      <View className={`w-9 h-9 rounded-xl ${iconBoxBgClass} items-center justify-center mr-3.5`}>
+                        <Ionicons name="folder-open-outline" size={19} color={iconDefaultColor} />
+                      </View>
+                      <Text className={`text-[14.5px] font-outfit-semibold ${textPrimaryClass} flex-1`}>
+                        Move {currentItem.isFolder ? "Folder" : "Document"}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={iconSubtleColor} />
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       activeOpacity={0.65}
                       onPress={handleDeletePress}
@@ -522,7 +533,6 @@ export function DriveFileOptionsSheet({
         </KeyboardAvoidingView>
       </Modal>
 
-      {}
       <Modal
         visible={showInfoModal && !!currentItem}
         transparent
@@ -534,7 +544,6 @@ export function DriveFileOptionsSheet({
           <View className="flex-1 bg-black/75 items-center justify-center px-5">
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
               <View className="w-full max-w-[350px] bg-[#16171B] rounded-[30px] p-5 border border-white/[0.1] shadow-2xl">
-                {}
                 <View className="flex-row items-center justify-between pb-3 border-b border-white/[0.06]">
                   <Text className="text-[13px] font-outfit-bold text-[#8E8E93] tracking-widest uppercase">
                     {currentItem.isFolder ? "Folder Info" : "File Info"}
@@ -548,7 +557,6 @@ export function DriveFileOptionsSheet({
                   </TouchableOpacity>
                 </View>
 
-                {}
                 <View className="items-center my-3.5">
                   <View className="w-16 h-16 rounded-[22px] bg-[#202127] border border-white/[0.08] items-center justify-center shadow-md mb-2.5">
                     <FileCategoryIcon
@@ -563,14 +571,13 @@ export function DriveFileOptionsSheet({
                     className="text-[16.5px] font-outfit-bold text-white text-center leading-snug px-2"
                     numberOfLines={2}
                   >
-                    {currentItem.name}
+                    {getFileDisplayName(currentItem.name, currentItem.isFolder)}
                   </Text>
                   <Text className="text-[12.5px] font-outfit text-[#8E8E93] text-center mt-1">
                     {currentItem.size ? `${currentItem.size} • ` : ""}{getKindLabel(currentItem)}
                   </Text>
                 </View>
 
-                {}
                 {(() => {
                   const locationName = currentItem.parentId
                     ? parentFolderName ||
@@ -581,7 +588,6 @@ export function DriveFileOptionsSheet({
 
                   return (
                     <View className="bg-[#1F2026] rounded-[20px] border border-white/[0.06] px-4 py-1">
-                      {}
                       <View className="flex-row items-center justify-between py-2.5 border-b border-white/[0.05]">
                         <Text className="text-[13px] font-outfit text-[#8E8E93]">Kind</Text>
                         <Text className="text-[13px] font-outfit-medium text-white max-w-[170px]" numberOfLines={1}>
@@ -589,7 +595,6 @@ export function DriveFileOptionsSheet({
                         </Text>
                       </View>
 
-                      {}
                       {currentItem.size && (
                         <View className="flex-row items-center justify-between py-2.5 border-b border-white/[0.05]">
                           <Text className="text-[13px] font-outfit text-[#8E8E93]">Size</Text>
@@ -599,7 +604,6 @@ export function DriveFileOptionsSheet({
                         </View>
                       )}
 
-                      {}
                       <View className="flex-row items-center justify-between py-2.5 border-b border-white/[0.05]">
                         <Text className="text-[13px] font-outfit text-[#8E8E93]">Where</Text>
                         <Text className="text-[13px] font-outfit-medium text-white max-w-[170px]" numberOfLines={1}>
@@ -607,7 +611,6 @@ export function DriveFileOptionsSheet({
                         </Text>
                       </View>
 
-                      {}
                       <View className="flex-row items-center justify-between py-2.5">
                         <Text className="text-[13px] font-outfit text-[#8E8E93]">Owner</Text>
                         <Text className="text-[13px] font-outfit-medium text-white max-w-[170px]" numberOfLines={1}>
@@ -618,7 +621,6 @@ export function DriveFileOptionsSheet({
                   );
                 })()}
 
-                {}
                 <TouchableOpacity
                   onPress={handleCloseDetails}
                   activeOpacity={0.85}
@@ -632,11 +634,10 @@ export function DriveFileOptionsSheet({
         </TouchableWithoutFeedback>
       </Modal>
 
-      {}
       <IosDialog
         visible={showDeleteConfirm && !!currentItem}
         title={currentItem.isFolder ? "Delete Folder" : "Delete Document"}
-        message={`Are you sure you want to delete "${currentItem.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${getFileDisplayName(currentItem.name, currentItem.isFolder)}"? This action cannot be undone.`}
         actions={[
           {
             text: "Cancel",

@@ -99,7 +99,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
       style={{ paddingBottom: Math.max(bottomInset, Platform.OS === "android" ? 16 : 10) }}
     >
       <View className="flex-row items-center justify-around h-[54px] px-3">
-        {}
         <TabButton onPress={() => handleTabPress("home")} isActive={activeTab === "home"}>
           <Image
             source={activeTab === "home" ? ICON_HOME_ACTIVE : ICON_HOME_INACTIVE}
@@ -109,7 +108,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
           />
         </TabButton>
 
-        {}
         <TabButton onPress={() => handleTabPress("drive")} isActive={activeTab === "drive"}>
           <Ionicons
             name={activeTab === "drive" ? "layers" : "layers-outline"}
@@ -118,7 +116,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
           />
         </TabButton>
 
-        {}
         <TabButton onPress={() => handleTabPress("gallery")} isActive={activeTab === "gallery"}>
           <Image
             source={activeTab === "gallery" ? ICON_GALLERY_ACTIVE : ICON_GALLERY_INACTIVE}
@@ -128,7 +125,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
           />
         </TabButton>
 
-        {}
         <TabButton onPress={() => handleTabPress("notes")} isActive={activeTab === "notes"}>
           <Image
             source={activeTab === "notes" ? ICON_NOTE_ACTIVE : ICON_NOTE_INACTIVE}
@@ -138,7 +134,6 @@ export const BottomTabBar = React.memo(function BottomTabBar({
           />
         </TabButton>
 
-        {}
         <TabButton onPress={() => handleTabPress("profile")} isActive={activeTab === "profile"}>
           <View
             className={`w-[30px] h-[30px] rounded-full overflow-hidden items-center justify-center bg-[#E5E7EB] ${

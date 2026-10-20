@@ -29,7 +29,7 @@ export function ProfileCardRow({
   const handlePress = () => {
     if (onPress) {
       const now = Date.now();
-      if (now - lastPressRef.current < 750) return;
+      if (now - lastPressRef.current < 250) return;
       lastPressRef.current = now;
       triggerHaptic();
       onPress();
@@ -88,7 +88,7 @@ export function ProfileCardRow({
 
   return (
     <View>
-      {onPress && !rightElement ? (
+      {onPress ? (
         <TouchableOpacity onPress={handlePress} activeOpacity={0.6}>
           {rowContent}
         </TouchableOpacity>

@@ -232,7 +232,6 @@ export default function HomeScreen() {
     <View className="flex-1 bg-[#F4F5F7]">
       <StatusBar style="dark" />
 
-      {}
       <Svg
         width="100%"
         height={screenHeight > 800 ? 560 : 490}
@@ -240,7 +239,6 @@ export default function HomeScreen() {
         pointerEvents="none"
       >
         <Defs>
-          {}
           <LinearGradient id="topGlow" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor="#FF8A5B" stopOpacity="0.92" />
             <Stop offset="20%" stopColor="#FF9B73" stopOpacity="0.75" />
@@ -250,7 +248,6 @@ export default function HomeScreen() {
             <Stop offset="100%" stopColor="#F4F5F7" stopOpacity="0" />
           </LinearGradient>
 
-          {}
           <RadialGradient id="coreAmberGlow" cx="80%" cy="2%" rx="75%" ry="50%">
             <Stop offset="0%" stopColor="#FF7043" stopOpacity="0.75" />
             <Stop offset="25%" stopColor="#FF825A" stopOpacity="0.55" />
@@ -259,7 +256,6 @@ export default function HomeScreen() {
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </RadialGradient>
 
-          {}
           <RadialGradient id="softCoralGlow" cx="15%" cy="8%" rx="60%" ry="40%">
             <Stop offset="0%" stopColor="#FFD0BC" stopOpacity="0.28" />
             <Stop offset="50%" stopColor="#FFE5D9" stopOpacity="0.1" />
@@ -273,13 +269,11 @@ export default function HomeScreen() {
       </Svg>
 
       <SafeAreaView edges={["top"]} className="flex-1">
-        {}
         <View className="flex-row items-center justify-between px-5 pt-6 pb-3">
           <View className="justify-center">
             <MarkXLogo width={110} height={15} color="#111111" />
           </View>
 
-          {}
           <View className="flex-row items-center bg-[#F8DEC8]/90 border border-white/60 rounded-full px-4 py-2 gap-4">
             <TouchableOpacity
               activeOpacity={0.7}
@@ -299,7 +293,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {}
         <View className="px-4 pt-3 pb-1">
           <StorageHeroCard
             usedStorage={usedStorage}
@@ -309,7 +302,6 @@ export default function HomeScreen() {
           />
         </View>
 
-        {}
         <ScrollView
           showsVerticalScrollIndicator={false}
           bounces={true}
@@ -321,9 +313,7 @@ export default function HomeScreen() {
             paddingBottom: 40,
           }}
         >
-          {}
           <View className="w-full gap-3.5">
-            {}
             <View className="flex-row gap-3.5">
               <FeatureCard
                 title="Gallery"
@@ -348,7 +338,6 @@ export default function HomeScreen() {
               </FeatureCard>
             </View>
 
-            {}
             <View className="flex-row gap-3.5">
               <FeatureCard
                 title="Secure Notes"

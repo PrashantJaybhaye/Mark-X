@@ -67,7 +67,6 @@ export default function OnboardingScreen() {
           paddingBottom: Math.max(insets.bottom, Platform.OS === "android" ? 28 : 24) + 12,
         }}
       >
-        {}
         <View className="items-center" style={{ marginBottom: headerMarginBottom }}>
           <Text
             allowFontScaling={false}
@@ -106,7 +105,6 @@ export default function OnboardingScreen() {
           </Text>
         </View>
 
-        {}
         <TouchableOpacity
           onPress={handleGetStarted}
           disabled={isNavigating}

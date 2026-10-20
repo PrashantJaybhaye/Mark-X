@@ -88,7 +88,6 @@ export function NotesEmptyState({
 
   return (
     <View className="flex-row justify-between w-full">
-      {}
       <TouchableOpacity
         activeOpacity={0.72}
         onPress={handleCreate}
@@ -114,7 +113,6 @@ export function NotesEmptyState({
         </Text>
       </TouchableOpacity>
 
-      {}
       <View
         style={columnWidth ? { width: columnWidth } : undefined}
         className="rounded-[24px] border border-dashed border-black/[0.08] items-center justify-center min-h-[160px]"

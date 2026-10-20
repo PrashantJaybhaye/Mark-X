@@ -479,7 +479,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         <StatusBar style="light" />
 
         <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: 'black' }}>
-          {}
           <View className="flex-1 w-full px-3 pt-1 pb-3">
             <View
               className="flex-1 w-full rounded-[28px] overflow-hidden relative bg-black items-center justify-center border border-white/10"
@@ -488,7 +487,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                 <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               </View>
 
-              {}
               <View className="w-full flex-row justify-between items-center px-5 pt-4 absolute top-0 left-0 right-0 z-20" pointerEvents="box-none">
                 <TouchableOpacity
                   onPress={handleRetake}
@@ -509,9 +507,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             </View>
           </View>
 
-          {}
           <View className="w-full px-6 py-3 flex-row items-center justify-between bg-black">
-            {}
             <TouchableOpacity
               onPress={handleRetake}
               disabled={isSaving}
@@ -521,7 +517,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
               <Text className="text-white font-outfit-bold text-base">Retake</Text>
             </TouchableOpacity>
 
-            {}
             <TouchableOpacity
               onPress={handleUsePhoto}
               disabled={isSaving}
@@ -543,7 +538,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
           </View>
         </SafeAreaView>
 
-        {}
         <Modal
           transparent
           visible={showDiscardDialog}
@@ -559,7 +553,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
               activeOpacity={1}
               className="w-full max-w-[280px] bg-[#252525] rounded-[18px] overflow-hidden border border-white/10 shadow-2xl"
             >
-              {}
               <View className="pt-5 pb-4 px-5 items-center">
                 <Text className="text-white font-outfit-bold text-lg text-center mb-1">
                   Unsaved Photo
@@ -569,9 +562,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                 </Text>
               </View>
 
-              {}
               <View className="border-t border-white/10">
-                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
@@ -585,7 +576,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                   </Text>
                 </TouchableOpacity>
 
-                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleDiscardDirect}
@@ -596,7 +586,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
                   </Text>
                 </TouchableOpacity>
 
-                {}
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setShowDiscardDialog(false)}
@@ -618,7 +607,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: 'black' }}>
       <StatusBar style="light" />
 
-      {}
       <View style={{ flex: 1, width: "100%", position: "relative", backgroundColor: "black", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
         <GestureDetector gesture={cameraTapGesture}>
           <View style={cameraContainerStyle}>
@@ -668,9 +656,7 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
           pointerEvents="none"
         />
 
-        {}
         <SafeAreaView edges={["top"]} style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          {}
           <View className="w-full flex-row justify-between items-center px-6 pt-4" pointerEvents="box-none">
             <TouchableOpacity onPress={onClose} activeOpacity={0.7} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
               <Ionicons name="close" size={32} color="white" />
@@ -701,7 +687,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
             </View>
           </View>
 
-          {}
           <View className="absolute bottom-6 w-full flex-row justify-between items-center px-10" pointerEvents="box-none">
             <TouchableOpacity activeOpacity={0.7}>
               <Ionicons name="images" size={30} color="white" />
@@ -726,7 +711,6 @@ export function HomeCamera({ onClose }: { onClose?: () => void }) {
         </SafeAreaView>
       </View>
 
-      {}
       <SafeAreaView edges={["bottom"]} className="bg-black">
         <View className="w-full py-6 items-center justify-center">
           <Text className="text-white text-[13px]">Tap for photo</Text>

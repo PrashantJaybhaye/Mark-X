@@ -39,7 +39,6 @@ export function StorageHeroCardSkeleton() {
 
   return (
     <View className="w-full mb-4 relative">
-      {}
       <View className="w-full bg-[#FFFFFF] rounded-[24px] pt-4 pb-16 px-5 flex-row justify-between items-start border border-black/[0.04]">
         <View className="flex-1 mr-3">
           <Animated.View
@@ -64,7 +63,6 @@ export function StorageHeroCardSkeleton() {
         </View>
       </View>
 
-      {}
       <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
         <View className="flex-row justify-between items-start mb-1">
           <View>
@@ -84,7 +82,6 @@ export function StorageHeroCardSkeleton() {
           />
         </View>
 
-        {}
         <View className="flex-row items-center pt-1">
           <Animated.View
             style={{ opacity: pulseAnim }}
@@ -155,7 +152,6 @@ export function StorageHeroCard({
 
   return (
     <View className="w-full mb-4 relative">
-      {}
       <View className="w-full bg-[#FFFFFF] rounded-[24px] pt-4 pb-16 px-5 flex-row justify-between items-start border border-black/[0.04]">
         <View className="flex-1 mr-3">
           <Text
@@ -194,11 +190,8 @@ export function StorageHeroCard({
         </View>
       </View>
 
-      {}
       <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
-        {}
         <View className="flex-row justify-between items-start mb-1">
-          {}
           <View>
             <Text
               allowFontScaling={false}
@@ -240,7 +233,6 @@ export function StorageHeroCard({
             )}
           </View>
 
-          {}
           <View className="flex-row items-center bg-black/15 px-2.5 py-1 rounded-full border border-white/20 mt-1 mb-10">
             <Ionicons name="cloud-done-outline" size={13} color="rgba(255,255,255,0.9)" style={{ marginRight: 4 }} />
             <Text
@@ -253,9 +245,7 @@ export function StorageHeroCard({
           </View>
         </View>
 
-        {}
         <View className="flex-row items-center pt-1">
-          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onUploadFile}
@@ -271,7 +261,6 @@ export function StorageHeroCard({
             </Text>
           </TouchableOpacity>
 
-          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onAddPhoto}
@@ -287,7 +276,6 @@ export function StorageHeroCard({
             </Text>
           </TouchableOpacity>
 
-          {}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onManageStorage}

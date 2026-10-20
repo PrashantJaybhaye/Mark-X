@@ -44,10 +44,8 @@ export function GalleryCardArt() {
           </LinearGradient>
         </Defs>
 
-        {}
         <Rect x="0" y="0" width="320" height="64" fill="#FFF1F2" />
 
-        {}
         <Rect
           x="28"
           y="12"
@@ -71,7 +69,6 @@ export function GalleryCardArt() {
           opacity="0.7"
         />
 
-        {}
         <Rect
           x="224"
           y="12"
@@ -95,7 +92,6 @@ export function GalleryCardArt() {
           opacity="0.7"
         />
 
-        {}
         <Rect
           x="75"
           y="6"
@@ -107,7 +103,6 @@ export function GalleryCardArt() {
           strokeWidth="1.5"
         />
 
-        {}
         <Rect
           x="81"
           y="11"
@@ -117,30 +112,25 @@ export function GalleryCardArt() {
           fill="url(#gallerySkyGrad)"
         />
 
-        {}
         <Circle cx="135" cy="20" r="7" fill="url(#gallerySunGrad)" />
 
-        {}
         <Path
           d="M81,38 L115,24 L142,32 L170,22 L205,34 L239,26 L239,46 L81,46 Z"
           fill="url(#galleryMtnBack)"
           opacity="0.75"
         />
 
-        {}
         <Path
           d="M81,46 L100,32 L132,41 L162,28 L195,38 L222,30 L239,37 L239,46 Z"
           fill="url(#galleryMtnFront)"
         />
 
-        {}
         <Path
           d="M82,12 L125,12 L98,46 L82,46 Z"
           fill="#FFFFFF"
           opacity="0.22"
         />
 
-        {}
         <Circle cx="152" cy="51" r="2" fill="#FDA4AF" />
         <Rect
           x="160"
@@ -186,10 +176,8 @@ export function DriveCardArt() {
           </LinearGradient>
         </Defs>
 
-        {}
         <Ellipse cx="80" cy="56" rx="42" ry="6" fill="#64748B" fillOpacity="0.12" />
 
-        {}
         {DRIVE_DISCS.map(({ y, grad, topFill, innerStroke }) => (
           <React.Fragment key={y}>
             <Path
@@ -213,11 +201,9 @@ export function DriveCardArt() {
           </React.Fragment>
         ))}
 
-        {}
         <Ellipse cx="80" cy="16" rx="14" ry="4.5" fill="#0284C7" stroke="#BAE6FD" strokeWidth="1" />
         <Circle cx="80" cy="16" r="3.5" fill="#FFFFFF" />
 
-        {}
         <Path d="M52,14 A32,7 0 0,1 92,10" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
       </Svg>
     </View>
@@ -290,13 +276,10 @@ export function CameraCardArt() {
           </RadialGradient>
         </Defs>
 
-        {}
         <Rect x="0" y="0" width="160" height="64" fill="url(#amberBg)" />
 
-        {}
         <Circle cx="80" cy="32" r="32" fill="url(#amberCenterGlow)" />
 
-        {}
         <Rect
           x="22"
           y="12"
@@ -321,7 +304,6 @@ export function CameraCardArt() {
         />
         <Circle cx="45" cy="27" r="4" fill="#FEF3C7" opacity="0.8" transform="rotate(-11 45 27)" />
 
-        {}
         <Rect
           x="92"
           y="12"
@@ -346,28 +328,22 @@ export function CameraCardArt() {
         />
         <Circle cx="115" cy="27" r="4" fill="#FDE68A" opacity="0.8" transform="rotate(11 115 27)" />
 
-        {}
         <Ellipse cx="80" cy="54" rx="26" ry="4" fill="#B45309" opacity="0.14" />
 
-        {}
         <Circle cx="80" cy="32" r="23" fill="#FFFFFF" stroke="#FDE68A" strokeWidth="1.5" />
         <Circle cx="80" cy="32" r="19" fill="url(#amberLensRingGrad)" />
         <Circle cx="80" cy="32" r="15" fill="url(#amberLensCoreGrad)" />
 
-        {}
         <Path d="M72,24 L84,24 L78,32 Z" fill="#FDE68A" opacity="0.65" />
         <Path d="M88,28 L88,40 L80,34 Z" fill="#FBBF24" opacity="0.65" />
         <Path d="M72,36 L84,36 L78,28 Z" fill="#F59E0B" opacity="0.65" />
 
-        {}
         <Circle cx="80" cy="32" r="6.5" fill="#78350F" />
         <Circle cx="80" cy="32" r="3" fill="#FDE68A" />
         <Circle cx="82" cy="30" r="1.3" fill="#FFFFFF" opacity="0.95" />
 
-        {}
         <Path d="M69,21 A15,15 0 0,1 91,21" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.85" />
 
-        {}
         <Path d="M128,14 L129.5,18 L133.5,19.5 L129.5,21 L128,25 L126.5,21 L122.5,19.5 L126.5,18 Z" fill="#F59E0B" opacity="0.9" />
         <Path d="M32,42 L33,44 L35,45 L33,46 L32,48 L31,46 L29,45 L31,44 Z" fill="#FBBF24" opacity="0.9" />
       </Svg>

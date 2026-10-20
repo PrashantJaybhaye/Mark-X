@@ -18,11 +18,13 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { DriveActionSheet } from "../../components/drive/DriveActionSheet";
 import { DriveBreadcrumbs, FolderStackItem } from "../../components/drive/DriveBreadcrumbs";
+import { DriveCreateFolderDialog } from "../../components/drive/DriveCreateFolderDialog";
 import { DriveEmptyState } from "../../components/drive/DriveEmptyState";
 import { DriveFileList } from "../../components/drive/DriveFileList";
 import { DriveFileOptionsSheet } from "../../components/drive/DriveFileOptionsSheet";
 import { DriveFilePreviewScreen } from "../../components/drive/DriveFilePreviewScreen";
-import { DriveHeader, DriveTabType } from "../../components/drive/DriveHeader";
+import { DriveMoveModal } from "../../components/drive/DriveMoveModal";
+import { DriveHeader } from "../../components/drive/DriveHeader";
 import { ToastStatusType, UploadStatusToast } from "../../components/drive/UploadStatusToast";
 
 import {
@@ -37,13 +39,12 @@ import {
 import { openInNativeApp } from "../../services/nativeFileOpenerService";
 import { safePickDocument } from "../../services/nativePickerService";
 import { loadDriveItems, saveDriveItems } from "../../services/storageService";
-import { DriveItem, getFileCategory } from "../../utils/driveFileTypes";
+import { DriveItem, getFileCategory, getFileDisplayName } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 
 export default function DriveScreen() {
   const insets = useSafeAreaInsets();
 
-  const [activeTab, setActiveTab] = useState<DriveTabType>("drive");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [files, setFiles] = useState<DriveItem[]>([]);
@@ -54,10 +55,11 @@ export default function DriveScreen() {
 
   const [search, setSearch] = useState("");
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+  const [isCreateFolderDialogOpen, setIsCreateFolderDialogOpen] = useState(false);
   const [selectedFileForOptions, setSelectedFileForOptions] = useState<DriveItem | null>(null);
   const [selectedFileForPreview, setSelectedFileForPreview] = useState<DriveItem | null>(null);
+  const [selectedFileForMove, setSelectedFileForMove] = useState<DriveItem | null>(null);
 
-  // Toast notification state
   const [isToastOpen, setIsToastOpen] = useState(false);
   const [fileName, setFileName] = useState("");
   const [toastDetail, setToastDetail] = useState("");
@@ -181,14 +183,10 @@ export default function DriveScreen() {
   };
 
   const displayedFiles = useMemo(() => {
-    const nonMediaFiles = files.filter(
+    return files.filter(
       (f) => f.isFolder || (f.category !== "image" && f.category !== "video")
     );
-    if (activeTab === "folders") {
-      return nonMediaFiles.filter((f) => f.isFolder);
-    }
-    return nonMediaFiles;
-  }, [files, activeTab]);
+  }, [files]);
 
   const currentFolderFilesCount = displayedFiles.filter((f) => {
     if (!currentFolderId) return !f.parentId;
@@ -228,7 +226,7 @@ export default function DriveScreen() {
     };
 
     updateFilesAndPersist((prev) => [newItem, ...prev]);
-    triggerToast(newItem.name, "uploading", "Uploading to Cloud Storage...");
+    triggerToast(getFileDisplayName(newItem.name, newItem.isFolder), "uploading", "Uploading to Cloud Storage...");
 
     saveDriveItemToServer(newItem).catch((err) =>
       console.warn("[Drive] Firebase metadata write error:", err)
@@ -244,12 +242,12 @@ export default function DriveScreen() {
               : f
           )
         );
-        triggerToast(newItem.name, "success", "Saved to Cloud Storage");
+        triggerToast(getFileDisplayName(newItem.name, newItem.isFolder), "success", "Saved to Cloud Storage");
       } else {
         updateFilesAndPersist((prev) =>
           prev.map((f) => (f.id === newItem.id ? { ...f, uploading: false } : f))
         );
-        triggerToast(newItem.name, "success", "Saved locally");
+        triggerToast(getFileDisplayName(newItem.name, newItem.isFolder), "success", "Saved locally");
       }
     } catch (err) {
       console.warn("[Drive] Cloudflare upload error:", err);
@@ -259,14 +257,12 @@ export default function DriveScreen() {
     }
   };
 
-  const handleCreateFolder = () => {
-    const currentFolderSiblings = files.filter(
-      (f) => f.isFolder && (currentFolderId ? f.parentId === currentFolderId : !f.parentId)
-    ).length;
+  const handleConfirmCreateFolder = (folderName: string) => {
+    const trimmedName = folderName.trim() || "Untitled folder";
 
     const newFolder: DriveItem = {
       id: generateUniqueId(),
-      name: `New Folder ${currentFolderSiblings + 1}`,
+      name: trimmedName,
       category: "folder",
       updatedAt: String(Date.now()),
       isFolder: true,
@@ -292,7 +288,7 @@ export default function DriveScreen() {
       console.warn("[Drive] Toggle star server error:", err)
     );
     triggerToast(
-      item.name,
+      getFileDisplayName(item.name, item.isFolder),
       "star",
       nextStarred ? "Added to Starred" : "Removed from Starred"
     );
@@ -311,7 +307,7 @@ export default function DriveScreen() {
         return f;
       })
     );
-    triggerToast(`Renamed to "${newName}"`, "rename", "Name updated & synced");
+    triggerToast(`Renamed to "${getFileDisplayName(newName, false)}"`, "rename", "Name updated & synced");
   };
 
   const handleDeleteFile = (id: string) => {
@@ -338,8 +334,37 @@ export default function DriveScreen() {
       return prev.filter((f) => !idsToDelete.has(f.id));
     });
     if (fileToDelete) {
-      triggerToast(`Deleted "${fileToDelete.name}"`, "delete", "Removed from Drive & Cloud");
+      triggerToast(`Deleted "${getFileDisplayName(fileToDelete.name, fileToDelete.isFolder)}"`, "delete", "Removed from Drive & Cloud");
     }
+  };
+
+  const handleMoveFile = (itemId: string, targetFolderId: string | null) => {
+    const file = files.find((f) => f.id === itemId);
+    if (!file) return;
+
+    const targetFolderName = targetFolderId
+      ? files.find((f) => f.id === targetFolderId)?.name || "Folder"
+      : "Drive";
+
+    const updated = {
+      ...file,
+      parentId: targetFolderId,
+      updatedAt: String(Date.now()),
+    };
+
+    updateFilesAndPersist((prev) =>
+      prev.map((f) => (f.id === itemId ? updated : f))
+    );
+
+    saveDriveItemToServer(updated).catch((err) =>
+      console.warn("[Drive] Firebase move error:", err)
+    );
+
+    triggerToast(
+      `Moved to "${targetFolderName}"`,
+      "folder",
+      `"${getFileDisplayName(file.name, file.isFolder)}" moved successfully`
+    );
   };
 
   const handleShareFile = async (item: DriveItem) => {
@@ -347,7 +372,7 @@ export default function DriveScreen() {
       triggerToast("Cannot Export", "error", "Folders cannot be exported as a single file");
       return;
     }
-    triggerToast(`Exporting "${item.name}"...`, "export", "Preparing file attachment");
+    triggerToast(`Exporting "${getFileDisplayName(item.name, item.isFolder)}"...`, "export", "Preparing file attachment");
     const result = await exportDriveFile(item);
     if (!result.success && result.error) {
       triggerToast("Export Failed", "error", result.error);
@@ -358,12 +383,9 @@ export default function DriveScreen() {
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      {/* Header */}
       <DriveHeader
         search={search}
         onSearchChange={setSearch}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
         sortOrder={sortOrder}
         onToggleSort={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
         viewMode={viewMode}
@@ -371,7 +393,6 @@ export default function DriveScreen() {
         topInset={insets.top}
       />
 
-      {/* Breadcrumbs for nested folders */}
       {folderStack.length > 1 && (
         <DriveBreadcrumbs
           folderStack={folderStack}
@@ -381,7 +402,6 @@ export default function DriveScreen() {
         />
       )}
 
-      {/* File List / Empty State */}
       {displayedFiles.length > 0 || folderStack.length > 1 ? (
         <DriveFileList
           files={displayedFiles}
@@ -405,7 +425,6 @@ export default function DriveScreen() {
         </ScrollView>
       )}
 
-      {/* Google Drive Multi-color Floating Action Button */}
       <Animated.View
         style={{
           position: "absolute",
@@ -433,7 +452,6 @@ export default function DriveScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Floating Bottom Notification Toast */}
       <UploadStatusToast
         visible={isToastOpen}
         fileName={fileName}
@@ -443,12 +461,22 @@ export default function DriveScreen() {
         bottomInset={0}
       />
 
-      {/* Bottom Sheets and Modals */}
       <DriveActionSheet
         visible={isActionSheetOpen}
         onClose={() => setIsActionSheetOpen(false)}
         onUploadFile={handleUploadFile}
-        onCreateFolder={handleCreateFolder}
+        onCreateFolder={() => {
+          setIsActionSheetOpen(false);
+          setTimeout(() => {
+            setIsCreateFolderDialogOpen(true);
+          }, 150);
+        }}
+      />
+
+      <DriveCreateFolderDialog
+        visible={isCreateFolderDialogOpen}
+        onClose={() => setIsCreateFolderDialogOpen(false)}
+        onCreate={handleConfirmCreateFolder}
       />
 
       <DriveFileOptionsSheet
@@ -458,6 +486,7 @@ export default function DriveScreen() {
         onClose={() => setSelectedFileForOptions(null)}
         onDelete={handleDeleteFile}
         onRename={handleRenameFile}
+        onMove={(item) => setSelectedFileForMove(item)}
         onShare={handleShareFile}
         onToggleStar={handleToggleStar}
       />
@@ -469,7 +498,16 @@ export default function DriveScreen() {
         onClose={() => setSelectedFileForPreview(null)}
         onDelete={handleDeleteFile}
         onRename={handleRenameFile}
+        onMove={(item) => setSelectedFileForMove(item)}
         onToggleStar={handleToggleStar}
+      />
+
+      <DriveMoveModal
+        visible={!!selectedFileForMove}
+        item={selectedFileForMove}
+        allItems={files}
+        onClose={() => setSelectedFileForMove(null)}
+        onMove={handleMoveFile}
       />
     </View>
   );

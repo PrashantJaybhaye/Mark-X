@@ -1,5 +1,6 @@
 export * from "./DriveActionSheet";
 export * from "./DriveBreadcrumbs";
+export * from "./DriveCreateFolderDialog";
 export * from "./DriveEmptyIllustration";
 export * from "./DriveEmptyState";
 export * from "./DriveFileItem";
@@ -7,6 +8,7 @@ export * from "./DriveFileList";
 export * from "./DriveFileOptionsSheet";
 export * from "./DriveFilePreviewScreen";
 export * from "./DriveHeader";
+export * from "./DriveMoveModal";
 export * from "./DrivePdfViewer";
 export * from "./DrivePreviewActionSheet";
 export * from "./FileCategoryIcon";

@@ -31,7 +31,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
         className="relative w-full justify-center"
         style={{ height: cardHeight + 12 }}
       >
-        {}
         <View
           style={{
             position: "absolute",
@@ -46,7 +45,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           className="shadow-sm"
         />
 
-        {}
         <View
           style={{
             position: "absolute",
@@ -61,7 +59,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           className="shadow-sm"
         />
 
-        {}
         <View
           style={{
             width: frontCardWidth,
@@ -71,7 +68,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
           }}
           className="p-6 justify-between shadow-xl shadow-black/40 border border-white/10"
         >
-          {}
           <View className="flex-row items-center">
             <Text
               allowFontScaling={false}
@@ -82,7 +78,6 @@ export function NotesStackedBanner({ notes = [], onPress, onNotePress }: NotesSt
             </Text>
           </View>
 
-          {}
           <View className="mt-auto">
             <Text
               allowFontScaling={false}

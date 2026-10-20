@@ -70,16 +70,13 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
           </LinearGradient>
         </Defs>
 
-        {}
         <Path
           d="M 4 5 A 3 3 0 0 1 7 2 H 15 A 2 2 0 0 1 16.6 2.8 L 19 6 H 33 A 3 3 0 0 1 36 9 V 25 A 3 3 0 0 1 33 28 H 5 A 3 3 0 0 1 2 25 V 7 A 2 2 0 0 1 4 5 Z"
           fill="url(#folderBack)"
         />
 
-        {}
         <Rect x="7" y="5" width="24" height="12" rx="2" fill="#FFFFFF" fillOpacity={0.9} />
 
-        {}
         <Path
           d="M 2 12 A 3 3 0 0 1 5 9 H 33 A 3 3 0 0 1 36 12 V 25 A 3 3 0 0 1 33 28 H 5 A 3 3 0 0 1 2 25 Z"
           fill="url(#folderFront)"
@@ -161,72 +158,131 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
 
   return (
     <Svg width={docWidth} height={docHeight} viewBox="0 0 28 34" fill="none">
-      {}
       <Path
         d="M 4 1 A 2.5 2.5 0 0 0 1.5 3.5 V 30.5 A 2.5 2.5 0 0 0 4 33 H 24 A 2.5 2.5 0 0 0 26.5 30.5 V 9 L 18.5 1 H 4 Z"
         fill={bodyColor}
       />
 
-      {}
       <Path
         d="M 18.5 1 V 7 A 2 2 0 0 0 20.5 9 H 26.5 Z"
         fill={foldColor}
       />
 
-      {}
       {docType === "docs" && (
-        <G fill="#FFFFFF">
-          <Rect x="6.5" y="14" width="15" height="2" rx="1" />
-          <Rect x="6.5" y="18" width="15" height="2" rx="1" />
-          <Rect x="6.5" y="22" width="9.5" height="2" rx="1" />
-        </G>
-      )}
-
-      {}
-      {docType === "sheets" && (
-        <G stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-          <Rect x="6" y="13" width="16" height="13" rx="1.5" strokeWidth="1.6" />
-          <Line x1="14" y1="13" x2="14" y2="26" strokeWidth="1.5" />
-          <Line x1="6" y1="19.5" x2="22" y2="19.5" strokeWidth="1.5" />
-        </G>
-      )}
-
-      {}
-      {docType === "slides" && (
-        <G fill="#FFFFFF">
-          <Rect x="6" y="13" width="16" height="12" rx="1.5" fill="none" stroke="#FFFFFF" strokeWidth="1.6" />
-          <Rect x="8.5" y="15.5" width="11" height="7" rx="0.8" fill="#FFFFFF" />
-        </G>
-      )}
-
-      {}
-      {docType === "pdf" && (
-        <G fill="#FFFFFF">
-          <Rect x="5.5" y="13.5" width="17" height="12" rx="2" fill="none" stroke="#FFFFFF" strokeWidth="1.4" />
-          <SvgText
-            x="14"
-            y="22.2"
-            fontSize="6.2"
-            fontWeight="bold"
-            fontFamily="sans-serif"
-            textAnchor="middle"
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
             fill="#FFFFFF"
-          >
-            PDF
-          </SvgText>
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#E8F0FE"
+          />
+
+          <Rect x="7.5" y="17.8" width="11" height="1.6" rx="0.8" fill="#4285F4" />
+          <Rect x="7.5" y="21.2" width="11" height="1.6" rx="0.8" fill="#4285F4" />
+          <Rect x="7.5" y="24.6" width="7" height="1.6" rx="0.8" fill="#4285F4" />
         </G>
       )}
 
-      {}
+      {docType === "sheets" && (
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
+            fill="#FFFFFF"
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#E6F4EA"
+          />
+
+          <Rect x="7.5" y="16.5" width="11" height="9.5" rx="1" fill="#FFFFFF" stroke="#0F9D58" strokeWidth="1.1" />
+          <Rect x="7.5" y="16.5" width="11" height="3.2" rx="0.8" fill="#0F9D58" opacity={0.2} />
+          <Line x1="13" y1="16.5" x2="13" y2="26" stroke="#0F9D58" strokeWidth="1.1" />
+          <Line x1="7.5" y1="19.7" x2="18.5" y2="19.7" stroke="#0F9D58" strokeWidth="1.1" />
+          <Line x1="7.5" y1="22.8" x2="18.5" y2="22.8" stroke="#0F9D58" strokeWidth="1.1" />
+        </G>
+      )}
+
+      {docType === "slides" && (
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
+            fill="#FFFFFF"
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#FEF7E0"
+          />
+
+          <Rect x="7.5" y="16.5" width="11" height="8.5" rx="1.2" fill="#FBBC04" />
+          <Rect x="8.8" y="17.8" width="8.4" height="5.9" rx="0.6" fill="#FFFFFF" />
+          <Rect x="10" y="19.2" width="4.5" height="1.2" rx="0.6" fill="#FBBC04" />
+          <Rect x="10" y="21.2" width="6" height="1.2" rx="0.6" fill="#FBBC04" />
+        </G>
+      )}
+
+      {docType === "pdf" && (
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
+            fill="#FFFFFF"
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#FEE2E2"
+          />
+
+          <Rect x="7.5" y="17.8" width="11" height="1.6" rx="0.8" fill="#EA4335" />
+          <Rect x="7.5" y="21.2" width="11" height="1.6" rx="0.8" fill="#EA4335" />
+          <Rect x="7.5" y="24.6" width="7" height="1.6" rx="0.8" fill="#EA4335" />
+        </G>
+      )}
+
       {docType === "code" && (
-        <G stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none">
-          <Path d="M 10 16 L 7.5 19 L 10 22" />
-          <Path d="M 18 16 L 20.5 19 L 18 22" />
-          <Path d="M 15 15 L 13 23" strokeWidth="1.3" />
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
+            fill="#FFFFFF"
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#E8F0FE"
+          />
+
+          <Path
+            d="M 10 18.2 L 8 20.5 L 10 22.8"
+            stroke="#1A73E8"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <Path
+            d="M 16 18.2 L 18 20.5 L 16 22.8"
+            stroke="#1A73E8"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <Line
+            x1="14.2"
+            y1="17.5"
+            x2="11.8"
+            y2="23.5"
+            stroke="#1A73E8"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+          />
         </G>
       )}
 
-      {}
       {docType === "zip" && (
         <G stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" fill="none">
           <Line x1="14" y1="12" x2="14" y2="25" strokeDasharray="1.5,1.5" />
@@ -234,7 +290,6 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
         </G>
       )}
 
-      {}
       {docType === "video" && (
         <G fill="#FFFFFF">
           <Rect x="6" y="13" width="16" height="12" rx="1.5" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
@@ -242,7 +297,6 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
         </G>
       )}
 
-      {}
       {docType === "audio" && (
         <G fill="#FFFFFF">
           <Circle cx="10" cy="22" r="2" />
@@ -251,7 +305,6 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
         </G>
       )}
 
-      {}
       {docType === "image" && (
         <G stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none">
           <Rect x="6" y="13" width="16" height="12" rx="1.5" />
@@ -260,12 +313,21 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
         </G>
       )}
 
-      {}
       {docType === "generic" && (
-        <G fill="#FFFFFF" opacity={0.9}>
-          <Rect x="7" y="15" width="14" height="2" rx="1" />
-          <Rect x="7" y="19" width="14" height="2" rx="1" />
-          <Rect x="7" y="23" width="9" height="2" rx="1" />
+        <G>
+          <Path
+            d="M 6.5 12 A 1.8 1.8 0 0 0 5 13.8 V 27.2 A 1.8 1.8 0 0 0 6.8 29 H 21.2 A 1.8 1.8 0 0 0 23 27.2 V 17 L 18 12 H 6.5 Z"
+            fill="#FFFFFF"
+          />
+
+          <Path
+            d="M 18 12 V 15.8 A 1.2 1.2 0 0 0 19.2 17 H 23 Z"
+            fill="#F1F3F4"
+          />
+
+          <Rect x="7.5" y="17.8" width="11" height="1.6" rx="0.8" fill="#5F6368" />
+          <Rect x="7.5" y="21.2" width="11" height="1.6" rx="0.8" fill="#5F6368" />
+          <Rect x="7.5" y="24.6" width="7" height="1.6" rx="0.8" fill="#5F6368" />
         </G>
       )}
     </Svg>

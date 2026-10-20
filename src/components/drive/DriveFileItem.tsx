@@ -2,7 +2,7 @@ import React, { memo, useCallback } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { DriveItem } from "../../utils/driveFileTypes";
+import { DriveItem, getFileDisplayName } from "../../utils/driveFileTypes";
 import { triggerHaptic } from "../../utils/haptics";
 import { FileCategoryIcon } from "./FileCategoryIcon";
 import { formatDriveTimestamp } from "../../services/driveFirebaseService";
@@ -22,6 +22,8 @@ function DriveFileItemComponent({
   onPress,
   onOptionsPress,
 }: DriveFileItemProps) {
+  const displayName = getFileDisplayName(item.name, item.isFolder);
+
   const handleRowPress = useCallback(() => {
     triggerHaptic();
     onPress?.(item);
@@ -51,7 +53,7 @@ function DriveFileItemComponent({
               className="flex-1 text-[13px] font-outfit-semibold text-[#1F1F1F] mr-1"
               numberOfLines={1}
             >
-              {item.name}
+              {displayName}
             </Text>
             <TouchableOpacity
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -67,7 +69,6 @@ function DriveFileItemComponent({
 
     return (
       <View className="flex-1 m-1.5 bg-white border border-[#EBECEF] rounded-2xl overflow-hidden h-[145px] shadow-xs">
-        {}
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleRowPress}
@@ -88,7 +89,6 @@ function DriveFileItemComponent({
           )}
         </TouchableOpacity>
 
-        {}
         <View className="flex-row items-center justify-between px-2.5 py-2 bg-white flex-1 border-t border-[#F0F2F5]">
           <View className="flex-row items-center flex-1 mr-1">
             <FileCategoryIcon category={item.category} size={18} id={item.id} fileName={item.name} />
@@ -96,7 +96,7 @@ function DriveFileItemComponent({
               className="text-[12px] font-outfit-semibold text-[#1F1F1F] flex-1 ml-1.5"
               numberOfLines={1}
             >
-              {item.name}
+              {displayName}
             </Text>
           </View>
 
@@ -124,7 +124,6 @@ function DriveFileItemComponent({
         onPress={handleRowPress}
         className="flex-1 flex-row items-center pr-2"
       >
-        {}
         <View className="w-10 h-10 items-center justify-center mr-3.5">
           <FileCategoryIcon
             category={item.isFolder ? "folder" : item.category}
@@ -135,10 +134,9 @@ function DriveFileItemComponent({
           />
         </View>
 
-        {}
         <View className="flex-1">
           <Text className="text-[15px] font-outfit-medium text-[#1F1F1F]" numberOfLines={1}>
-            {item.name}
+            {displayName}
           </Text>
           <View className="flex-row items-center mt-0.5">
             {item.starred && (
@@ -160,11 +158,10 @@ function DriveFileItemComponent({
         </View>
       </TouchableOpacity>
 
-      {}
       <TouchableOpacity
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         onPress={handleOptions}
-        accessibilityLabel={`Options for ${item.name}`}
+        accessibilityLabel={`Options for ${displayName}`}
         className="p-2"
       >
         <Ionicons name="ellipsis-horizontal" size={20} color="#444746" />
