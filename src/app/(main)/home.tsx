@@ -224,7 +224,7 @@ export default function HomeScreen() {
             paddingBottom: bottomScrollPadding,
           }}
         >
-          <View className="w-full mb-1">
+          <View className="w-full mb-3.5">
             <StorageHeroCard
               usedStorage={usedStorage}
               isStatsLoading={isStatsLoading}

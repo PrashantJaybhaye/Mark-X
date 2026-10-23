@@ -2,12 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   Keyboard,
   KeyboardAvoidingView,
-  NativeSyntheticEvent,
   Platform,
   Pressable,
   StatusBar as RNStatusBar,
@@ -15,7 +14,6 @@ import {
   Share,
   Text,
   TextInput,
-  TextInputKeyPressEventData,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -31,16 +29,51 @@ import { syncNoteToFirestore, deleteNoteFromFirestore } from "../../services/not
 import { triggerHaptic } from "../../utils/haptics";
 
 const BLOCK_TYPOGRAPHY: Record<string, { fontFamily: string; fontSize: number; lineHeight: number; color: string; includeFontPadding: boolean }> = {
-  title: { fontFamily: "Outfit_700Bold", fontSize: 24, lineHeight: 28, color: "#111111", includeFontPadding: false },
-  heading: { fontFamily: "Outfit_700Bold", fontSize: 20, lineHeight: 25, color: "#1C1C1E", includeFontPadding: false },
-  subheading: { fontFamily: "Outfit_600SemiBold", fontSize: 17, lineHeight: 22, color: "#27272A", includeFontPadding: false },
-  paragraph: { fontFamily: "Outfit_400Regular", fontSize: 15, lineHeight: 20, color: "#27272A", includeFontPadding: false },
+  title: { fontFamily: "Outfit_700Bold", fontSize: 24, lineHeight: 30, color: "#111111", includeFontPadding: false },
+  heading: { fontFamily: "Outfit_700Bold", fontSize: 20, lineHeight: 26, color: "#1C1C1E", includeFontPadding: false },
+  subheading: { fontFamily: "Outfit_600SemiBold", fontSize: 17, lineHeight: 23, color: "#27272A", includeFontPadding: false },
+  paragraph: { fontFamily: "Outfit_400Regular", fontSize: 16, lineHeight: 24, color: "#27272A", includeFontPadding: false },
 };
+
+export type BlockType = "paragraph" | "title" | "heading" | "subheading" | "todo" | "bullet" | "numbered";
 
 export interface FormatRange {
   type: "bold" | "italic" | "underline" | "strikethrough";
   start: number;
   length: number;
+}
+
+function parseFormattedText(rawText: string) {
+  let text = "";
+  const formats: FormatRange[] = [];
+  const parts = rawText.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|<u>[^<]+<\/u>)/g);
+
+  for (const part of parts) {
+    if (!part) continue;
+    let type: "bold" | "italic" | "underline" | "strikethrough" | null = null;
+    let content = part;
+
+    if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+      type = "bold";
+      content = part.slice(2, -2);
+    } else if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) {
+      type = "strikethrough";
+      content = part.slice(2, -2);
+    } else if (part.startsWith("<u>") && part.endsWith("</u>") && part.length >= 7) {
+      type = "underline";
+      content = part.slice(3, -4);
+    } else if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
+      type = "italic";
+      content = part.slice(1, -1);
+    }
+
+    if (type) {
+      formats.push({ type, start: text.length, length: content.length });
+    }
+    text += content;
+  }
+
+  return { text, formats };
 }
 
 function splitIntoFormattedChunks(text: string, formats?: FormatRange[]) {
@@ -89,121 +122,385 @@ function splitIntoFormattedChunks(text: string, formats?: FormatRange[]) {
 }
 
 function renderRichText(text: string, formats: FormatRange[], baseStyle: any) {
-  if (!formats || formats.length === 0) return <Text allowFontScaling={false} style={baseStyle}>{text}</Text>;
+  if (!formats || formats.length === 0) return text;
 
   const chunks = splitIntoFormattedChunks(text, formats);
   return chunks.map((chunk, i) => {
     const style: any = { ...baseStyle };
-    if (chunk.formats.has("bold")) { style.fontFamily = "Outfit_700Bold"; style.fontWeight = "bold"; }
+    if (chunk.formats.has("bold")) {
+      style.fontFamily = "Outfit_700Bold";
+      style.fontWeight = "bold";
+    }
     if (chunk.formats.has("italic")) style.fontStyle = "italic";
     const decs = [];
     if (chunk.formats.has("underline")) decs.push("underline");
     if (chunk.formats.has("strikethrough")) decs.push("line-through");
     if (decs.length > 0) style.textDecorationLine = decs.join(" ");
-    return <Text allowFontScaling={false} key={i} style={style}>{chunk.text}</Text>;
+    return (
+      <Text allowFontScaling={false} key={i} style={style}>
+        {chunk.text}
+      </Text>
+    );
   });
 }
 
-export type BlockType = "paragraph" | "title" | "heading" | "subheading" | "todo" | "bullet" | "numbered";
+function renderFormattedBody(
+  bodyText: string,
+  onToggleCheckbox: (lineIdx: number) => void
+) {
+  const lines = bodyText.split("\n");
+  let numberedCount = 1;
 
-export interface NoteBlock {
-  id: string;
-  type: BlockType;
-  text: string;
-  checked?: boolean;
-  formats?: FormatRange[];
-}
-
-function parseFormattedText(rawText: string) {
-  let text = "";
-  const formats: FormatRange[] = [];
-  const parts = rawText.split(/(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|<u>[^<]+<\/u>)/g);
-
-  for (const part of parts) {
-    if (!part) continue;
-    let type: "bold" | "italic" | "underline" | "strikethrough" | null = null;
-    let content = part;
-
-    if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) { type = "bold"; content = part.slice(2, -2); }
-    else if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) { type = "strikethrough"; content = part.slice(2, -2); }
-    else if (part.startsWith("<u>") && part.endsWith("</u>") && part.length >= 7) { type = "underline"; content = part.slice(3, -4); }
-    else if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) { type = "italic"; content = part.slice(1, -1); }
-
-    if (type) {
-      formats.push({ type, start: text.length, length: content.length });
-    }
-    text += content;
-  }
-
-  return { text, formats };
-}
-
-function formatBlockText(block: NoteBlock): string {
-  if (!block.formats || block.formats.length === 0) return block.text;
-
-  const chunks = splitIntoFormattedChunks(block.text, block.formats);
-  let result = "";
-  for (const chunk of chunks) {
-    let chunkStr = chunk.text;
-    if (chunk.formats.has("bold")) chunkStr = `**${chunkStr}**`;
-    if (chunk.formats.has("italic")) chunkStr = `*${chunkStr}*`;
-    if (chunk.formats.has("underline")) chunkStr = `<u>${chunkStr}</u>`;
-    if (chunk.formats.has("strikethrough")) chunkStr = `~~${chunkStr}~~`;
-    result += chunkStr;
-  }
-  return result;
-}
-
-function parseBodyToBlocks(raw: string): NoteBlock[] {
-  if (!raw) return [{ id: `b-${Date.now()}-0`, type: "paragraph", text: "" }];
-  return raw.split("\n").map((line, idx) => {
-    const id = `b-${Date.now()}-${idx}`;
+  return lines.map((line, idx) => {
     const trimmed = line.trim();
+
     let blockType: BlockType = "paragraph";
     let content = line;
     let checked: boolean | undefined = undefined;
 
     if (trimmed.startsWith("# ")) {
-      blockType = "title"; content = line.slice(line.indexOf("# ") + 2);
+      blockType = "title";
+      content = line.slice(line.indexOf("# ") + 2);
+      numberedCount = 1;
     } else if (trimmed.startsWith("## ")) {
-      blockType = "heading"; content = line.slice(line.indexOf("## ") + 3);
+      blockType = "heading";
+      content = line.slice(line.indexOf("## ") + 3);
+      numberedCount = 1;
     } else if (trimmed.startsWith("### ")) {
-      blockType = "subheading"; content = line.slice(line.indexOf("### ") + 4);
+      blockType = "subheading";
+      content = line.slice(line.indexOf("### ") + 4);
+      numberedCount = 1;
     } else {
       const todoMatch = line.match(/^(\s*)([•\-\*–—]\s*)?\[([ xX])\]\s*(.*)$/);
       if (todoMatch) {
-        blockType = "todo"; content = todoMatch[4]; checked = todoMatch[3].toLowerCase() === "x";
+        blockType = "todo";
+        content = todoMatch[4];
+        checked = todoMatch[3].toLowerCase() === "x";
+        numberedCount = 1;
       } else {
         const bulletMatch = line.match(/^(\s*)[•\-\*–—]\s+(.*)$/);
         if (bulletMatch) {
-          blockType = "bullet"; content = bulletMatch[2];
+          blockType = "bullet";
+          content = bulletMatch[2];
+          numberedCount = 1;
         } else {
           const numMatch = line.match(/^(\s*)\d+[\.\)]\s+(.*)$/);
           if (numMatch) {
-            blockType = "numbered"; content = numMatch[2];
+            blockType = "numbered";
+            content = numMatch[2];
+          } else {
+            numberedCount = 1;
           }
         }
       }
     }
 
+    const isTodo = blockType === "todo";
+    const isBullet = blockType === "bullet";
+    const isNumbered = blockType === "numbered";
+    const currentNum = isNumbered ? numberedCount++ : 1;
+
+    const fontStyle: any = { ...(BLOCK_TYPOGRAPHY[blockType] || BLOCK_TYPOGRAPHY.paragraph) };
+    if (isTodo && checked) {
+      fontStyle.textDecorationLine = "line-through";
+      fontStyle.color = "#8E8E93";
+    }
+
     const { text, formats } = parseFormattedText(content);
-    return { id, type: blockType, text, checked, formats };
+
+    return (
+      <View
+        key={`line-${idx}`}
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          marginBottom: blockType === "title" ? 6 : blockType === "heading" ? 4 : blockType === "subheading" ? 3 : line === "" ? 4 : 2,
+          minHeight: line === "" ? 10 : 22,
+        }}
+      >
+        {isTodo && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => onToggleCheckbox(idx)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginRight: 8, marginTop: 2 }}
+          >
+            <Ionicons
+              name={checked ? "checkmark-circle" : "ellipse-outline"}
+              size={19}
+              color={checked ? "#E5A93C" : "#C7C7CC"}
+            />
+          </TouchableOpacity>
+        )}
+        {isBullet && (
+          <Text
+            allowFontScaling={false}
+            style={{
+              color: "#E5A93C",
+              fontSize: 18,
+              lineHeight: fontStyle.lineHeight || 24,
+              includeFontPadding: false,
+              width: 16,
+              textAlign: "center",
+              marginRight: 6,
+            }}
+          >
+            •
+          </Text>
+        )}
+        {isNumbered && (
+          <Text
+            allowFontScaling={false}
+            style={{
+              color: "#E5A93C",
+              fontFamily: "Outfit_700Bold",
+              fontSize: 15,
+              lineHeight: fontStyle.lineHeight || 24,
+              includeFontPadding: false,
+              minWidth: 20,
+              marginRight: 6,
+            }}
+          >
+            {currentNum}.
+          </Text>
+        )}
+        <Text allowFontScaling={false} style={[{ flex: 1 }, fontStyle]}>
+          {line.trim() === "" ? " " : renderRichText(text, formats, fontStyle)}
+        </Text>
+      </View>
+    );
   });
 }
 
-function blocksToBody(blocks: NoteBlock[]): string {
-  let num = 1;
-  return blocks.map((b) => {
-    const text = formatBlockText(b);
-    if (b.type === "title") { num = 1; return `# ${text}`; }
-    if (b.type === "heading") { num = 1; return `## ${text}`; }
-    if (b.type === "subheading") { num = 1; return `### ${text}`; }
-    if (b.type === "todo") { num = 1; return `[${b.checked ? "x" : " "}] ${text}`; }
-    if (b.type === "bullet") { num = 1; return `• ${text}`; }
-    if (b.type === "numbered") return `${num++}. ${text}`;
-    num = 1;
-    return text;
-  }).join("\n");
+export interface NoteLine {
+  id: string;
+  type: BlockType;
+  text: string;
+  checked?: boolean;
+}
+
+export function parseMarkdownToLines(raw: string): NoteLine[] {
+  if (!raw) return [{ id: `l-${Date.now()}-0`, type: "paragraph", text: "" }];
+  return raw.split("\n").map((line, idx) => {
+    const id = `l-${Date.now()}-${idx}`;
+    const trimmed = line.trim();
+    let type: BlockType = "paragraph";
+    let text = line;
+    let checked: boolean | undefined = undefined;
+
+    if (trimmed.startsWith("# ")) {
+      type = "title";
+      text = line.slice(line.indexOf("# ") + 2);
+    } else if (trimmed.startsWith("## ")) {
+      type = "heading";
+      text = line.slice(line.indexOf("## ") + 3);
+    } else if (trimmed.startsWith("### ")) {
+      type = "subheading";
+      text = line.slice(line.indexOf("### ") + 4);
+    } else {
+      const todoMatch = line.match(/^(\s*)([•\-\*–—]\s*)?\[([ xX])\]\s*(.*)$/);
+      if (todoMatch) {
+        type = "todo";
+        text = todoMatch[4];
+        checked = todoMatch[3].toLowerCase() === "x";
+      } else {
+        const bulletMatch = line.match(/^(\s*)[•\-\*–—]\s+(.*)$/);
+        if (bulletMatch) {
+          type = "bullet";
+          text = bulletMatch[2];
+        } else {
+          const numMatch = line.match(/^(\s*)\d+[\.\)]\s+(.*)$/);
+          if (numMatch) {
+            type = "numbered";
+            text = numMatch[2];
+          }
+        }
+      }
+    }
+
+    return { id, type, text, checked };
+  });
+}
+
+export function cleanLinesToMarkdown(lines: NoteLine[]): string {
+  return lines
+    .map((l, idx) => {
+      if (l.type === "title") return `# ${l.text}`;
+      if (l.type === "heading") return `## ${l.text}`;
+      if (l.type === "subheading") return `### ${l.text}`;
+      if (l.type === "todo") return `[${l.checked ? "x" : " "}] ${l.text}`;
+      if (l.type === "bullet") return `• ${l.text}`;
+      if (l.type === "numbered") return `${idx + 1}. ${l.text}`;
+      return l.text;
+    })
+    .join("\n");
+}
+
+export function getLinePrefix(line: NoteLine, idx: number): string {
+  if (line.type === "todo") return line.checked ? "☑ " : "☐ ";
+  if (line.type === "bullet") return "• ";
+  if (line.type === "numbered") return `${idx + 1}. `;
+  return "";
+}
+
+export function parseLinePrefix(raw: string): { cleanText: string; isTodo: boolean; checked: boolean; isBullet: boolean; isNumbered: boolean } {
+  if (raw.startsWith("☑ ")) {
+    return { cleanText: raw.slice(2), isTodo: true, checked: true, isBullet: false, isNumbered: false };
+  }
+  if (raw.startsWith("☐ ")) {
+    return { cleanText: raw.slice(2), isTodo: true, checked: false, isBullet: false, isNumbered: false };
+  }
+  if (raw.startsWith("• ")) {
+    return { cleanText: raw.slice(2), isTodo: false, checked: false, isBullet: true, isNumbered: false };
+  }
+  const numMatch = raw.match(/^\d+\.\s+/);
+  if (numMatch) {
+    return { cleanText: raw.slice(numMatch[0].length), isTodo: false, checked: false, isBullet: false, isNumbered: true };
+  }
+  return { cleanText: raw, isTodo: false, checked: false, isBullet: false, isNumbered: false };
+}
+
+function reconcileEditorLines(newRawLines: string[], prevLines: NoteLine[]): NoteLine[] {
+  if (newRawLines.length === prevLines.length) {
+    return prevLines.map((prev, i) => {
+      const p = parseLinePrefix(newRawLines[i] ?? "");
+      let type = prev.type;
+      let checked = prev.checked;
+      if (p.isTodo) {
+        type = "todo";
+        checked = p.checked;
+      } else if (p.isBullet) {
+        type = "bullet";
+      } else if (p.isNumbered) {
+        type = "numbered";
+      } else if (prev.type === "todo" || prev.type === "bullet" || prev.type === "numbered") {
+        type = "paragraph";
+        checked = false;
+      }
+      return {
+        ...prev,
+        type,
+        checked,
+        text: p.cleanText,
+      };
+    });
+  }
+
+  if (newRawLines.length > prevLines.length) {
+    const diff = newRawLines.length - prevLines.length;
+    let splitIdx = 0;
+    while (
+      splitIdx < prevLines.length &&
+      parseLinePrefix(newRawLines[splitIdx] ?? "").cleanText === prevLines[splitIdx]?.text
+    ) {
+      splitIdx++;
+    }
+
+    const prevAtSplit = prevLines[splitIdx];
+    const inheritType: BlockType =
+      prevAtSplit?.type === "todo" && prevAtSplit.text.trim().length > 0
+        ? "todo"
+        : prevAtSplit?.type === "bullet"
+        ? "bullet"
+        : "paragraph";
+
+    const result: NoteLine[] = [];
+    for (let i = 0; i < splitIdx; i++) {
+      result.push(prevLines[i]);
+    }
+
+    const p0 = parseLinePrefix(newRawLines[splitIdx] ?? "");
+    result.push({
+      ...(prevLines[splitIdx] || { id: `l-${Date.now()}-${splitIdx}`, type: "paragraph" }),
+      text: p0.cleanText,
+    });
+
+    for (let i = 1; i <= diff; i++) {
+      const pNew = parseLinePrefix(newRawLines[splitIdx + i] ?? "");
+      result.push({
+        id: `l-${Date.now()}-${splitIdx + i}`,
+        type: pNew.isTodo ? "todo" : pNew.isBullet ? "bullet" : inheritType,
+        text: pNew.cleanText,
+        checked: pNew.checked || false,
+      });
+    }
+
+    for (let i = splitIdx + 1; i < prevLines.length; i++) {
+      const pRem = parseLinePrefix(newRawLines[i + diff] ?? "");
+      result.push({
+        ...prevLines[i],
+        text: pRem.cleanText,
+      });
+    }
+
+    return result;
+  }
+
+  const diff = prevLines.length - newRawLines.length;
+  let delIdx = 0;
+  while (
+    delIdx < newRawLines.length &&
+    parseLinePrefix(newRawLines[delIdx] ?? "").cleanText === prevLines[delIdx]?.text
+  ) {
+    delIdx++;
+  }
+
+  const result: NoteLine[] = [];
+  for (let i = 0; i < delIdx; i++) {
+    result.push(prevLines[i]);
+  }
+
+  for (let i = delIdx; i < newRawLines.length; i++) {
+    const old = prevLines[i + diff] || prevLines[i] || { id: `l-${Date.now()}-${i}`, type: "paragraph" as BlockType };
+    const p = parseLinePrefix(newRawLines[i] ?? "");
+    result.push({
+      id: old.id || `l-${Date.now()}-${i}`,
+      type: p.isTodo ? "todo" : p.isBullet ? "bullet" : p.isNumbered ? "numbered" : old.type || "paragraph",
+      text: p.cleanText,
+      checked: p.checked !== undefined ? p.checked : old.checked,
+    });
+  }
+
+  return result;
+}
+
+function renderCleanEditorLines(lines: NoteLine[]) {
+  if (!lines || lines.length === 0) return null;
+  const total = lines.length;
+
+  return lines.map((line, idx) => {
+    const isLast = idx === total - 1;
+    const fontStyle = BLOCK_TYPOGRAPHY[line.type] || BLOCK_TYPOGRAPHY.paragraph;
+
+    let prefix = "";
+    if (line.type === "todo") {
+      prefix = line.checked ? "☑ " : "☐ ";
+    } else if (line.type === "bullet") {
+      prefix = "• ";
+    } else if (line.type === "numbered") {
+      prefix = `${idx + 1}. `;
+    }
+
+    const { text: cleanText, formats } = parseFormattedText(line.text);
+
+    return (
+      <Text key={line.id} style={fontStyle}>
+        {prefix !== "" && (
+          <Text style={{ color: "#E5A93C", fontFamily: "Outfit_700Bold", fontSize: fontStyle.fontSize }}>
+            {prefix}
+          </Text>
+        )}
+        {line.type === "todo" && line.checked ? (
+          <Text style={{ textDecorationLine: "line-through", color: "#8E8E93" }}>
+            {cleanText}
+          </Text>
+        ) : (
+          renderRichText(cleanText, formats, fontStyle)
+        )}
+        {!isLast && "\n"}
+      </Text>
+    );
+  });
 }
 
 export default function NoteDetailScreen() {
@@ -217,10 +514,10 @@ export default function NoteDetailScreen() {
   );
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [blocks, setBlocks] = useState<NoteBlock[]>(() => parseBodyToBlocks(""));
-  const [activeBlockIndex, setActiveBlockIndex] = useState<number>(0);
-  const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
-  const pendingFocusRef = useRef<string | null>(null);
+  const [lines, setLines] = useState<NoteLine[]>(() => parseMarkdownToLines(""));
+
+  const bodyInputRef = useRef<TextInput | null>(null);
+  const titleInputRef = useRef<TextInput | null>(null);
 
   const [isPinned, setIsPinned] = useState(false);
   const [createdAt, setCreatedAt] = useState("");
@@ -230,12 +527,23 @@ export default function NoteDetailScreen() {
   const [showFormatSheet, setShowFormatSheet] = useState(false);
   const [selectedTextStyle, setSelectedTextStyle] = useState("Body");
   const [activeFormats, setActiveFormats] = useState<{ [key: string]: boolean }>({});
-  const [activeSelection, setActiveSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
+  const activeSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   const [activeDialog, setActiveDialog] = useState<"delete" | "more" | "unsaved" | null>(null);
 
   const historyRef = useRef<{ title: string; body: string }[]>([]);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const latestLinesRef = useRef<NoteLine[]>(lines);
+  latestLinesRef.current = lines;
+  const latestBodyRef = useRef<string>(body);
+  latestBodyRef.current = body;
+  const latestTitleRef = useRef<string>(title);
+  latestTitleRef.current = title;
+  const isPinnedRef = useRef<boolean>(isPinned);
+  isPinnedRef.current = isPinned;
+  const isDeletedRef = useRef(false);
+  const hasUnsavedChanges = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -251,55 +559,42 @@ export default function NoteDetailScreen() {
         if (isMounted && note) {
           setTitle(note.title);
           const raw = note.body ?? "";
+          const parsedLines = parseMarkdownToLines(raw);
+          setLines(parsedLines);
+          latestLinesRef.current = parsedLines;
           setBody(raw);
-          setBlocks(parseBodyToBlocks(raw));
+          latestTitleRef.current = note.title;
+          latestBodyRef.current = raw;
           setIsPinned(note.isPinned ?? false);
           setCreatedAt(note.createdAt ?? "");
         }
       });
     }
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [id, isNewNote]);
 
   useEffect(() => {
-    const cur = blocks[activeBlockIndex];
-    if (cur) {
-      const nextStyle =
-        cur.type === "title" ? "Title" : cur.type === "heading" ? "Heading" : cur.type === "subheading" ? "Subheading" : "Body";
-      setSelectedTextStyle((prev) => (prev !== nextStyle ? nextStyle : prev));
-      setActiveFormats((prev) => {
-        let b = false, it = false, u = false, s = false;
-        if (cur.formats) {
-          const { start, end } = activeSelection;
-          const pos = Math.min(start, end);
-          const formatsAtCursor = cur.formats.filter((f) => f.start <= pos && f.start + f.length >= pos);
-          b = formatsAtCursor.some(f => f.type === "bold");
-          it = formatsAtCursor.some(f => f.type === "italic");
-          u = formatsAtCursor.some(f => f.type === "underline");
-          s = formatsAtCursor.some(f => f.type === "strikethrough");
-        }
-        if (prev.bold === b && prev.italic === it && prev.underline === u && prev.strikethrough === s) {
-          return prev;
-        }
-        return { bold: b, italic: it, underline: u, strikethrough: s };
-      });
-    }
-  }, [activeBlockIndex, blocks, activeSelection]);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) => setKeyboardHeight(e.endCoordinates.height));
-    const hideSub = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => setKeyboardHeight(0));
-    return () => { showSub.remove(); hideSub.remove(); };
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
-  const latestBlocksRef = useRef<NoteBlock[]>(blocks);
-  latestBlocksRef.current = blocks;
-  const latestTitleRef = useRef<string>(title);
-  latestTitleRef.current = title;
-  const isPinnedRef = useRef<boolean>(isPinned);
-  isPinnedRef.current = isPinned;
-  const isDeletedRef = useRef(false);
-  const hasUnsavedChanges = useRef(false);
+  useEffect(() => {
+    if (showFormatSheet) {
+      Keyboard.dismiss();
+    }
+  }, [showFormatSheet]);
 
   const commitNote = useCallback(
     async (currentTitle: string, currentBody: string, currentPinned: boolean) => {
@@ -307,8 +602,14 @@ export default function NoteDetailScreen() {
       const trimmedBody = currentBody.trim();
       if (!trimmedTitle && !trimmedBody) return;
 
-      const resolvedTitle = trimmedTitle || (trimmedBody ? trimmedBody.split("\n")[0].trim().slice(0, 40) : "") || "New Note";
-      const formattedDate = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      const resolvedTitle =
+        trimmedTitle || (trimmedBody ? trimmedBody.split("\n")[0].trim().slice(0, 40) : "") || "New Note";
+      const formattedDate = new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
       const finalCreatedAt = createdAt || formattedDate;
       const nowMs = Date.now();
       await saveSingleNote({
@@ -347,15 +648,12 @@ export default function NoteDetailScreen() {
     return () => backSub.remove();
   }, [activeDialog, showFormatSheet]);
 
-  const updateBlocksAndSave = (updater: (prev: NoteBlock[]) => NoteBlock[]) => {
-    setBlocks((prev) => {
-      const next = updater(prev);
-      latestBlocksRef.current = next;
-      const newBody = blocksToBody(next);
-      setBody(newBody);
-      hasUnsavedChanges.current = true;
-      return next;
-    });
+  const updateBodyAndSave = (nextBody: string) => {
+    latestBodyRef.current = nextBody;
+    const parsed = parseMarkdownToLines(nextBody);
+    setLines(parsed);
+    latestLinesRef.current = parsed;
+    hasUnsavedChanges.current = true;
   };
 
   const handleBack = async () => {
@@ -380,7 +678,8 @@ export default function NoteDetailScreen() {
     Keyboard.dismiss();
     setIsEditing(false);
     setShowFormatSheet(false);
-    const currentBody = blocksToBody(latestBlocksRef.current);
+    const currentBody = cleanLinesToMarkdown(latestLinesRef.current);
+    latestBodyRef.current = currentBody;
     const dates = await commitNote(latestTitleRef.current, currentBody, isPinnedRef.current);
     if (dates) {
       syncNoteToFirestore({
@@ -397,10 +696,24 @@ export default function NoteDetailScreen() {
   };
 
   const handleTitleChange = (nextTitle: string) => {
-    const currentBody = blocksToBody(latestBlocksRef.current);
-    if (Math.abs(nextTitle.length - title.length) > 3) historyRef.current.push({ title, body: currentBody });
+    if (Math.abs(nextTitle.length - title.length) > 3) {
+      historyRef.current.push({ title, body: latestBodyRef.current });
+    }
     setTitle(nextTitle);
     latestTitleRef.current = nextTitle;
+    hasUnsavedChanges.current = true;
+  };
+
+  const handleBodyChange = (nextText: string) => {
+    if (Math.abs(nextText.length - (latestBodyRef.current?.length || 0)) > 5) {
+      historyRef.current.push({ title: latestTitleRef.current, body: latestBodyRef.current });
+    }
+    const newRawLines = nextText.split("\n");
+    const updatedLines = reconcileEditorLines(newRawLines, latestLinesRef.current);
+    setLines(updatedLines);
+    latestLinesRef.current = updatedLines;
+    const md = cleanLinesToMarkdown(updatedLines);
+    latestBodyRef.current = md;
     hasUnsavedChanges.current = true;
   };
 
@@ -410,7 +723,11 @@ export default function NoteDetailScreen() {
       const prev = historyRef.current.pop()!;
       setTitle(prev.title);
       setBody(prev.body);
-      setBlocks(parseBodyToBlocks(prev.body));
+      const restored = parseMarkdownToLines(prev.body);
+      setLines(restored);
+      latestLinesRef.current = restored;
+      latestTitleRef.current = prev.title;
+      latestBodyRef.current = prev.body;
       hasUnsavedChanges.current = true;
     }
   };
@@ -419,7 +736,9 @@ export default function NoteDetailScreen() {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     const content = [title.trim(), body.trim()].filter(Boolean).join("\n\n");
     if (!content) return;
-    try { await Share.share({ title: title || "Note", message: content }); } catch { }
+    try {
+      await Share.share({ title: title || "Note", message: content });
+    } catch {}
   };
 
   const handleDeleteConfirmed = async () => {
@@ -433,73 +752,204 @@ export default function NoteDetailScreen() {
     router.back();
   };
 
-  const handleToggleCheckbox = (id: string) => {
+  const handleToggleCheckboxInBody = (lineIdx: number) => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    setBlocks((prev) => {
-      const next = prev.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b));
-      latestBlocksRef.current = next;
-      const newBody = blocksToBody(next);
-      setBody(newBody);
-      if (!isEditing) {
-        commitNote(latestTitleRef.current, newBody, isPinnedRef.current).then((dates) => {
-          if (dates) {
-            syncNoteToFirestore({
-              id: noteId,
-              title: latestTitleRef.current,
-              body: newBody,
-              isPinned: isPinnedRef.current,
-              createdAt: dates.createdAt,
-              updatedAt: dates.updatedAt,
-              updatedAtMs: dates.updatedAtMs,
-            });
-          }
-        });
-        hasUnsavedChanges.current = false;
-      } else {
-        hasUnsavedChanges.current = true;
+    const currentLines = latestLinesRef.current;
+    if (lineIdx >= 0 && lineIdx < currentLines.length) {
+      const updated = currentLines.map((l, i) =>
+        i === lineIdx ? { ...l, checked: !l.checked } : l
+      );
+      setLines(updated);
+      latestLinesRef.current = updated;
+      const newBody = cleanLinesToMarkdown(updated);
+      updateBodyAndSave(newBody);
+      commitNote(latestTitleRef.current, newBody, isPinnedRef.current).then((dates) => {
+        if (dates) {
+          syncNoteToFirestore({
+            id: noteId,
+            title: latestTitleRef.current,
+            body: newBody,
+            isPinned: isPinnedRef.current,
+            createdAt: dates.createdAt,
+            updatedAt: dates.updatedAt,
+            updatedAtMs: dates.updatedAtMs,
+          });
+        }
+      });
+    }
+  };
+
+  const getActiveLineIndex = useCallback((selPos: number): number => {
+    const currentLines = latestLinesRef.current;
+    let charCount = 0;
+    for (let i = 0; i < currentLines.length; i++) {
+      const lineLen = getLinePrefix(currentLines[i], i).length + currentLines[i].text.length + 1;
+      if (selPos >= charCount && selPos <= charCount + lineLen) {
+        return i;
       }
-      return next;
+      charCount += lineLen;
+    }
+    return Math.max(0, currentLines.length - 1);
+  }, []);
+
+  const checkActiveFormats = useCallback((sel: { start: number; end: number }) => {
+    const currentLines = latestLinesRef.current;
+    const pos = Math.min(sel.start, sel.end);
+    const activeLineIdx = getActiveLineIndex(pos);
+    const activeLine = currentLines[activeLineIdx];
+
+    if (activeLine) {
+      const styleName =
+        activeLine.type === "title"
+          ? "Title"
+          : activeLine.type === "heading"
+          ? "Heading"
+          : activeLine.type === "subheading"
+          ? "Subheading"
+          : "Body";
+      setSelectedTextStyle(styleName);
+
+      const before = activeLine.text.slice(0, pos);
+      const after = activeLine.text.slice(pos);
+      const isBold = before.split("**").length % 2 === 0 && after.includes("**");
+      const isItalic = before.split("*").length % 2 === 0 && after.includes("*");
+      const isUnderline = before.split("<u>").length > before.split("</u>").length;
+      const isStrike = before.split("~~").length % 2 === 0 && after.includes("~~");
+      setActiveFormats({ bold: isBold, italic: isItalic, underline: isUnderline, strikethrough: isStrike });
+    }
+  }, [getActiveLineIndex]);
+
+  const applyLinePrefix = (prefix: string) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    setIsEditing(true);
+    historyRef.current.push({ title: latestTitleRef.current, body: latestBodyRef.current });
+
+    const currentBody = latestBodyRef.current;
+    const selStart = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const selEnd = Math.max(activeSelectionRef.current.start, activeSelectionRef.current.end);
+
+    const firstLineStart = currentBody.lastIndexOf("\n", Math.max(0, selStart - 1)) + 1;
+    let lastLineEnd = currentBody.indexOf("\n", selEnd);
+    if (lastLineEnd === -1) lastLineEnd = currentBody.length;
+
+    const targetText = currentBody.slice(firstLineStart, lastLineEnd);
+    const lines = targetText.split("\n");
+
+    const newLines = lines.map((line) => {
+      const clean = line.replace(/^(#+\s*|\[[ xX]\]\s*|[•\-\*]\s*|\d+[\.\)]\s*)/, "");
+      if (!prefix) return clean;
+      if (line.startsWith(prefix)) return clean;
+      return `${prefix}${clean}`;
     });
+
+    const replacement = newLines.join("\n");
+    const newBody = currentBody.slice(0, firstLineStart) + replacement + currentBody.slice(lastLineEnd);
+    updateBodyAndSave(newBody);
+  };
+
+  const applyInlineFormat = (type: "bold" | "italic" | "underline" | "strikethrough") => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    setIsEditing(true);
+    historyRef.current.push({ title: latestTitleRef.current, body: latestBodyRef.current });
+
+    const currentBody = latestBodyRef.current;
+    const selStart = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const selEnd = Math.max(activeSelectionRef.current.start, activeSelectionRef.current.end);
+
+    const marker = type === "bold" ? "**" : type === "italic" ? "*" : type === "strikethrough" ? "~~" : "<u>";
+    const closeMarker = type === "underline" ? "</u>" : marker;
+    const mLen = marker.length;
+    const cLen = closeMarker.length;
+
+    if (selStart !== selEnd) {
+      const selected = currentBody.slice(selStart, selEnd);
+      let newBody: string;
+      if (selected.startsWith(marker) && selected.endsWith(closeMarker) && selected.length >= mLen + cLen) {
+        const unwrapped = selected.slice(mLen, -cLen);
+        newBody = currentBody.slice(0, selStart) + unwrapped + currentBody.slice(selEnd);
+      } else {
+        newBody = currentBody.slice(0, selStart) + marker + selected + closeMarker + currentBody.slice(selEnd);
+      }
+      updateBodyAndSave(newBody);
+    } else {
+      const newBody = currentBody.slice(0, selStart) + marker + closeMarker + currentBody.slice(selStart);
+      updateBodyAndSave(newBody);
+      activeSelectionRef.current = { start: selStart + mLen, end: selStart + mLen };
+      if (!showFormatSheet) {
+        setTimeout(() => {
+          bodyInputRef.current?.setSelection(selStart + mLen, selStart + mLen);
+        }, 25);
+      } else {
+        Keyboard.dismiss();
+      }
+    }
+  };
+
+  const applyIndent = (isOutdent: boolean) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    setIsEditing(true);
+    historyRef.current.push({ title: latestTitleRef.current, body: latestBodyRef.current });
+
+    const currentBody = latestBodyRef.current;
+    const selStart = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const selEnd = Math.max(activeSelectionRef.current.start, activeSelectionRef.current.end);
+
+    const firstLineStart = currentBody.lastIndexOf("\n", Math.max(0, selStart - 1)) + 1;
+    let lastLineEnd = currentBody.indexOf("\n", selEnd);
+    if (lastLineEnd === -1) lastLineEnd = currentBody.length;
+
+    const lines = currentBody.slice(firstLineStart, lastLineEnd).split("\n");
+    const newLines = lines.map((line) => {
+      if (isOutdent) {
+        if (line.startsWith("  ")) return line.slice(2);
+        if (line.startsWith("\t")) return line.slice(1);
+        return line;
+      } else {
+        return `  ${line}`;
+      }
+    });
+
+    const newBody = currentBody.slice(0, firstLineStart) + newLines.join("\n") + currentBody.slice(lastLineEnd);
+    updateBodyAndSave(newBody);
   };
 
   const handleInsertChecklist = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(true);
-    historyRef.current.push({ title, body });
-    updateBlocksAndSave((prev) => {
-      const updated = [...prev];
-      const cur = updated[activeBlockIndex];
-      if (cur && cur.text.trim() === "" && cur.type === "paragraph") {
-        updated[activeBlockIndex] = { ...cur, type: "todo", checked: false };
-        setTimeout(() => inputRefs.current[cur.id]?.focus(), 50);
+
+    const currentLines = latestLinesRef.current;
+    const selPos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const activeLineIdx = getActiveLineIndex(selPos);
+
+    const updated = [...currentLines];
+    const cur = updated[activeLineIdx];
+    if (cur) {
+      if (cur.type === "todo" && !cur.checked) {
+        updated[activeLineIdx] = { ...cur, checked: true };
+      } else if (cur.type === "todo" && cur.checked) {
+        updated[activeLineIdx] = { ...cur, type: "paragraph", checked: false };
       } else {
-        const newId = `b-${Date.now()}`;
-        const insertAt = activeBlockIndex >= 0 && activeBlockIndex < updated.length ? activeBlockIndex + 1 : updated.length;
-        updated.splice(insertAt, 0, { id: newId, type: "todo", text: "", checked: false });
-        setActiveBlockIndex(insertAt);
-        setTimeout(() => inputRefs.current[newId]?.focus(), 50);
+        updated[activeLineIdx] = { ...cur, type: "todo", checked: false };
       }
-      return updated;
-    });
+      setLines(updated);
+      latestLinesRef.current = updated;
+      const md = cleanLinesToMarkdown(updated);
+      updateBodyAndSave(md);
+    }
   };
 
   const handleInsertAttachment = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(true);
-    historyRef.current.push({ title, body });
-    updateBlocksAndSave((prev) => {
-      const updated = [...prev];
-      const cur = updated[activeBlockIndex];
-      if (cur) {
-        updated[activeBlockIndex] = { ...cur, text: cur.text ? cur.text + " 📎" : "📎 " };
-        setTimeout(() => inputRefs.current[cur.id]?.focus(), 50);
-      } else {
-        const newId = `b-${Date.now()}`;
-        updated.push({ id: newId, type: "paragraph", text: "📎 " });
-        setTimeout(() => inputRefs.current[newId]?.focus(), 50);
-      }
-      return updated;
-    });
+    historyRef.current.push({ title: latestTitleRef.current, body: latestBodyRef.current });
+
+    const currentBody = latestBodyRef.current;
+    const pos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const newBody = currentBody.slice(0, pos) + " 📎" + currentBody.slice(pos);
+    updateBodyAndSave(newBody);
+    setTimeout(() => {
+      bodyInputRef.current?.setSelection(pos + 3, pos + 3);
+    }, 25);
   };
 
   const handleNewNote = () => {
@@ -508,8 +958,11 @@ export default function NoteDetailScreen() {
     setNoteId(`note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
     setTitle("");
     setBody("");
-    setBlocks(parseBodyToBlocks(""));
-    setActiveBlockIndex(0);
+    const emptyLines = parseMarkdownToLines("");
+    setLines(emptyLines);
+    latestLinesRef.current = emptyLines;
+    latestTitleRef.current = "";
+    latestBodyRef.current = "";
     setIsPinned(false);
     setCreatedAt("");
     setIsEditing(true);
@@ -517,238 +970,82 @@ export default function NoteDetailScreen() {
     hasUnsavedChanges.current = false;
   };
 
+  const handleSelectTextStyle = (styleName: string) => {
+    setSelectedTextStyle(styleName);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    setIsEditing(true);
+
+    const styleTypeMap: Record<string, BlockType> = {
+      Title: "title",
+      Heading: "heading",
+      Subheading: "subheading",
+      Body: "paragraph",
+    };
+    const targetType = styleTypeMap[styleName] ?? "paragraph";
+
+    const currentLines = latestLinesRef.current;
+    const selPos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const activeLineIdx = getActiveLineIndex(selPos);
+
+    const updated = [...currentLines];
+    if (updated[activeLineIdx]) {
+      updated[activeLineIdx] = {
+        ...updated[activeLineIdx],
+        type: targetType,
+      };
+      setLines(updated);
+      latestLinesRef.current = updated;
+      const md = cleanLinesToMarkdown(updated);
+      updateBodyAndSave(md);
+    }
+  };
+
   const handleApplyFormat = (type: string) => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(true);
-    historyRef.current.push({ title, body });
 
-    updateBlocksAndSave((prev) => {
-      const updated = [...prev];
-      const cur = updated[activeBlockIndex];
-      if (!cur) return prev;
+    const currentLines = latestLinesRef.current;
+    const selPos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+    const activeLineIdx = getActiveLineIndex(selPos);
 
-      if (type === "outdent") {
-        if (cur.text.startsWith("  ")) updated[activeBlockIndex] = { ...cur, text: cur.text.slice(2) };
-      } else if (type === "indent") {
-        updated[activeBlockIndex] = { ...cur, text: "  " + cur.text };
-      } else if (type === "bullet" || type === "dash" || type === "numbered") {
-        const listType = type === "numbered" ? "numbered" : "bullet";
-        updated[activeBlockIndex] = { ...cur, type: cur.type === listType ? "paragraph" : listType };
-      } else if (["bold", "italic", "underline", "strikethrough"].includes(type)) {
-        const key = type as "bold" | "italic" | "underline" | "strikethrough";
-
-        const { start, end } = activeSelection;
-        const selStart = Math.min(start, end);
-        const selEnd = Math.max(start, end);
-
-        if (selStart !== selEnd) {
-          const length = selEnd - selStart;
-          const formats = cur.formats ? [...cur.formats] : [];
-          const isFullyFormatted = formats.some(f => f.type === key && f.start <= selStart && f.start + f.length >= selEnd);
-
-          if (isFullyFormatted) {
-            const newFormats = [];
-            for (const f of formats) {
-              if (f.type === key && f.start < selEnd && f.start + f.length > selStart) {
-                if (f.start < selStart) newFormats.push({ type: key, start: f.start, length: selStart - f.start });
-                if (f.start + f.length > selEnd) newFormats.push({ type: key, start: selEnd, length: (f.start + f.length) - selEnd });
-              } else {
-                newFormats.push(f);
-              }
-            }
-            updated[activeBlockIndex] = { ...cur, formats: newFormats };
-          } else {
-            formats.push({ type: key, start: selStart, length });
-            updated[activeBlockIndex] = { ...cur, formats };
-          }
-        } else {
-          setActiveFormats((p) => ({ ...p, [key]: !p[key] }));
-        }
-      } else if (type === "marker") {
-        updated[activeBlockIndex] = { ...cur, text: cur.text ? `✍️ ${cur.text}` : "✍️ " };
-      } else if (type === "color") {
-        updated[activeBlockIndex] = { ...cur, text: cur.text ? `🔹 ${cur.text}` : "🔹 " };
+    if (type === "bullet" || type === "dash") {
+      const updated = [...currentLines];
+      if (updated[activeLineIdx]) {
+        updated[activeLineIdx] = {
+          ...updated[activeLineIdx],
+          type: updated[activeLineIdx].type === "bullet" ? "paragraph" : "bullet",
+        };
+        setLines(updated);
+        latestLinesRef.current = updated;
+        const md = cleanLinesToMarkdown(updated);
+        updateBodyAndSave(md);
       }
-      return updated;
-    });
-  };
-
-  const handleSelectTextStyle = (styleName: string) => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedTextStyle(styleName);
-    const typeMap: Record<string, BlockType> = { Title: "title", Heading: "heading", Subheading: "subheading", Body: "paragraph" };
-    const targetType = typeMap[styleName] || "paragraph";
-
-    updateBlocksAndSave((prev) => {
-      const updated = [...prev];
-      if (updated[activeBlockIndex]) updated[activeBlockIndex] = { ...updated[activeBlockIndex], type: targetType };
-      return updated;
-    });
-    const curId = blocks[activeBlockIndex]?.id;
-    if (curId) inputRefs.current[curId]?.focus();
-  };
-
-  const handleBlockChangeText = (id: string, index: number, text: string) => {
-    if (text.includes("\n")) {
-      const parts = text.split("\n");
-      const currentText = parts[0];
-      const nextText = parts.slice(1).join("\n");
-      const cur = blocks[index];
-      if (!cur) return;
-
-      if ((cur.type === "todo" || cur.type === "bullet" || cur.type === "numbered") && cur.text.trim() === "") {
-        updateBlocksAndSave((prev) => {
-          const updated = [...prev];
-          updated[index] = { ...cur, type: "paragraph", text: "" };
-          return updated;
-        });
-        return;
+    } else if (type === "numbered") {
+      const updated = [...currentLines];
+      if (updated[activeLineIdx]) {
+        updated[activeLineIdx] = {
+          ...updated[activeLineIdx],
+          type: updated[activeLineIdx].type === "numbered" ? "paragraph" : "numbered",
+        };
+        setLines(updated);
+        latestLinesRef.current = updated;
+        const md = cleanLinesToMarkdown(updated);
+        updateBodyAndSave(md);
       }
-
-      const nextType: BlockType = ["todo", "bullet", "numbered"].includes(cur.type) ? cur.type : "paragraph";
-
-      if (parts.length > 2) {
-        const newBlocks: NoteBlock[] = parts.slice(1).map((partText) => ({
-          id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          type: nextType,
-          text: partText,
-          checked: false,
-          formats: [],
-        }));
-
-        updateBlocksAndSave((prev) => {
-          const updated = [...prev];
-          updated[index] = { ...cur, text: currentText };
-          updated.splice(index + 1, 0, ...newBlocks);
-          return updated;
-        });
-
-        const lastNewId = newBlocks[newBlocks.length - 1].id;
-        pendingFocusRef.current = lastNewId;
-        setActiveBlockIndex(index + newBlocks.length);
-        return;
-      }
-
-      const newId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newBlock: NoteBlock = {
-        id: newId,
-        type: nextType,
-        text: nextText,
-        checked: false,
-        formats: [],
-      };
-
-      updateBlocksAndSave((prev) => {
-        const updated = [...prev];
-        updated[index] = { ...cur, text: currentText };
-        updated.splice(index + 1, 0, newBlock);
-        return updated;
-      });
-
-      pendingFocusRef.current = newId;
-      setActiveBlockIndex(index + 1);
-      return;
-    }
-
-    updateBlocksAndSave((prev) => {
-      const updated = [...prev];
-      if (updated[index]) {
-        const cur = updated[index];
-        const oldText = cur.text;
-
-        let start = 0;
-        while (start < oldText.length && start < text.length && oldText[start] === text[start]) start++;
-        let oldEnd = oldText.length - 1;
-        let newEnd = text.length - 1;
-        while (oldEnd >= start && newEnd >= start && oldText[oldEnd] === text[newEnd]) {
-          oldEnd--; newEnd--;
-        }
-
-        const removedLen = oldEnd - start + 1;
-        const addedLen = newEnd - start + 1;
-        const delta = addedLen - removedLen;
-
-        const newFormats = (cur.formats || []).map(f => {
-          let fStart = f.start;
-          let fEnd = f.start + f.length;
-
-          if (start < fStart) {
-            fStart += delta;
-            fEnd += delta;
-          } else if (start >= fEnd) {
-          } else {
-            if (addedLen > 0 && removedLen === 0) {
-              fEnd += addedLen;
-            } else if (removedLen > 0) {
-              const overlapStart = Math.max(start, fStart);
-              const overlapEnd = Math.min(start + removedLen, fEnd);
-              const overlap = Math.max(0, overlapEnd - overlapStart);
-              fEnd -= overlap;
-              if (start < fStart) {
-                 fStart -= Math.min(fStart - start, removedLen);
-              }
-            }
-          }
-          return { ...f, start: fStart, length: fEnd - fStart };
-        }).filter(f => f.length > 0);
-
-        if (addedLen > 0 && activeSelection.start === activeSelection.end && start === activeSelection.start) {
-          Object.keys(activeFormats).forEach(key => {
-            if (activeFormats[key]) {
-              newFormats.push({ type: key as any, start, length: addedLen });
-            }
-          });
-        }
-
-        updated[index] = { ...cur, text, formats: newFormats };
-      }
-      return updated;
-    });
-  };
-
-  const handleKeyPress = (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-    if (e.nativeEvent.key === "Backspace") {
-      const cur = blocks[index];
-      if (cur && cur.text === "") {
-        if (cur.type !== "paragraph") {
-          updateBlocksAndSave((prev) => {
-            const updated = [...prev];
-            updated[index] = { ...cur, type: "paragraph" };
-            return updated;
-          });
-          return;
-        }
-        if (blocks.length > 1 && index > 0) {
-          const prevBlock = blocks[index - 1];
-          updateBlocksAndSave((prev) => prev.filter((_, i) => i !== index));
-          setActiveBlockIndex(index - 1);
-          inputRefs.current[prevBlock.id]?.focus();
-        }
-      }
-    }
-  };
-
-  const handleCanvasPress = () => {
-    setIsEditing(true);
-    if (blocks.length === 0) {
-      const newId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      pendingFocusRef.current = newId;
-      setBlocks([{ id: newId, type: "paragraph", text: "" }]);
-      setActiveBlockIndex(0);
-      setTimeout(() => inputRefs.current[newId]?.focus(), 15);
-    } else {
-      const lastIndex = blocks.length - 1;
-      const last = blocks[lastIndex];
-      if (last.text.trim() === "") {
-        setActiveBlockIndex(lastIndex);
-        inputRefs.current[last.id]?.focus();
-      } else {
-        const newId = `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        pendingFocusRef.current = newId;
-        setBlocks((prev) => [...prev, { id: newId, type: "paragraph", text: "" }]);
-        setActiveBlockIndex(blocks.length);
-        setTimeout(() => inputRefs.current[newId]?.focus(), 15);
-      }
+    } else if (type === "outdent") {
+      applyIndent(true);
+    } else if (type === "indent") {
+      applyIndent(false);
+    } else if (["bold", "italic", "underline", "strikethrough"].includes(type)) {
+      applyInlineFormat(type as any);
+    } else if (type === "marker") {
+      const pos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+      const newBody = latestBodyRef.current.slice(0, pos) + "✍️ " + latestBodyRef.current.slice(pos);
+      updateBodyAndSave(newBody);
+    } else if (type === "color") {
+      const pos = Math.min(activeSelectionRef.current.start, activeSelectionRef.current.end);
+      const newBody = latestBodyRef.current.slice(0, pos) + "🔹 " + latestBodyRef.current.slice(pos);
+      updateBodyAndSave(newBody);
     }
   };
 
@@ -784,7 +1081,10 @@ export default function NoteDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.65}
-              onPress={() => { triggerHaptic(Haptics.ImpactFeedbackStyle.Light); setActiveDialog("more"); }}
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setActiveDialog("more");
+              }}
               style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}
             >
               <Ionicons name="ellipsis-horizontal" size={20} color="#1C1C1E" />
@@ -822,19 +1122,37 @@ export default function NoteDetailScreen() {
           contentContainerStyle={{
             paddingHorizontal: 20,
             paddingTop: 16,
-            paddingBottom: Platform.OS === "ios" && keyboardHeight > 0 ? keyboardHeight + 110 : 160,
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + (Platform.OS === "android" ? 140 : 110) : (showFormatSheet ? 280 : 160),
             flexGrow: 1,
           }}
         >
-          {inEditMode ? (
+          <Pressable
+            pointerEvents={inEditMode ? "box-none" : "auto"}
+            onPress={() => {
+              if (!inEditMode) {
+                setIsEditing(true);
+                setTimeout(() => titleInputRef.current?.focus(), 50);
+              }
+            }}
+          >
             <TextInput
+              ref={titleInputRef}
               value={title}
-              onFocus={() => setIsEditing(true)}
+              editable={inEditMode}
+              pointerEvents={inEditMode ? "auto" : "none"}
+              showSoftInputOnFocus={!showFormatSheet}
+              onFocus={() => {
+                if (showFormatSheet) {
+                  Keyboard.dismiss();
+                } else {
+                  setIsEditing(true);
+                }
+              }}
               onChangeText={handleTitleChange}
               placeholder="Title"
               placeholderTextColor="#C7C7CC"
               returnKeyType="next"
-              onSubmitEditing={() => { const firstId = blocks[0]?.id; if (firstId) inputRefs.current[firstId]?.focus(); }}
+              onSubmitEditing={() => bodyInputRef.current?.focus()}
               blurOnSubmit={false}
               allowFontScaling={false}
               className="p-0 mb-3 text-[#111111]"
@@ -847,155 +1165,71 @@ export default function NoteDetailScreen() {
                 includeFontPadding: false,
               }}
             />
-          ) : (
-            <Pressable onPress={() => { setIsEditing(true); const firstId = blocks[0]?.id; if (firstId) setTimeout(() => inputRefs.current[firstId]?.focus(), 80); }}>
-              <Text
+          </Pressable>
+
+          <View style={{ minHeight: 320 }}>
+            <Pressable
+              style={{ minHeight: 300 }}
+              pointerEvents={inEditMode ? "box-none" : "auto"}
+              onPress={() => {
+                if (!inEditMode) {
+                  setIsEditing(true);
+                  setTimeout(() => bodyInputRef.current?.focus(), 50);
+                }
+              }}
+            >
+              <TextInput
+                ref={bodyInputRef}
+                editable={inEditMode}
+                pointerEvents={inEditMode ? "auto" : "none"}
+                showSoftInputOnFocus={!showFormatSheet}
+                onChangeText={handleBodyChange}
+                onSelectionChange={(e) => {
+                  activeSelectionRef.current = e.nativeEvent.selection;
+                  if (showFormatSheet) {
+                    checkActiveFormats(e.nativeEvent.selection);
+                  }
+                }}
+                onFocus={() => {
+                  if (showFormatSheet) {
+                    Keyboard.dismiss();
+                  } else {
+                    setIsEditing(true);
+                  }
+                }}
+                placeholder="Type your note here..."
+                placeholderTextColor="#C7C7CC"
+                multiline={true}
+                scrollEnabled={false}
                 allowFontScaling={false}
-                className="p-0 mb-3 text-[#111111]"
                 style={{
-                  fontFamily: "Outfit_700Bold",
-                  fontSize: 30,
-                  lineHeight: 38,
+                  fontFamily: "Outfit_400Regular",
+                  fontSize: 16,
+                  lineHeight: 24,
+                  color: "#1C1C1E",
+                  minHeight: 300,
+                  paddingVertical: 0,
+                  paddingHorizontal: 0,
+                  textAlignVertical: "top",
                   includeFontPadding: false,
                 }}
               >
-                {title.trim() || "Untitled Note"}
-              </Text>
+                {renderCleanEditorLines(lines)}
+              </TextInput>
             </Pressable>
-          )}
-
-          <View style={{ minHeight: 320 }}>
-            {blocks.map((block, index) => {
-              let currentNum = 1;
-              if (block.type === "numbered") {
-                let count = 1;
-                for (let i = index - 1; i >= 0; i--) {
-                  if (blocks[i].type === "numbered") count++;
-                  else break;
+            <Pressable
+              style={{ flex: 1, minHeight: 120 }}
+              onPress={() => {
+                if (showFormatSheet) {
+                  setShowFormatSheet(false);
+                  return;
                 }
-                currentNum = count;
-              }
-              const isTodo = block.type === "todo";
-              const isBullet = block.type === "bullet";
-              const isNumbered = block.type === "numbered";
-
-              const fontStyle: any = { ...(BLOCK_TYPOGRAPHY[block.type] || BLOCK_TYPOGRAPHY.paragraph) };
-              const decs: string[] = [];
-              if (isTodo && block.checked) decs.push("line-through");
-              if (decs.length > 0) fontStyle.textDecorationLine = decs.join(" ");
-              if (isTodo && block.checked) fontStyle.color = "#8E8E93";
-
-              const placeholder = block.type === "title" ? "Title" : block.type === "heading" ? "Heading" : block.type === "subheading" ? "Subheading" : isTodo ? "To-do" : isBullet || isNumbered ? "List item" : index === 0 ? "Note" : "";
-
-              return (
-                <View
-                  key={block.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    marginBottom: block.type === "title" ? 6 : block.type === "heading" ? 4 : block.type === "subheading" ? 2 : 0,
-                    minHeight: 20,
-                  }}
-                >
-                  {isTodo && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleToggleCheckbox(block.id)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={{ marginRight: 8, marginTop: 1 }}
-                    >
-                      <Ionicons name={block.checked ? "checkmark-circle" : "ellipse-outline"} size={19} color={block.checked ? "#E5A93C" : "#C7C7CC"} />
-                    </TouchableOpacity>
-                  )}
-                  {isBullet && (
-                    <Text
-                      allowFontScaling={false}
-                      style={{
-                        color: "#E5A93C",
-                        fontSize: 18,
-                        lineHeight: fontStyle.lineHeight || 20,
-                        includeFontPadding: false,
-                        width: 16,
-                        textAlign: "center",
-                        marginRight: 8,
-                      }}
-                    >
-                      •
-                    </Text>
-                  )}
-                  {isNumbered && (
-                    <Text
-                      allowFontScaling={false}
-                      style={{
-                        color: "#E5A93C",
-                        fontFamily: "Outfit_700Bold",
-                        fontSize: 15,
-                        lineHeight: fontStyle.lineHeight || 20,
-                        includeFontPadding: false,
-                        minWidth: 20,
-                        marginRight: 6,
-                      }}
-                    >
-                      {currentNum}.
-                    </Text>
-                  )}
-
-                  {inEditMode ? (
-                    <TextInput
-                      ref={(el) => {
-                        inputRefs.current[block.id] = el;
-                        if (el && pendingFocusRef.current === block.id) {
-                          pendingFocusRef.current = null;
-                          el.focus();
-                        }
-                      }}
-                      onSelectionChange={(e) => {
-                        setActiveSelection({ start: e.nativeEvent.selection.start, end: e.nativeEvent.selection.end });
-                      }}
-                      onFocus={() => { setIsEditing(true); setActiveBlockIndex(index); }}
-                      onChangeText={(val) => handleBlockChangeText(block.id, index, val)}
-                      onKeyPress={(e) => handleKeyPress(index, e)}
-                      placeholder={placeholder}
-                      placeholderTextColor="#C7C7CC"
-                      multiline={true}
-                      blurOnSubmit={false}
-                      allowFontScaling={false}
-                      style={[
-                        {
-                          flex: 1,
-                          paddingVertical: 0,
-                          paddingHorizontal: 0,
-                          paddingTop: 0,
-                          paddingBottom: 0,
-                          margin: 0,
-                          textAlignVertical: "top",
-                          includeFontPadding: false,
-                        },
-                        fontStyle,
-                      ]}
-                    >
-                      {renderRichText(block.text, block.formats || [], fontStyle)}
-                    </TextInput>
-                  ) : (
-                    <Pressable
-                      onPress={() => {
-                        setIsEditing(true);
-                        setActiveBlockIndex(index);
-                        requestAnimationFrame(() => inputRefs.current[block.id]?.focus());
-                      }}
-                      style={{ flex: 1, paddingVertical: 0 }}
-                    >
-                      {block.text.trim() === "" ? (
-                        <Text allowFontScaling={false} style={[fontStyle, { color: "#C7C7CC" }]}>{placeholder}</Text>
-                      ) : (
-                        <Text allowFontScaling={false} style={fontStyle}>{renderRichText(block.text, block.formats || [], fontStyle)}</Text>
-                      )}
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
-            <Pressable style={{ flex: 1, minHeight: 200 }} onPress={handleCanvasPress} />
+                if (!inEditMode) {
+                  setIsEditing(true);
+                  setTimeout(() => bodyInputRef.current?.focus(), 50);
+                }
+              }}
+            />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1180,6 +1414,7 @@ export default function NoteDetailScreen() {
               onPress={() => {
                 triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
                 Keyboard.dismiss();
+                checkActiveFormats(activeSelectionRef.current);
                 setShowFormatSheet((prev) => !prev);
               }}
               style={{ width: 46, height: 46, alignItems: "center", justifyContent: "center" }}

@@ -153,7 +153,7 @@ export default function NotesScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingBottom: 100,
+            paddingBottom: 130,
           }}
         >
           <NotesStackedBanner notes={notes} onPress={handleAddNote} onNotePress={handleEditNote} />
