@@ -96,8 +96,13 @@ export function BiometricsProvider({ children }: { children: ReactNode }) {
 
       if (isAuthenticatingRef.current || isSystemBypassActive) return;
 
-      if (nextAppState === "background") {
-        lastBackgroundTime.current = Date.now();
+      if (nextAppState === "background" || nextAppState === "inactive") {
+        if (lastBackgroundTime.current === null) {
+          lastBackgroundTime.current = Date.now();
+        }
+        if (isBiometricsEnabled && user && lockTimeoutMinutes === 0) {
+          setIsLockedState(true);
+        }
       } else if (nextAppState === "active") {
         if (
           lastBackgroundTime.current !== null &&

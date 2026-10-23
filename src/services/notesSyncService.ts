@@ -56,6 +56,17 @@ function formatTimestamp(value: any): string {
 }
 
 export function normalizeNoteItem(data: any, docId: string): NoteItem {
+  let updatedAtMs = typeof data.updatedAtMs === "number" ? data.updatedAtMs : undefined;
+  if (!updatedAtMs && data.serverUpdatedAt?.toMillis) {
+    updatedAtMs = data.serverUpdatedAt.toMillis();
+  }
+  if (!updatedAtMs && data.updatedAt && !isNaN(Date.parse(data.updatedAt))) {
+    updatedAtMs = Date.parse(data.updatedAt);
+  }
+  if (!updatedAtMs && data.createdAt && !isNaN(Date.parse(data.createdAt))) {
+    updatedAtMs = Date.parse(data.createdAt);
+  }
+
   return {
     id: String(data.id || docId),
     title: String(data.title || "Untitled"),
@@ -64,7 +75,17 @@ export function normalizeNoteItem(data: any, docId: string): NoteItem {
     iconName: data.iconName || undefined,
     createdAt: formatTimestamp(data.createdAt),
     updatedAt: data.updatedAt ? formatTimestamp(data.updatedAt) : undefined,
+    updatedAtMs: updatedAtMs || 0,
   };
+}
+
+export function sortNotesChronologically(notes: NoteItem[]): NoteItem[] {
+  return [...notes].sort((a, b) => {
+    if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
+      return Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
+    }
+    return (b.updatedAtMs || 0) - (a.updatedAtMs || 0);
+  });
 }
 
 export function subscribeToNotesServer(
@@ -87,11 +108,9 @@ export function subscribeToNotesServer(
           serverNotes.push(normalizeNoteItem(docSnap.data(), docSnap.id));
         });
 
-        serverNotes.sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned));
-
-        await saveNotes(serverNotes);
-
-        onUpdate(serverNotes);
+        const sorted = sortNotesChronologically(serverNotes);
+        await saveNotes(sorted);
+        onUpdate(sorted);
       },
       (error: any) => {
         if (
@@ -123,6 +142,8 @@ export async function syncNoteToFirestore(note: NoteItem, customUid?: string): P
       minute: "2-digit",
     });
 
+    const nowMs = typeof note.updatedAtMs === "number" && note.updatedAtMs > 0 ? note.updatedAtMs : Date.now();
+
     await setDoc(
       ref,
       {
@@ -133,6 +154,7 @@ export async function syncNoteToFirestore(note: NoteItem, customUid?: string): P
         iconName: note.iconName || null,
         createdAt: note.createdAt || now,
         updatedAt: note.updatedAt || now,
+        updatedAtMs: nowMs,
         serverUpdatedAt: serverTimestamp(),
       },
       { merge: true }
@@ -165,9 +187,9 @@ export async function fetchNotesFromServer(customUid?: string): Promise<NoteItem
       serverNotes.push(normalizeNoteItem(d.data(), d.id));
     });
 
-    serverNotes.sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned));
-    await saveNotes(serverNotes);
-    return serverNotes;
+    const sorted = sortNotesChronologically(serverNotes);
+    await saveNotes(sorted);
+    return sorted;
   } catch (err) {
     console.warn("[NotesSyncService] fetchNotesFromServer failed, returning local cache:", err);
     return await loadNotes();

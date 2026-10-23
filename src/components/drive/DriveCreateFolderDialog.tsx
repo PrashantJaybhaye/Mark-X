@@ -71,7 +71,8 @@ export function DriveCreateFolderDialog({
 
   const handleCreate = () => {
     triggerHaptic();
-    const finalName = folderName.trim() || defaultName;
+    const sanitized = folderName.replace(/[/\\:*?"<>|]/g, "_").trim();
+    const finalName = sanitized || defaultName;
     Keyboard.dismiss();
     onClose();
     onCreate(finalName);

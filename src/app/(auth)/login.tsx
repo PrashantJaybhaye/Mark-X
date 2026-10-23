@@ -53,7 +53,8 @@ export default function LoginScreen() {
   };
 
   const parseFirebaseError = (error: any): string => {
-    const code = error?.code || "";
+    const rawCode = error?.code || (typeof error?.message === "string" ? error.message.match(/auth\/[a-z0-9-]+/i)?.[0] : "");
+    const code = (rawCode || "").toLowerCase();
     switch (code) {
       case "auth/invalid-email":
       case "auth/invalid-credential":
@@ -70,11 +71,18 @@ export default function LoginScreen() {
         return "Network connection issue. Please check your internet.";
       case "auth/too-many-requests":
         return "Too many failed attempts. Please try again in a few minutes.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Please contact support.";
+      case "auth/operation-not-allowed":
+        return "This sign-in method is currently disabled.";
       case "auth/popup-closed-by-user":
       case "auth/cancelled-popup-request":
-        return "Google sign-in was cancelled.";
-      default:
-        return error?.message || "An unexpected error occurred. Please try again.";
+        return "Sign-in was cancelled.";
+      default: {
+        const rawMsg = error?.message || "";
+        const cleaned = rawMsg.replace(/^Firebase:\s*Error\s*\([^)]*\):?\s*/i, "").trim();
+        return cleaned || "An unexpected error occurred. Please try again.";
+      }
     }
   };
 

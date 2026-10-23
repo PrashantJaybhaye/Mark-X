@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
+  AppState,
   View,
   Text,
   TouchableOpacity,
@@ -121,11 +122,18 @@ function InlineVideoPlayer({
       }
     });
 
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        player.pause();
+      }
+    });
+
     return () => {
       statusSub.remove();
       timeSub.remove();
       sourceSub.remove();
       playSub.remove();
+      appStateSub.remove();
     };
   }, [player, isMuted, hidePosterSmoothly]);
 

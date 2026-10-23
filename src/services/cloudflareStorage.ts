@@ -96,3 +96,58 @@ export async function uploadFileToMarkx(
 }
 
 export const uploadFileToCloudflare = uploadFileToMarkx;
+
+export async function deleteFileFromMarkx(keyOrUrl: string): Promise<{ success: boolean; error?: string }> {
+  if (!SERVER_URL || !keyOrUrl) {
+    return { success: false, error: "Mark-X Storage server is not configured or key is missing." };
+  }
+
+  try {
+    let key = keyOrUrl.trim();
+    if (key.startsWith("http://") || key.startsWith("https://")) {
+      try {
+        const parsed = new URL(key);
+        key = parsed.pathname.replace(/^\/+/, "");
+      } catch {
+        const parts = key.split("/");
+        key = parts.slice(3).join("/");
+      }
+    }
+
+    if (!key) return { success: false, error: "Invalid file key" };
+
+    const headers: Record<string, string> = {};
+    if (UPLOAD_SECRET) {
+      headers["X-Auth-Key"] = UPLOAD_SECRET;
+    }
+
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const idToken = await currentUser.getIdToken();
+        if (idToken) {
+          headers["Authorization"] = `Bearer ${idToken}`;
+        }
+        headers["X-User-Id"] = currentUser.uid;
+      } catch {}
+    }
+
+    const deleteEndpoint = `${SERVER_URL}/${encodeURIComponent(key)}`;
+    const response = await fetch(deleteEndpoint, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (response.ok) {
+      return { success: true };
+    }
+
+    const json = await response.json().catch(() => ({}));
+    return { success: false, error: json.error || `Delete failed with status ${response.status}` };
+  } catch (err: any) {
+    console.warn("[MarkxStorage] Delete error:", err);
+    return { success: false, error: err?.message || "Delete request failed" };
+  }
+}
+
+export const deleteFileFromCloudflare = deleteFileFromMarkx;

@@ -26,6 +26,7 @@ import { exportDriveFile } from "../../services/driveFirebaseService";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 async function parseNativeDocxContent(uri: string): Promise<string[] | null> {
+  let downloadedTempPath: string | null = null;
   try {
     if (!uri) return null;
 
@@ -34,8 +35,9 @@ async function parseNativeDocxContent(uri: string): Promise<string[] | null> {
       const safeName = `temp_${Date.now()}.docx`;
       const cachePath = `${FileSystem.cacheDirectory}${safeName}`;
       const downloadRes = await FileSystem.downloadAsync(uri, cachePath);
-      if (downloadRes.status === 200 && downloadRes.uri) {
+      if (downloadRes.status >= 200 && downloadRes.status < 300 && downloadRes.uri) {
         targetUri = downloadRes.uri;
+        downloadedTempPath = downloadRes.uri;
       }
     }
 
@@ -66,6 +68,10 @@ async function parseNativeDocxContent(uri: string): Promise<string[] | null> {
     }
   } catch (err) {
     console.warn("[NativeDocxParser] Error parsing XML:", err);
+  } finally {
+    if (downloadedTempPath) {
+      FileSystem.deleteAsync(downloadedTempPath, { idempotent: true }).catch(() => {});
+    }
   }
   return null;
 }
@@ -182,18 +188,33 @@ export function DriveFilePreviewScreen({
         item.name.endsWith(".py") ||
         item.name.endsWith(".log");
 
-      if (isTextReadable && item.uri.startsWith("file://")) {
+      const rawUri = item.uri;
+      if (isTextReadable && rawUri) {
         setIsLoadingText(true);
-        FileSystem.readAsStringAsync(item.uri)
-          .then((content) => {
+        (async () => {
+          let tempDownloadedPath: string | null = null;
+          try {
+            let readUri: string = rawUri;
+            if (readUri.startsWith("http://") || readUri.startsWith("https://")) {
+              const safeName = `cache_${Date.now()}_${(item.name || "file.txt").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+              const cachePath = `${FileSystem.cacheDirectory}${safeName}`;
+              const res = await FileSystem.downloadAsync(readUri, cachePath);
+              if (res.status >= 200 && res.status < 300 && res.uri) {
+                readUri = res.uri;
+                tempDownloadedPath = res.uri;
+              }
+            }
+            const content = await FileSystem.readAsStringAsync(readUri);
             if (isMountedRef.current) setTextContent(content);
-          })
-          .catch(() => {
+          } catch {
             if (isMountedRef.current) setTextContent(null);
-          })
-          .finally(() => {
+          } finally {
+            if (tempDownloadedPath) {
+              FileSystem.deleteAsync(tempDownloadedPath, { idempotent: true }).catch(() => {});
+            }
             if (isMountedRef.current) setIsLoadingText(false);
-          });
+          }
+        })();
       }
     }
   }, [item]);

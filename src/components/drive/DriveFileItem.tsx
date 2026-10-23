@@ -37,14 +37,14 @@ function DriveFileItemComponent({
   if (viewMode === "grid") {
     if (item.isFolder) {
       return (
-        <View className="flex-1 m-1.5 bg-[#F8F9FA] border border-[#E8EAED] rounded-2xl p-3 h-[140px] justify-between shadow-xs">
+        <View className="flex-1 m-1.5 bg-[#F8F9FA] border border-[#E8EAED] rounded-2xl p-3 h-[142px] justify-between shadow-xs">
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleRowPress}
             className="flex-1 items-center justify-center pt-2"
           >
-            <View className="w-16 h-16 rounded-2xl bg-[#F8F9FA] items-center justify-center">
-              <FileCategoryIcon category="folder" size={42} fileName={item.name} />
+            <View className="w-16 h-16 rounded-2xl bg-white border border-[#E8EAED] items-center justify-center shadow-xs">
+              <FileCategoryIcon category="folder" size={44} id={item.id} fileName={item.name} />
             </View>
           </TouchableOpacity>
 

@@ -15,7 +15,7 @@ import * as Sharing from "expo-sharing";
 import { db, auth } from "./firebase";
 import { DriveItem, DriveFileCategory } from "../utils/driveFileTypes";
 import { loadDriveItems, saveDriveItems } from "./storageService";
-import { uploadFileToCloudflare, UploadProgressCallback } from "./cloudflareStorage";
+import { uploadFileToCloudflare, deleteFileFromCloudflare, UploadProgressCallback } from "./cloudflareStorage";
 import { getMimeTypeForFile } from "./nativeFileOpenerService";
 
 async function cleanupLocalDiskFile(uri?: string) {
@@ -272,6 +272,12 @@ export async function deleteDriveItemFromServer(
 
     for (const item of itemsToDelete) {
       cleanupLocalDiskFile(item.uri).catch(() => {});
+      const cloudTarget = item.cloudflareKey || item.cloudflareUrl;
+      if (cloudTarget) {
+        deleteFileFromCloudflare(cloudTarget).catch((cErr) =>
+          console.warn("[DriveFirebaseService] Cloudflare R2 delete warning:", cErr)
+        );
+      }
     }
   } catch (error) {
     console.error("[DriveFirebaseService] Delete document failed:", error);
@@ -390,7 +396,7 @@ export async function exportDriveFile(
       const cleanName = (item.name || "export_file").replace(/[^a-zA-Z0-9._-]/g, "_");
       const cachePath = `${FileSystem.cacheDirectory}export_${Date.now()}_${cleanName}`;
       const downloadRes = await FileSystem.downloadAsync(targetUri, cachePath);
-      if (downloadRes.status === 200 && downloadRes.uri) {
+      if (downloadRes.status >= 200 && downloadRes.status < 300 && downloadRes.uri) {
         localShareUri = downloadRes.uri;
       } else {
         return { success: false, error: "Failed to download file from cloud for export." };
@@ -403,7 +409,7 @@ export async function exportDriveFile(
         const cleanName = (item.name || "export_file").replace(/[^a-zA-Z0-9._-]/g, "_");
         const cachePath = `${FileSystem.cacheDirectory}export_${Date.now()}_${cleanName}`;
         const downloadRes = await FileSystem.downloadAsync(item.cloudflareUrl, cachePath);
-        if (downloadRes.status === 200 && downloadRes.uri) {
+        if (downloadRes.status >= 200 && downloadRes.status < 300 && downloadRes.uri) {
           localShareUri = downloadRes.uri;
         } else {
           return { success: false, error: "File does not exist on device and cloud download failed." };

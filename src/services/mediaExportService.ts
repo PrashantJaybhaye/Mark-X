@@ -24,7 +24,10 @@ export async function exportMediaToDevice(
 
     if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
       const ext = mediaUrl.includes(".mp4") ? "mp4" : "jpg";
-      const cleanFileName = fileName || `markx_${Date.now()}.${ext}`;
+      const sanitizedBase = (fileName || `markx_${Date.now()}.${ext}`)
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .replace(/^\.+/, "");
+      const cleanFileName = sanitizedBase || `markx_${Date.now()}.${ext}`;
       const targetFile = new File(Paths.cache, cleanFileName);
 
       const downloadedFile = await File.downloadFileAsync(mediaUrl, targetFile, {

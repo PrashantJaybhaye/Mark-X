@@ -9,13 +9,38 @@
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, X-Auth-Key, Authorization, Range",
   "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, ETag",
 };
 
 const jsonResponse = (data, status = 200) =>
   Response.json(data, { status, headers: CORS_HEADERS });
+
+function isAuthorized(request, env) {
+  if (!env.UPLOAD_SECRET) return true;
+  const xAuth = request.headers.get("X-Auth-Key");
+  const authHeader = request.headers.get("Authorization");
+  const bearerToken = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  return (
+    xAuth === env.UPLOAD_SECRET ||
+    authHeader === env.UPLOAD_SECRET ||
+    bearerToken === env.UPLOAD_SECRET
+  );
+}
+
+function sanitizeKey(key) {
+  if (!key || typeof key !== "string") return null;
+  try {
+    const decoded = decodeURIComponent(key).replace(/^\/+/, "").trim();
+    if (decoded.includes("..") || decoded.includes("\0") || decoded.startsWith("/")) {
+      return null;
+    }
+    return decoded;
+  } catch {
+    return null;
+  }
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -42,15 +67,8 @@ export default {
     // 1. Upload Handler (POST /upload)
     // ==========================================
     if (request.method === "POST" && url.pathname === "/upload") {
-      // Validate Auth Key if secret is configured
-      if (env.UPLOAD_SECRET) {
-        const xAuth = request.headers.get("X-Auth-Key");
-        const authHeader = request.headers.get("Authorization");
-        const isSecretValid = xAuth === env.UPLOAD_SECRET || authHeader === env.UPLOAD_SECRET;
-        const hasBearer = Boolean(authHeader && authHeader.startsWith("Bearer "));
-        if (!isSecretValid && !hasBearer) {
-          return jsonResponse({ success: false, error: "Unauthorized: Invalid upload key" }, 401);
-        }
+      if (!isAuthorized(request, env)) {
+        return jsonResponse({ success: false, error: "Unauthorized: Invalid or missing authorization credentials" }, 401);
       }
 
       if (!env.MARK_X_BUCKET) {
@@ -136,13 +154,56 @@ export default {
     }
 
     // ==========================================
-    // 2. Media Delivery Handler (GET & HEAD /*)
+    // 2. Delete Handler (DELETE /* or DELETE /delete)
+    // ==========================================
+    if (request.method === "DELETE") {
+      if (!isAuthorized(request, env)) {
+        return jsonResponse({ success: false, error: "Unauthorized: Invalid or missing authorization credentials" }, 401);
+      }
+
+      if (!env.MARK_X_BUCKET) {
+        return jsonResponse(
+          { success: false, error: "MARK_X_BUCKET binding is not configured in Cloudflare." },
+          500
+        );
+      }
+
+      try {
+        let rawKey = url.pathname.replace(/^\/+/, "");
+        if (rawKey.startsWith("delete/")) {
+          rawKey = rawKey.replace(/^delete\//, "");
+        } else if (rawKey === "delete" || !rawKey) {
+          const body = await request.json().catch(() => ({}));
+          rawKey = body.key || "";
+        }
+
+        const key = sanitizeKey(rawKey);
+        if (!key) {
+          return jsonResponse({ success: false, error: "Target key not specified or invalid" }, 400);
+        }
+
+        await env.MARK_X_BUCKET.delete(key);
+
+        try {
+          const cache = caches.default;
+          await cache.delete(new Request(`${url.origin}/${key}`, { method: "GET" }));
+        } catch (_cErr) {}
+
+        return jsonResponse({ success: true, deletedKey: key });
+      } catch (err) {
+        console.error("Worker delete error:", err);
+        return jsonResponse({ success: false, error: err.message || "Delete failed" }, 500);
+      }
+    }
+
+    // ==========================================
+    // 3. Media Delivery Handler (GET & HEAD /*)
     // ==========================================
     if (request.method === "GET" || request.method === "HEAD") {
-      const key = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+      const key = sanitizeKey(url.pathname);
 
       if (!key) {
-        return jsonResponse({ error: "Key not specified" }, 400);
+        return jsonResponse({ error: "Key not specified or invalid" }, 400);
       }
 
       if (!env.MARK_X_BUCKET) {
@@ -213,7 +274,7 @@ export default {
         Object.entries(CORS_HEADERS).forEach(([k, v]) => headers.set(k, v));
 
         let status = 200;
-        if (object.range) {
+        if (rangeHeader && object.range) {
           status = 206;
           const offset = object.range.offset ?? 0;
           const length = object.range.length ?? (object.size - offset);

@@ -283,11 +283,11 @@ export function DriveMoveModal({
                         dest.isRoot ? "bg-[#007AFF]/10" : "bg-[#FFF8E1]"
                       }`}
                     >
-                      <Ionicons
-                        name={dest.isRoot ? "cloud-outline" : "folder"}
-                        size={22}
-                        color={dest.isRoot ? "#007AFF" : "#F59E0B"}
-                      />
+                      {dest.isRoot ? (
+                        <Ionicons name="cloud-outline" size={22} color="#007AFF" />
+                      ) : (
+                        <FileCategoryIcon category="folder" size={24} id={dest.id || undefined} />
+                      )}
                     </View>
 
                     <View className="flex-1 pr-2">

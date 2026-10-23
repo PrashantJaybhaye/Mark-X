@@ -21,7 +21,7 @@ export async function getOrFetchCachedImage(
     }
 
     const downloadResult = await FileSystem.downloadAsync(remoteUrl, localUri);
-    if (downloadResult.status === 200) {
+    if (downloadResult.status >= 200 && downloadResult.status < 300) {
       return downloadResult.uri;
     }
   } catch (error) {
@@ -49,7 +49,7 @@ export async function forceRefetchCachedImage(
     }
 
     const downloadResult = await FileSystem.downloadAsync(remoteUrl, localUri);
-    if (downloadResult.status === 200) {
+    if (downloadResult.status >= 200 && downloadResult.status < 300) {
       return downloadResult.uri;
     }
   } catch (error) {

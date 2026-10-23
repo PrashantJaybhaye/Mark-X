@@ -70,14 +70,14 @@ export default function HomeScreen() {
 
       const prefs = await loadUserPreferences();
       if (prefs.stats) {
-        applyStats({ ...prefs.stats, usedStorageGB: Math.max(recalculatedGB, prefs.stats.usedStorageGB || 0) });
+        applyStats({ ...prefs.stats, usedStorageGB: recalculatedGB });
       }
 
       const uid = explicitUid || user?.uid || auth.currentUser?.uid;
       if (uid) {
         const metadata = await getUserMetadata(uid);
         if (metadata && metadata.stats) {
-          const finalGB = Math.max(recalculatedGB, metadata.stats.usedStorageGB || 0);
+          const finalGB = recalculatedGB;
           const mergedStats = { ...metadata.stats, usedStorageGB: finalGB };
           applyStats(mergedStats);
           await saveUserPreferences({ ...prefs, stats: mergedStats });
@@ -115,8 +115,11 @@ export default function HomeScreen() {
     };
   }, [user?.uid, refreshCounts, applyStats]);
 
+  const isNavigatingRef = React.useRef(false);
+
   useFocusEffect(
     React.useCallback(() => {
+      isNavigatingRef.current = false;
       setStatusBarStyle("dark");
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
@@ -136,6 +139,8 @@ export default function HomeScreen() {
   };
 
   const handleCapturePhoto = () => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     triggerHaptic();
     router.push('/camera');
   };

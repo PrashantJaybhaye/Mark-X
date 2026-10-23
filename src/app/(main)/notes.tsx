@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { View, ScrollView, useWindowDimensions, Platform, StatusBar as RNStatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
@@ -14,6 +14,7 @@ import {
   subscribeToNotesServer,
   deleteNoteFromFirestore,
   syncNoteToFirestore,
+  sortNotesChronologically,
 } from "../../services/notesSyncService";
 import { useAuth } from "../../context/AuthContext";
 import { IosDialog } from "../../components/common/IosDialog";
@@ -27,9 +28,11 @@ export default function NotesScreen() {
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [selectedNote, setSelectedNote] = useState<NoteItem | null>(null);
   const [activeDialog, setActiveDialog] = useState<"more" | "delete" | null>(null);
+  const isNavigatingRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
+      isNavigatingRef.current = false;
       setStatusBarStyle("dark");
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
@@ -73,6 +76,8 @@ export default function NotesScreen() {
   };
 
   const handleAddNote = () => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     triggerHaptic();
     router.push({
       pathname: "/note/[id]",
@@ -81,6 +86,8 @@ export default function NotesScreen() {
   };
 
   const handleEditNote = React.useCallback((note: NoteItem) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     triggerHaptic();
     router.push({
       pathname: "/note/[id]",
@@ -124,7 +131,7 @@ export default function NotesScreen() {
   }, [notes, searchQuery]);
 
   const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => Number(!!b.isPinned) - Number(!!a.isPinned));
+    return sortNotesChronologically(filteredNotes);
   }, [filteredNotes]);
 
   const leftColumnNotes = sortedNotes.filter((_, i) => i % 2 === 0);

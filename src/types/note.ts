@@ -7,5 +7,6 @@ export interface NoteItem {
   iconName?: keyof typeof Ionicons.glyphMap;
   createdAt: string;
   updatedAt?: string;
+  updatedAtMs?: number;
   isPinned?: boolean;
 }

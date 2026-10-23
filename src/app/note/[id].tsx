@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar, setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BackHandler,
   Keyboard,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
@@ -309,6 +310,7 @@ export default function NoteDetailScreen() {
       const resolvedTitle = trimmedTitle || (trimmedBody ? trimmedBody.split("\n")[0].trim().slice(0, 40) : "") || "New Note";
       const formattedDate = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
       const finalCreatedAt = createdAt || formattedDate;
+      const nowMs = Date.now();
       await saveSingleNote({
         id: noteId,
         title: resolvedTitle,
@@ -316,11 +318,34 @@ export default function NoteDetailScreen() {
         isPinned: currentPinned,
         createdAt: finalCreatedAt,
         updatedAt: formattedDate,
+        updatedAtMs: nowMs,
       });
-      return { createdAt: finalCreatedAt, updatedAt: formattedDate };
+      return { createdAt: finalCreatedAt, updatedAt: formattedDate, updatedAtMs: nowMs };
     },
     [noteId, createdAt]
   );
+
+  useEffect(() => {
+    const onHardwareBack = () => {
+      if (activeDialog) {
+        setActiveDialog(null);
+        return true;
+      }
+      if (showFormatSheet) {
+        setShowFormatSheet(false);
+        return true;
+      }
+      if (hasUnsavedChanges.current) {
+        Keyboard.dismiss();
+        setActiveDialog("unsaved");
+        return true;
+      }
+      return false;
+    };
+
+    const backSub = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
+    return () => backSub.remove();
+  }, [activeDialog, showFormatSheet]);
 
   const updateBlocksAndSave = (updater: (prev: NoteBlock[]) => NoteBlock[]) => {
     setBlocks((prev) => {
@@ -365,6 +390,7 @@ export default function NoteDetailScreen() {
         isPinned: isPinnedRef.current,
         createdAt: dates.createdAt,
         updatedAt: dates.updatedAt,
+        updatedAtMs: dates.updatedAtMs,
       });
     }
     hasUnsavedChanges.current = false;
@@ -409,7 +435,31 @@ export default function NoteDetailScreen() {
 
   const handleToggleCheckbox = (id: string) => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    updateBlocksAndSave((prev) => prev.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b)));
+    setBlocks((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, checked: !b.checked } : b));
+      latestBlocksRef.current = next;
+      const newBody = blocksToBody(next);
+      setBody(newBody);
+      if (!isEditing) {
+        commitNote(latestTitleRef.current, newBody, isPinnedRef.current).then((dates) => {
+          if (dates) {
+            syncNoteToFirestore({
+              id: noteId,
+              title: latestTitleRef.current,
+              body: newBody,
+              isPinned: isPinnedRef.current,
+              createdAt: dates.createdAt,
+              updatedAt: dates.updatedAt,
+              updatedAtMs: dates.updatedAtMs,
+            });
+          }
+        });
+        hasUnsavedChanges.current = false;
+      } else {
+        hasUnsavedChanges.current = true;
+      }
+      return next;
+    });
   };
 
   const handleInsertChecklist = () => {

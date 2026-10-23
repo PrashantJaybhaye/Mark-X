@@ -184,10 +184,15 @@ export default function DriveScreen() {
       return;
     }
 
-    const isPdf = item.category === "pdf" || item.name.toLowerCase().endsWith(".pdf");
+    const name = (item.name || "").toLowerCase();
+    const isPdf = item.category === "pdf" || name.endsWith(".pdf");
     const isImage = item.category === "image";
+    const isTextOrCode =
+      item.category === "code" ||
+      item.category === "document" ||
+      /\.(txt|md|json|csv|html|htm|xml|css|js|ts|tsx|jsx|py|log|docx|doc|rtf)$/i.test(name);
 
-    if (isPdf || isImage) {
+    if (isPdf || isImage || isTextOrCode) {
       setSelectedFileForPreview(item);
     } else {
       openInNativeApp(item);
@@ -220,10 +225,13 @@ export default function DriveScreen() {
     if (!file) return;
 
     const category = getFileCategory(file.name, file.mimeType);
-    if (category === "image" || category === "video") return;
+    if (category === "image" || category === "video") {
+      triggerToast("Photos & Videos", "error", "Please switch to the Gallery tab to upload photos and videos.");
+      return;
+    }
 
     let permanentUri = file.uri;
-    if (FileSystem.documentDirectory && file.uri.startsWith("file://")) {
+    if (FileSystem.documentDirectory && (file.uri.startsWith("file://") || file.uri.startsWith("content://"))) {
       try {
         const safeName = `drive_${Date.now()}_${(file.name || "document").replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const destUri = `${FileSystem.documentDirectory}${safeName}`;
@@ -280,11 +288,24 @@ export default function DriveScreen() {
   };
 
   const handleConfirmCreateFolder = (folderName: string) => {
-    const trimmedName = folderName.trim() || "Untitled folder";
+    const baseName = folderName.trim() || "Untitled folder";
+
+    const existingNames = new Set(
+      files
+        .filter((f) => f.isFolder && (f.parentId ?? null) === (currentFolderId ?? null))
+        .map((f) => f.name.toLowerCase())
+    );
+
+    let finalName = baseName;
+    let counter = 1;
+    while (existingNames.has(finalName.toLowerCase())) {
+      finalName = `${baseName} (${counter})`;
+      counter++;
+    }
 
     const newFolder: DriveItem = {
       id: generateUniqueId(),
-      name: trimmedName,
+      name: finalName,
       category: "folder",
       updatedAt: String(Date.now()),
       isFolder: true,
@@ -339,22 +360,28 @@ export default function DriveScreen() {
       console.warn("[Drive] Firebase delete error:", err)
     );
 
-    updateFilesAndPersist((prev) => {
-      const idsToDelete = new Set<string>([id]);
-      if (fileToDelete?.isFolder) {
-        let addedMore = true;
-        while (addedMore) {
-          addedMore = false;
-          for (const item of prev) {
-            if (item.parentId && idsToDelete.has(item.parentId) && !idsToDelete.has(item.id)) {
-              idsToDelete.add(item.id);
-              addedMore = true;
-            }
+    const idsToDelete = new Set<string>([id]);
+    if (fileToDelete?.isFolder) {
+      let addedMore = true;
+      while (addedMore) {
+        addedMore = false;
+        for (const item of files) {
+          if (item.parentId && idsToDelete.has(item.parentId) && !idsToDelete.has(item.id)) {
+            idsToDelete.add(item.id);
+            addedMore = true;
           }
         }
       }
-      return prev.filter((f) => !idsToDelete.has(f.id));
-    });
+
+      setFolderStack((prev) => {
+        const deletedIdx = prev.findIndex((f) => f.id && idsToDelete.has(f.id));
+        if (deletedIdx > 0) return prev.slice(0, deletedIdx);
+        if (deletedIdx === 0) return [{ id: null, name: "Drive" }];
+        return prev;
+      });
+    }
+
+    updateFilesAndPersist((prev) => prev.filter((f) => !idsToDelete.has(f.id)));
     if (fileToDelete) {
       triggerToast(`Deleted "${getFileDisplayName(fileToDelete.name, fileToDelete.isFolder)}"`, "delete", "Removed from Drive & Cloud");
     }

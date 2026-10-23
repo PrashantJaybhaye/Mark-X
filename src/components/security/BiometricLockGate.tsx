@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  BackHandler,
   Platform,
   Text,
   TouchableOpacity,
@@ -59,6 +60,15 @@ export function BiometricLockGate() {
       hasAutoPromptedRef.current = false;
     }
   }, [isLocked, handleUnlock]);
+
+  useEffect(() => {
+    if (!isLocked || !user) return;
+    const backSub = BackHandler.addEventListener("hardwareBackPress", () => {
+      BackHandler.exitApp();
+      return true;
+    });
+    return () => backSub.remove();
+  }, [isLocked, user]);
 
   if (!isLocked || !user) {
     return null;

@@ -42,6 +42,7 @@ function DriveBreadcrumbsComponent({
 
         <ScrollView
           horizontal
+          nestedScrollEnabled={true}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ alignItems: "center" }}
           className="flex-1"

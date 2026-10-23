@@ -186,7 +186,7 @@ export function DriveFileOptionsSheet({
 
   const handleSaveRename = () => {
     Keyboard.dismiss();
-    let cleanBase = newBaseName.trim();
+    let cleanBase = newBaseName.replace(/[/\\:*?"<>|]/g, "_").trim();
     if (fileExtension && cleanBase.toLowerCase().endsWith(fileExtension.toLowerCase())) {
       cleanBase = cleanBase.slice(0, -fileExtension.length).trim();
     }

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useId } from "react";
 import { View } from "react-native";
 import { Image } from "expo-image";
 import Svg, {
@@ -29,6 +29,7 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
   uri,
   id,
 }: FileCategoryIconProps) {
+  const generatedId = useId();
 
   if (category === "image" && uri) {
     return (
@@ -55,37 +56,134 @@ export const FileCategoryIcon = memo(function FileCategoryIcon({
   }
 
   if (category === "folder") {
-    const width = Math.round(size * 1.15);
+    const width = Math.round(size * 1.22);
     const height = size;
+    const rawId = id || fileName || generatedId || "fld";
+    const cleanId = rawId.replace(/[^a-zA-Z0-9]/g, "");
+    const backGradId = `fldBack_${cleanId}`;
+    const frontGradId = `fldFront_${cleanId}`;
+    const cavityGradId = `fldCavity_${cleanId}`;
+    const sheetGradId = `fldSheet_${cleanId}`;
+
     return (
-      <Svg width={width} height={height} viewBox="0 0 38 32" fill="none">
+      <Svg width={width} height={height} viewBox="0 0 44 36" fill="none">
         <Defs>
-          <LinearGradient id="folderFront" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FBBF24" />
-            <Stop offset="1" stopColor="#F59E0B" />
+          <LinearGradient id={backGradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FBBF24" />
+            <Stop offset="35%" stopColor="#F59E0B" />
+            <Stop offset="100%" stopColor="#B45309" />
           </LinearGradient>
-          <LinearGradient id="folderBack" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#F59E0B" />
-            <Stop offset="1" stopColor="#D97706" />
+          <LinearGradient id={frontGradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FEF08A" />
+            <Stop offset="18%" stopColor="#FBBF24" />
+            <Stop offset="72%" stopColor="#F59E0B" />
+            <Stop offset="100%" stopColor="#D97706" />
+          </LinearGradient>
+          <LinearGradient id={cavityGradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#78350F" stopOpacity={0.4} />
+            <Stop offset="100%" stopColor="#78350F" stopOpacity={0.04} />
+          </LinearGradient>
+          <LinearGradient id={sheetGradId} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" />
+            <Stop offset="100%" stopColor="#F1F5F9" />
           </LinearGradient>
         </Defs>
 
+        {/* Back Plate with Ergonomic Curved Tab */}
         <Path
-          d="M 4 5 A 3 3 0 0 1 7 2 H 15 A 2 2 0 0 1 16.6 2.8 L 19 6 H 33 A 3 3 0 0 1 36 9 V 25 A 3 3 0 0 1 33 28 H 5 A 3 3 0 0 1 2 25 V 7 A 2 2 0 0 1 4 5 Z"
-          fill="url(#folderBack)"
+          d="M 6.5 33 C 4.3 33 2.5 31.2 2.5 29 L 2.5 6.8 C 2.5 4.7 4.2 3 6.3 3 L 15.8 3 C 17.6 3 19 4.1 20.2 6.1 L 20.6 6.8 C 21.6 8.3 23 9.1 24.8 9.1 L 37.7 9.1 C 39.8 9.1 41.5 10.8 41.5 12.9 L 41.5 29 C 41.5 31.2 39.8 33 37.7 33 Z"
+          fill={`url(#${backGradId})`}
         />
 
-        <Rect x="7" y="5" width="24" height="12" rx="2" fill="#FFFFFF" fillOpacity={0.9} />
-
+        {/* Tab Top subtle rim highlight */}
         <Path
-          d="M 2 12 A 3 3 0 0 1 5 9 H 33 A 3 3 0 0 1 36 12 V 25 A 3 3 0 0 1 33 28 H 5 A 3 3 0 0 1 2 25 Z"
-          fill="url(#folderFront)"
+          d="M 6.5 4.2 L 15.5 4.2"
+          stroke="#FEF08A"
+          strokeWidth="0.9"
+          strokeLinecap="round"
+          opacity={0.8}
         />
+
+        {/* Folder Cavity / Interior Depth Crease */}
+        <Rect
+          x="3.5"
+          y="9.2"
+          width="37"
+          height="8.5"
+          rx="1.5"
+          fill={`url(#${cavityGradId})`}
+        />
+
+        {/* Back Document Sheet (subtle offset) */}
+        <Rect
+          x="15"
+          y="5.2"
+          width="19"
+          height="13"
+          rx="2"
+          fill="#E2E8F0"
+          opacity={0.75}
+        />
+
+        {/* Primary Document Sheet (Crisp white with preview lines) */}
+        <Rect
+          x="8"
+          y="6.4"
+          width="26"
+          height="13"
+          rx="2.2"
+          fill={`url(#${sheetGradId})`}
+        />
+        {/* Document accent header badge */}
+        <Rect
+          x="11.5"
+          y="8.8"
+          width="8"
+          height="1.5"
+          rx="0.75"
+          fill="#3B82F6"
+          opacity={0.9}
+        />
+        {/* Document content lines */}
+        <Rect
+          x="21"
+          y="8.8"
+          width="9.5"
+          height="1.5"
+          rx="0.75"
+          fill="#CBD5E1"
+        />
+        <Rect
+          x="11.5"
+          y="11.8"
+          width="14"
+          height="1.3"
+          rx="0.65"
+          fill="#E2E8F0"
+        />
+
+        {/* Front Pocket Flap with Gentle Center Contour */}
         <Path
-          d="M 2 12 A 3 3 0 0 1 5 9 H 33 A 3 3 0 0 1 36 12"
-          stroke="#FDE68A"
+          d="M 2.5 16.5 C 2.5 14.8 3.8 13.6 5.8 13.6 C 14 13.6 18 14.8 22 14.8 C 26 14.8 30 13.6 38.2 13.6 C 40.2 13.6 41.5 14.8 41.5 16.5 L 41.5 29 C 41.5 31.2 39.8 33 37.7 33 L 6.3 33 C 4.2 33 2.5 31.2 2.5 29 Z"
+          fill={`url(#${frontGradId})`}
+        />
+
+        {/* Front Pocket Top Specular Highlight */}
+        <Path
+          d="M 4 15.2 C 4.5 14.2 5.5 13.8 7 13.8 C 14 13.8 18 14.9 22 14.9 C 26 14.9 30 13.8 37 13.8 C 38.5 13.8 39.5 14.2 40 15.2"
+          stroke="#FFFFFF"
+          strokeWidth="1.1"
+          strokeLinecap="round"
+          opacity={0.7}
+        />
+
+        {/* Ambient bottom shadow rim */}
+        <Path
+          d="M 6.5 32.8 L 37.5 32.8"
+          stroke="#92400E"
           strokeWidth="0.8"
           strokeLinecap="round"
+          opacity={0.35}
         />
       </Svg>
     );

@@ -19,7 +19,9 @@ import {
   syncGalleryStats,
   saveCachedGalleryPins,
   loadCachedGalleryPins,
+  recalculateTotalUsedStorageGB,
 } from "./storageService";
+import { deleteFileFromCloudflare } from "./cloudflareStorage";
 
 export const GALLERY_PAGE_LIMIT = 12;
 
@@ -128,6 +130,10 @@ export async function fetchGalleryPinsPage(
     };
   } catch (error) {
     console.warn("[GalleryServerService] Paginated fetch failed:", error);
+    if (!lastDoc) {
+      const cached = await loadCachedGalleryPins().catch(() => []);
+      return { pins: cached, lastVisibleDoc: null, hasMore: false };
+    }
     return { pins: [], lastVisibleDoc: null, hasMore: false };
   }
 }
@@ -219,8 +225,21 @@ export async function updateGalleryPinInServer(pinId: string, updates: Partial<G
 }
 
 export async function deleteGalleryPinFromServer(pinId: string): Promise<void> {
+  let targetUrl: string | undefined;
+  try {
+    const cached = await loadCachedGalleryPins();
+    const pin = cached.find((p) => p.id === pinId);
+    targetUrl = pin?.imageUrl;
+  } catch {}
+
   const docRef = getGalleryDocRef(pinId);
   await deleteDoc(docRef);
+
+  if (targetUrl && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+    deleteFileFromCloudflare(targetUrl).catch((cErr) =>
+      console.warn("[GalleryFirebaseService] Cloudflare R2 delete warning:", cErr)
+    );
+  }
 
   let remainingCount = 0;
   await updateLocalCache((cached) => {
@@ -230,6 +249,7 @@ export async function deleteGalleryPinFromServer(pinId: string): Promise<void> {
   });
 
   await syncGalleryStats(remainingCount);
+  recalculateTotalUsedStorageGB().catch(console.warn);
 }
 
 export const fetchGalleryPinsFromFirestore = fetchGalleryPinsFromServer;

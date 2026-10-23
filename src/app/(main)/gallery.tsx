@@ -134,14 +134,21 @@ export default function GalleryScreen() {
       for (const p of cached) {
         if (p.localUri) localUriMap.set(p.id, p.localUri);
       }
-      const mergedPins = result.pins.map((p) =>
-        localUriMap.has(p.id) ? { ...p, localUri: localUriMap.get(p.id) } : p
-      );
-      setPins(mergedPins);
-      lastDocRef.current = result.lastVisibleDoc;
-      setHasMore(result.hasMore);
-      await saveCachedGalleryPins(mergedPins);
-      prefetchPinImages(mergedPins);
+      if (result.pins.length > 0) {
+        const mergedPins = result.pins.map((p) =>
+          localUriMap.has(p.id) ? { ...p, localUri: localUriMap.get(p.id) } : p
+        );
+        setPins(mergedPins);
+        lastDocRef.current = result.lastVisibleDoc;
+        setHasMore(result.hasMore);
+        await saveCachedGalleryPins(mergedPins);
+        prefetchPinImages(mergedPins);
+      } else if (cached.length > 0) {
+        setPins(cached);
+        prefetchPinImages(cached);
+      } else {
+        setPins([]);
+      }
 
       if (result.hasMore && result.lastVisibleDoc) {
         fetchGalleryPinsPage(result.lastVisibleDoc, GALLERY_PAGE_LIMIT).then((nextResult) => {
