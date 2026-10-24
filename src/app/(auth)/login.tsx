@@ -440,14 +440,22 @@ export default function LoginScreen() {
             >
               By continuing, you agree to our{" "}
               <Text
-                className="text-[#8E8E93]"
+                onPress={() => {
+                  triggerHaptic();
+                  router.push("/profile/terms");
+                }}
+                className="text-[#8E8E93] underline"
                 style={{ fontFamily: "Outfit_500Medium" }}
               >
                 Terms of Service
               </Text>{" "}
               and{" "}
               <Text
-                className="text-[#8E8E93]"
+                onPress={() => {
+                  triggerHaptic();
+                  router.push("/profile/privacy");
+                }}
+                className="text-[#8E8E93] underline"
                 style={{ fontFamily: "Outfit_500Medium" }}
               >
                 Privacy Policy

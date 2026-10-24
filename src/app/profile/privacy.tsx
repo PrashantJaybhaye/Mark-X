@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 
+import { useAuth } from "../../context/AuthContext";
 import { IosDialog } from "../../components/common/IosDialog";
 import type { IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
@@ -53,6 +54,7 @@ function Section({
 export default function PrivacyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [dialog, setDialog] = useState<DialogState>(null);
 
   const topInset =
@@ -67,7 +69,7 @@ export default function PrivacyScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(main)/profile");
+      router.replace(user ? "/(main)/profile" : "/(auth)/login");
     }
   };
 
@@ -94,7 +96,7 @@ export default function PrivacyScreen() {
             onPress={handleDismiss}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Go back to Profile"
+            accessibilityLabel="Go back"
             accessibilityRole="button"
             className="w-10 h-10 items-center justify-center z-10"
           >
@@ -160,37 +162,64 @@ export default function PrivacyScreen() {
           className="text-[14px] text-[#111111] mb-6"
           style={{ fontFamily: "Outfit_600SemiBold", fontStyle: "italic" }}
         >
-          Effective Date: September 26, 2026
+          Effective Date: October 24, 2026
         </Text>
 
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-5"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
-          At Mark-X, we take your personal data privacy seriously. This Privacy Policy outlines how your information is handled in accordance with international digital data standards and local privacy regulations (including India's Digital Personal Data Protection (DPDP) Act 2023 and GDPR).
+          At Mark-X, your privacy is our foundational commitment. This Privacy Policy outlines how your personal data is collected, processed, and safeguarded across all features of the Mark-X digital workspace—including Smart Notes, Cloud Drive, Media Gallery, and Security Vault. We operate in full compliance with global privacy standards, including India&apos;s Digital Personal Data Protection (DPDP) Act 2023, the European General Data Protection Regulation (GDPR), and the California Consumer Privacy Act (CCPA/CPRA).
         </Text>
 
         <Section title="1. INFORMATION WE COLLECT & PURPOSE">
-          Mark-X only collects data necessary to operate your personal vault:
-          {"\n"}• Account Identity: Email address, display name, and profile photo for authentication.
-          {"\n"}• User Content: Vault files, media gallery photos/videos, and notes created by you.
-          {"\n"}• Device Metadata: Hardware device name, OS version, and app release version to manage active logged-in sessions.
+          Mark-X operates under a data-minimization model, collecting only information necessary to deliver and protect your personal digital workspace:
+          {"\n\n"}• Account Identity: Email address, display name, and avatar picture provided via Firebase Authentication or Google Sign-In to verify and secure your user account.
+          {"\n"}• Smart Notes & Checklists: Note titles, rich markdown content, interactive checklist task states, tags, and pinned statuses created in your personal editor.
+          {"\n"}• Cloud Drive Files: Uploaded documents (PDFs, DOCX, XLSX, TXT, CSV), images, audio, video files, custom folder hierarchies, and associated file metadata (size, MIME type, timestamps).
+          {"\n"}• Media Gallery: Encrypted photos, videos, album collections, and visual pins.
+          {"\n"}• Device & Session Telemetry: Hardware device model, operating system version, app build number, and session tokens used strictly to display your active device sessions and allow remote device revocation.
         </Section>
 
-        <Section title="2. ZERO AD TRACKING & DATA MINING">
-          Mark-X contains zero third-party advertisement trackers, behavioral tracking SDKs, or data brokers. We do not sell, rent, or trade your personal information to third parties under any circumstances.
+        <Section title="2. LOCAL-FIRST CACHING & CLOUD SYNCHRONIZATION">
+          Mark-X is architected with a local-first design:
+          {"\n\n"}• Offline Local Storage: Your notes, recent drive documents, and media thumbnails are cached locally on your physical device using sandboxed internal storage and SQLite databases. This allows you to create, view, and modify your notes and files even without network connectivity.
+          {"\n"}• Resilient Cloud Sync: When your device connects to the internet, local updates are securely synced with Mark-X Cloud Vault (Firebase Firestore and Firebase Storage) using transport layer security (TLS 1.3).
+          {"\n"}• Conflict Resolution: Timestamp-based synchronization ensures that your most recent modifications across devices are preserved without data loss or accidental overwrites.
         </Section>
 
-        <Section title="3. DATA ENCRYPTION & LOCAL SECURITY">
-          Your sensitive information is encrypted in transit (TLS 1.3) and at rest (AES-256). Biometric lock verification (Face ID / Fingerprint) is processed entirely locally within your device's native hardware Secure Enclave and is never transmitted to external servers.
+        <Section title="3. GOOGLE DRIVE & THIRD-PARTY SERVICES">
+          Mark-X provides optional integration with external cloud storage:
+          {"\n\n"}• Google Drive Integration: If you connect Google Drive to Mark-X, our application requests only the limited, user-approved &quot;drive.file&quot; scope (https://www.googleapis.com/auth/drive.file). Mark-X only creates, accesses, or manages files specifically created by or opened with Mark-X. We do NOT read, scan, or catalog your broader personal Google Drive files or folders.
+          {"\n"}• Google API Limited Use Policy: Mark-X&apos;s use and transfer of information received from Google APIs to any other app adheres to the Google API Services User Data Policy, including the Limited Use requirements.
+          {"\n"}• Infrastructure Partners: We utilize Google Cloud Firebase (Authentication, Firestore, Cloud Storage) for secure encrypted infrastructure under strict data-protection agreements.
         </Section>
 
-        <Section title="4. DATA RETENTION & YOUR RIGHT TO ERASE (DPDP ACT / GDPR)">
-          You hold 100% control over your personal data. You have the right to access, export, or permanently erase your data at any time. When you delete files or terminate your Mark-X account, your records and storage files are permanently erased from our servers immediately.
+        <Section title="4. ZERO AD TRACKING & NO AI TRAINING ON YOUR CONTENT">
+          Mark-X is a private utility, not an advertising platform:
+          {"\n\n"}• Zero Ads & Zero Brokers: Mark-X contains zero third-party advertising trackers, marketing SDKs, or data-broker integrations. We do not sell, rent, or trade your personal data.
+          {"\n"}• No AI Training on Vault Content: We will NEVER use your personal notes, checklists, documents, or media gallery assets to train artificial intelligence models or machine learning algorithms without your explicit, opt-in consent.
         </Section>
 
-        <Section title="5. CONTACT DATA PRIVACY OFFICER" last>
-          If you have questions regarding data protection, consent withdrawal, or privacy rights, please reach out directly to privacy@mark-x.app.
+        <Section title="5. HARDWARE-LEVEL BIOMETRIC PRIVACY">
+          When you enable Biometric Lock (Face ID, Fingerprint, or Iris scanning) within Profile &gt; Security, biometric verification is executed entirely on your local device via the native hardware Secure Enclave (iOS) or Android Keystore / BiometricPrompt. Mark-X never accesses, captures, or transmits your raw biometric templates or fingerprint hashes to external servers.
+        </Section>
+
+        <Section title="6. DATA RETENTION & YOUR RIGHT TO ERASE (DPDP ACT / GDPR)">
+          You retain 100% control and ownership of your personal data:
+          {"\n\n"}• Right to Access & Export: You can view and export any document or note at any time directly from the app to external storage or third-party apps.
+          {"\n"}• Right to Immediate Erasure: You have the right to permanently erase your data at any time. When you select &quot;Deactivate Account&quot; in Profile &gt; Security &amp; Privacy, Mark-X permanently wipes your authentication account, Firestore note collections, Cloud Storage files, device session records, and local device caches. This erasure is permanent and irreversible.
+        </Section>
+
+        <Section title="7. SECURITY SAFEGUARDS & MULTI-DEVICE PROTECTION">
+          We implement industry-grade defense-in-depth measures:
+          {"\n\n"}• End-to-End Encryption: All data in transit is encrypted using TLS 1.3, and all stored data is encrypted at rest using AES-256.
+          {"\n"}• Remote Session Revocation: You can view all hardware devices logged into your account in real-time under Security &gt; Active Devices and instantly terminate any session remotely.
+          {"\n"}• Firebase App Check: API endpoints are guarded against automated abuse and unauthorized access.
+        </Section>
+
+        <Section title="8. CONTACT DATA PRIVACY OFFICER" last>
+          If you have questions, feedback, or wish to exercise your data protection rights under the DPDP Act 2023, GDPR, or CCPA, please contact our Data Protection Officer directly at privacy@mark-x.app.
         </Section>
       </ScrollView>
 

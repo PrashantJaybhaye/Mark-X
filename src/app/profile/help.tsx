@@ -12,8 +12,9 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import * as Clipboard from "expo-clipboard";
+
+import { useAuth } from "../../context/AuthContext";
 import { IosDialog, IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -32,54 +33,85 @@ interface TopicItem {
 const FAQS: FAQItem[] = [
   {
     id: "1",
-    question: "How do I give feedback on Mark-X?",
+    question: "How do Smart Notes and Checklists work?",
     answer:
-      "We love hearing from you! Tap 'Contact us' below or email us directly at support@mark-x.app. Our design and engineering team reviews every message.",
+      "Mark-X notes feature rich Markdown formatting including headers, quotes, numbered/bulleted lists, and interactive checklists. Tap any checkbox directly to toggle tasks. Notes save instantly to local storage and sync with Cloud Vault when connected.",
   },
   {
     id: "2",
-    question: "How to setup Cloud Vault?",
+    question: "What files can I store and preview in Cloud Drive?",
     answer:
-      "Your Cloud Vault is created automatically upon registration. All files uploaded to Drive and notes saved in Smart Notes sync seamlessly to your isolated, encrypted cloud database.",
+      "Cloud Drive supports PDFs, Office documents (DOCX, XLSX, PPTX), plain text/Markdown, images, audio, and videos. You can view documents directly within Mark-X using the integrated document viewer or open them with external native apps.",
   },
   {
     id: "3",
-    question: "Biometrics doesn't seem to be working",
+    question: "How does Google Drive integration work?",
     answer:
-      "Check your device settings to confirm Mark-X has biometric permission (Face ID or Fingerprint). You can also toggle Biometric Lock off and on in Profile > Biometric Lock to recalibrate.",
+      "Connecting Google Drive lets you import and sync files directly with your workspace. Mark-X requests only the narrow 'drive.file' scope, meaning it only accesses files you explicitly create or open with Mark-X, never your broader Google Drive library.",
   },
   {
     id: "4",
-    question: "What is Cloud Sync & Offline Cache?",
+    question: "Does Mark-X work completely offline?",
     answer:
-      "Mark-X stores an encrypted local copy of your recent files and notes on your physical phone. You can view and edit them offline; when you reconnect, changes sync automatically to the cloud.",
+      "Yes! Mark-X is local-first. You can create or edit Smart Notes, check off tasks, and view recently cached drive documents and gallery pins without any internet connection. All changes automatically sync to the cloud once you reconnect.",
   },
   {
     id: "5",
-    question: "Can I export all my files and notes?",
+    question: "How does Biometric Lock & Auto-Lock work?",
     answer:
-      "Yes! Mark-X guarantees 100% data portability. You can export any document or note directly to your device or share it anytime with zero restrictions.",
+      "You can secure Mark-X with Face ID or Fingerprint under Profile > Security. You can also customize the Auto-Lock timeout (Immediately, 1 min, 5 mins, or 15 mins). All biometric operations run exclusively inside your device's native hardware Secure Enclave.",
+  },
+  {
+    id: "6",
+    question: "How do I manage active devices or remotely sign out?",
+    answer:
+      "Go to Profile > Active Devices to view every hardware device signed into your account, including device model, OS, and last active time. You can tap 'Revoke' to terminate and log out any session remotely.",
+  },
+  {
+    id: "7",
+    question: "Can I export my data or permanently delete my account?",
+    answer:
+      "Yes! Mark-X guarantees 100% data portability. You can export notes and drive files anytime. If you wish to permanently delete your account, visit Profile > Security & Privacy > Deactivate Account. All your cloud and local records will be permanently wiped immediately.",
+  },
+  {
+    id: "8",
+    question: "How does 'Clear Cache' help my device?",
+    answer:
+      "Tapping 'Clear Cache' under Profile > Security & Devices safely frees up local storage by purging temporary images and media thumbnails. Your actual cloud notes, drive documents, and gallery photos remain completely untouched in Cloud Vault.",
   },
 ];
 
 const TOPICS: TopicItem[] = [
   {
     id: "t1",
-    title: "Getting Started",
+    title: "Getting Started with Mark-X",
     description:
-      "Learn the basics of Mark-X: uploading documents to Drive, organizing visual pins in Gallery, writing Smart Notes, and locking your session with native biometrics.",
+      "Explore the core workspace: drafting rich Markdown notes with interactive checklists, organizing documents in Cloud Drive folders, curating visual albums in Gallery, and managing your profile.",
   },
   {
     id: "t2",
-    title: "Troubleshooting & Security",
+    title: "Cloud Sync & Offline Architecture",
     description:
-      "Diagnose sync issues, review hardware-isolated Secure Enclave cryptography, reset account credentials, and learn how offline caching protects your data.",
+      "Understand how local SQLite storage and Firebase Cloud Vault keep your data accessible offline, resolve multi-device sync conflicts, and protect notes with end-to-end transport encryption.",
+  },
+  {
+    id: "t3",
+    title: "Security, Biometrics & Session Control",
+    description:
+      "Learn about hardware Secure Enclave authentication, configuring auto-lock timers, inspecting active hardware devices in real time, and revoking unauthorized sessions.",
+  },
+  {
+    id: "t4",
+    title: "Data Rights & Account Erasure",
+    description:
+      "Learn how to export files and notes, withdraw consent, and permanently delete your account in accordance with GDPR and India's Digital Personal Data Protection (DPDP) Act 2023.",
   },
 ];
 
 export default function HelpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [dialog, setDialog] = useState<{ title: string; message: string; actions?: IosDialogAction[] } | null>(null);
 
   const topInset = Math.max(
@@ -92,7 +124,7 @@ export default function HelpScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(main)/profile");
+      router.replace(user ? "/(main)/profile" : "/(auth)/login");
     }
   };
 
@@ -121,7 +153,7 @@ export default function HelpScreen() {
 
     setDialog({
       title: "Contact Support",
-      message: "Our team typically responds within a few hours. How would you like to get in touch?",
+      message: "Our engineering and support team typically responds within a few hours. How would you like to get in touch?",
       actions: [
         { text: "Cancel", style: "cancel", onPress: () => setDialog(null) },
         {
@@ -172,6 +204,8 @@ export default function HelpScreen() {
             onPress={handleDismiss}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
             className="w-10 h-10 items-center justify-center z-10"
           >
             <Ionicons name="chevron-back" size={24} color="#111111" />

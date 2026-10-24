@@ -56,6 +56,12 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
     const inAuthGroup = segments[0] === "(auth)";
     const inMainGroup = segments[0] === "(main)";
     const isProfileGroup = segments[0] === "profile";
+    const isPublicProfilePage =
+      isProfileGroup &&
+      (segments[1] === "terms" ||
+        segments[1] === "privacy" ||
+        segments[1] === "about" ||
+        segments[1] === "help");
     const isNoteGroup = segments[0] === "note";
     const isGalleryGroup = segments[0] === "gallery";
     const isVerifyScreen = inAuthGroup && segments[1] === "verify-email";
@@ -65,7 +71,13 @@ function NavigationGuard({ onDecisionComplete }: NavigationGuardProps) {
       if (!isMounted) return;
 
       if (!user) {
-        if (inMainGroup || isProfileGroup || isNoteGroup || isGalleryGroup || isVerifyScreen) {
+        if (
+          inMainGroup ||
+          (isProfileGroup && !isPublicProfilePage) ||
+          isNoteGroup ||
+          isGalleryGroup ||
+          isVerifyScreen
+        ) {
           router.replace("/(auth)/login");
         } else {
           markDecisionComplete();

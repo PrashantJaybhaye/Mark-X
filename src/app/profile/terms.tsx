@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 
+import { useAuth } from "../../context/AuthContext";
 import { IosDialog } from "../../components/common/IosDialog";
 import type { IosDialogAction } from "../../components/common/IosDialog";
 import { triggerHaptic } from "../../utils/haptics";
@@ -53,6 +54,7 @@ function Section({
 export default function TermsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [dialog, setDialog] = useState<DialogState>(null);
 
   const topInset =
@@ -67,7 +69,7 @@ export default function TermsScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(main)/profile");
+      router.replace(user ? "/(main)/profile" : "/(auth)/login");
     }
   };
 
@@ -119,6 +121,8 @@ export default function TermsScreen() {
             onPress={handleDismiss}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
             className="w-10 h-10 items-center justify-center z-10"
           >
             <Ionicons name="chevron-back" size={24} color="#111111" />
@@ -183,99 +187,84 @@ export default function TermsScreen() {
           className="text-[14px] text-[#111111] mb-6"
           style={{ fontFamily: "Outfit_600SemiBold", fontStyle: "italic" }}
         >
-          Last Updated: September 20, 2026
+          Last Updated: October 24, 2026
         </Text>
 
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-5"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
-          Welcome to Mark-X. We built this application to give you a private,
-          fast, and reliable personal vault for your media gallery, documents,
-          and secure smart notes. We believe software terms should be
-          straightforward, transparent, and written for real humans—not hidden
-          behind convoluted corporate jargon.
+          Welcome to Mark-X. We built Mark-X as an intelligent, unified digital workspace that seamlessly brings together Smart Notes, Cloud Drive file management, Media Gallery curation, and hardware-grade security. We believe terms of service should be clear, transparent, and written for human beings—without hidden clauses or deceptive legalese.
         </Text>
         <Text
           className="text-[15px] text-[#1F2937] leading-[25px] mb-6"
           style={{ fontFamily: "Outfit_400Regular" }}
         >
-          By creating an account or using Mark-X, you agree to these terms. They
-          exist to protect both your privacy and the stability of our platform.
+          By creating an account or using Mark-X, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, please discontinue using the service.
         </Text>
 
         <Text
           className="text-[14px] text-[#000000] leading-[22px] mb-7"
           style={{ fontFamily: "Outfit_700Bold" }}
         >
-          YOU RETAIN 100% OWNERSHIP OF YOUR FILES, PHOTOS, VIDEOS, AND NOTES.
-          WE DO NOT MONETIZE YOUR PRIVATE CONTENT, WE DO NOT SELL YOUR PERSONAL
-          DATA, AND WE WILL NEVER USE YOUR PERSONAL VAULT TO TRAIN ARTIFICIAL
-          INTELLIGENCE MODELS.
+          YOU RETAIN 100% EXCLUSIVE OWNERSHIP OF YOUR NOTES, CHECKLISTS, FILES, AND MEDIA. WE DO NOT MONETIZE YOUR PRIVATE CONTENT, WE DO NOT SELL YOUR DATA, AND WE WILL NEVER USE YOUR PERSONAL VAULT TO TRAIN ARTIFICIAL INTELLIGENCE MODELS.
         </Text>
 
         <Section title="1. YOUR CONTENT & COMPLETE OWNERSHIP">
-          Everything you create, upload, or organize inside Mark-X belongs
-          exclusively to you. This includes documents saved in your Drive,
-          high-resolution visual and video assets saved to your Media Gallery,
-          and thoughts written in your Secure Notes. Mark-X claims zero
-          ownership or intellectual property rights over your personal assets.
-          When you delete an item, it is permanently purged from your vault.
+          Everything you create, write, upload, or organize within Mark-X belongs exclusively to you:
+          {"\n\n"}• Smart Notes & Checklists: All thoughts, markdown notes, code snippets, and checklists created in the notes editor remain your intellectual property.
+          {"\n"}• Cloud Drive Documents: All PDF files, spreadsheets, documents, archives, and custom folder layouts stored in your drive belong entirely to you.
+          {"\n"}• Media Gallery: High-resolution photos, 4K videos, and visual albums remain yours. Mark-X claims zero license or ownership rights over your content.
         </Section>
 
-        <Section title="2. ZERO SURVEILLANCE & AD-FREE PRIVACY">
-          We do not sell user data to data brokers, advertising networks, or
-          third-party marketing firms. Mark-X operates without behavioral ad
-          trackers. Your personal files, photos, videos, and notes are accessed
-          only by your authenticated session and are never analyzed or scanned
-          for commercial or promotional purposes.
+        <Section title="2. WORKSPACE FEATURES & MODULES">
+          Mark-X provides an integrated suite of productivity tools:
+          {"\n\n"}• Smart Notes: An interactive Markdown editor featuring live preview formatting, rich checklists, tag filtering, and note pinning.
+          {"\n"}• Cloud Drive: A structured file manager supporting multiple document types, breadcrumb folder navigation, multi-item operations, and in-app file previews.
+          {"\n"}• Media Gallery: A high-performance media viewer supporting image zoom, HD video playback, and visual album curation.
+          {"\n"}• Security Vault: Biometric app locking, multi-device management, and instant account deactivation.
         </Section>
 
-        <Section title="3. HARDWARE-LEVEL BIOMETRIC SECURITY">
-          When you enable Biometric Lock (Face ID, Fingerprint, or native
-          biometrics) within your Profile, authentication is handled entirely
-          within your device's native hardware Secure Enclave. Mark-X never
-          transmits, records, or stores your biometric information on external
-          servers.
+        <Section title="3. LOCAL-FIRST OFFLINE USE & RESILIENT CLOUD SYNC">
+          Mark-X employs a hybrid local-first architecture:
+          {"\n\n"}• Offline Availability: Recent notes and files are cached in sandboxed local device storage. You can draft notes, check off tasks, and view cached documents without an internet connection.
+          {"\n"}• Automatic Cloud Sync: Whenever your device reconnects to the network, your changes synchronize automatically with Mark-X Cloud Vault over encrypted TLS 1.3 channels.
+          {"\n"}• Conflict Resolution: When simultaneous edits occur across devices, Mark-X resolves them using timestamp-based reconciliation to prevent unintended overwrites.
         </Section>
 
-        <Section title="4. HIGH-PERFORMANCE CLOUD VAULT & RESILIENT SYNC">
-          Mark-X synchronizes your encrypted data using enterprise-grade Mark-X
-          cloud storage infrastructure (TLS 1.3 in transit and AES-256 at
-          rest). High-resolution photos and HD/4K videos are delivered with zero
-          loss and accurate aspect ratios. To give you uninterrupted access
-          without network connectivity, your recent files and media are safely
-          cached on your local device.
+        <Section title="4. GOOGLE DRIVE & THIRD-PARTY CLOUD INTEGRATION">
+          Mark-X offers optional integration with third-party cloud providers, including Google Drive:
+          {"\n\n"}• Limited Scope: Linking Google Drive grants Mark-X only the restricted &quot;drive.file&quot; permission. Mark-X only accesses files created or opened through our application.
+          {"\n"}• Compliance with Google Policies: Mark-X complies fully with the Google API Services User Data Policy, including the Limited Use requirements.
+          {"\n"}• User Revocation: You may disconnect third-party cloud providers at any time through your Google account security settings or app preferences.
         </Section>
 
-        <Section title="5. MULTI-DEVICE SESSION MANAGEMENT">
-          Mark-X allows you to view all active hardware sessions logged into
-          your account in real time. You retain the ability to remotely revoke
-          and terminate any session instantly from your Security & Devices
-          panel, ensuring complete control over who accesses your vault.
+        <Section title="5. BIOMETRIC SECURITY & MULTI-DEVICE MANAGEMENT">
+          We provide enterprise-class control over your sessions:
+          {"\n\n"}• Hardware Biometric Lock: When enabled, unlocking Mark-X uses your device&apos;s native Face ID or Fingerprint hardware (Secure Enclave or Keystore). Biometric data is never transmitted to our servers.
+          {"\n"}• Multi-Device Session Control: You can review every hardware device currently signed into your account. You possess the right to remotely terminate and revoke any session immediately from Profile &gt; Active Devices.
         </Section>
 
-        <Section title="6. RESPONSIBLE USAGE & ACCOUNT INTEGRITY">
-          Mark-X is designed for lawful personal organization, creative
-          curation, and secure productivity. You agree not to use our cloud
-          systems to distribute malware, engage in unauthorized penetration
-          attacks against our servers, or host unlawful content. You are
-          responsible for maintaining the secrecy of your login credentials.
+        <Section title="6. RESPONSIBLE USAGE & FAIR USE">
+          Mark-X is designed for personal productivity and secure file organization. By using the service, you agree not to:
+          {"\n\n"}• Store, host, or distribute malicious software, viruses, or exploit payloads.
+          {"\n"}• Attempt unauthorized penetration testing or denial-of-service attacks against Mark-X servers or databases.
+          {"\n"}• Use the service to store or transmit material that violates applicable local or international laws.
+          {"\n"}• Attempt to reverse engineer or extract the source code of our backend cloud infrastructure.
         </Section>
 
-        <Section title="7. DATA PORTABILITY & ACCOUNT TERMINATION">
-          You are never locked into Mark-X. You can export your documents,
-          gallery photos, videos, and notes at any time. If you decide to stop
-          using Mark-X, you can delete your account from your Profile settings,
-          which permanently wipes your user records and storage files from our
-          cloud vault.
+        <Section title="7. DATA PORTABILITY & IRREVERSIBLE ACCOUNT DELETION">
+          You are never locked into the Mark-X ecosystem:
+          {"\n\n"}• Exporting Data: You can export your documents, notes, and media at any time to your device storage or other apps.
+          {"\n"}• Permanent Deletion: In compliance with GDPR Article 17 and the DPDP Act 2023, you can permanently delete your account directly from Profile &gt; Security &amp; Privacy &gt; Deactivate Account. Upon confirmation, your user credentials, notes, drive files, gallery assets, and session records are immediately and irreversibly wiped from our servers.
         </Section>
 
-        <Section title="8. TRANSPARENT UPDATES" last>
-          As we release new features and improvements to Mark-X, we may revise
-          these terms. Whenever meaningful modifications occur, we will post a
-          clear in-app notice so you are always aware of how your rights and
-          data are handled.
+        <Section title="8. SERVICE AVAILABILITY & DISCLAIMERS">
+          While we maintain rigorous cloud infrastructure with automated backups and high availability, Mark-X is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. We recommend maintaining external backups of mission-critical files. To the maximum extent permitted by law, Mark-X disclaims liability for indirect, incidental, or consequential damages resulting from service interruptions or device malfunctions.
+        </Section>
+
+        <Section title="9. TRANSPARENT UPDATES TO TERMS" last>
+          As we release new features or adapt to legal regulations, we may update these Terms of Service. When material changes occur, we will provide conspicuous in-app notifications so you are always informed of your rights.
         </Section>
 
         <View className="border-t border-[#E5E7EB] pt-6 items-center">
