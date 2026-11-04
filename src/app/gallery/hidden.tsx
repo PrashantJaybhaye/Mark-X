@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ScrollView,
   Animated,
   useWindowDimensions,
@@ -13,7 +14,7 @@ import {
   Modal,
   BackHandler,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -60,6 +61,34 @@ export default function MyEyesOnlyVaultScreen() {
 
   // Options Modal
   const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const insets = useSafeAreaInsets();
+  const optionsSheetAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showOptionsModal) {
+      optionsSheetAnim.setValue(0);
+      Animated.spring(optionsSheetAnim, {
+        toValue: 1,
+        friction: 9,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showOptionsModal, optionsSheetAnim]);
+
+  const closeOptionsModal = useCallback(
+    (callback?: () => void) => {
+      Animated.timing(optionsSheetAnim, {
+        toValue: 0,
+        duration: 170,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowOptionsModal(false);
+        callback?.();
+      });
+    },
+    [optionsSheetAnim]
+  );
 
   const gutter = 6;
   const sideMargin = 8;
@@ -177,7 +206,7 @@ export default function MyEyesOnlyVaultScreen() {
   useEffect(() => {
     const onBackPress = () => {
       if (showOptionsModal) {
-        setShowOptionsModal(false);
+        closeOptionsModal();
         return true;
       }
       if (showUnhideConfirm) {
@@ -409,13 +438,11 @@ export default function MyEyesOnlyVaultScreen() {
         {isLoading || isRefreshing ? (
           <GalleryMasonrySkeleton cardWidth={columnWidth} />
         ) : pins.length === 0 ? (
-          <View className="flex-1 w-full items-center justify-center py-20">
-            <GalleryEmptyState
-              cardWidth={columnWidth}
-              title="Nothing in Hidden"
-              description="Hide photos and videos from your gallery to keep them private."
-            />
-          </View>
+          <GalleryEmptyState
+            cardWidth={columnWidth}
+            title="Nothing in Hidden"
+            description="Hide photos and videos from your gallery to keep them private."
+          />
         ) : (
           <View className="flex-row w-full" style={{ gap: gutter }}>
             {/* Left Column */}
@@ -687,123 +714,192 @@ export default function MyEyesOnlyVaultScreen() {
       {/* Options Bottom Sheet */}
       <Modal
         visible={showOptionsModal}
-        animationType="fade"
         transparent={true}
-        onRequestClose={() => setShowOptionsModal(false)}
+        animationType="none"
+        onRequestClose={() => closeOptionsModal()}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setShowOptionsModal(false)}
-          className="flex-1 bg-black/40 justify-end"
-        >
-          <View
+        <TouchableWithoutFeedback onPress={() => closeOptionsModal()}>
+          <Animated.View
             style={{
-              backgroundColor: "#FFFFFF",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              paddingTop: 12,
-              paddingBottom: 32,
-              paddingHorizontal: 20,
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.45)",
+              opacity: optionsSheetAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 1],
+              }),
+              justifyContent: "flex-end",
             }}
           >
-            <View className="w-10 h-1.5 rounded-full bg-[#E5E7EB] self-center mb-4" />
-            <Text style={{ fontSize: 16, fontFamily: "Outfit_700Bold", color: "#111111", textAlign: "center", marginBottom: 16 }}>
-              My Eyes Only Options
-            </Text>
+            <TouchableWithoutFeedback>
+              <Animated.View
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  borderTopLeftRadius: 28,
+                  borderTopRightRadius: 28,
+                  paddingTop: 12,
+                  paddingHorizontal: 20,
+                  paddingBottom: Math.max(insets.bottom, 20) + 12,
+                  borderTopWidth: 1,
+                  borderTopColor: "#F3F4F6",
+                  transform: [
+                    {
+                      translateY: optionsSheetAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [300, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                {/* Pull Grabber */}
+                <View
+                  style={{
+                    width: 36,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: "#E5E7EB",
+                    alignSelf: "center",
+                    marginBottom: 16,
+                  }}
+                />
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                if (isNavigatingRef.current) return;
-                isNavigatingRef.current = true;
-                setTimeout(() => {
-                  isNavigatingRef.current = false;
-                }, 1000);
-                setShowOptionsModal(false);
-                triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-                router.push({
-                  pathname: "/gallery/passcode",
-                  params: { mode: "change" },
-                });
-              }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: "#F3F4F6",
-                gap: 12,
-              }}
-            >
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#FEECE9", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="key-outline" size={18} color="#EB5B49" />
-              </View>
-              <View className="flex-1">
-                <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#111111" }}>
-                  Change Passcode
-                </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Outfit_400Regular", color: "#8E8E93" }}>
-                  Set a new 4-digit passcode for this vault
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-            </TouchableOpacity>
+                {/* Sheet Title & Subtitle */}
+                <View style={{ alignItems: "center", marginBottom: 18 }}>
+                  <Text
+                    style={{
+                      fontSize: 16.5,
+                      fontFamily: "Outfit_700Bold",
+                      color: "#111111",
+                      letterSpacing: -0.2,
+                      marginBottom: 3,
+                    }}
+                  >
+                    Vault Options
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12.5,
+                      fontFamily: "Outfit_400Regular",
+                      color: "#8E8E93",
+                    }}
+                  >
+                    Manage your private folder security
+                  </Text>
+                </View>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                if (isNavigatingRef.current) return;
-                isNavigatingRef.current = true;
-                setTimeout(() => {
-                  isNavigatingRef.current = false;
-                }, 1000);
-                setShowOptionsModal(false);
-                triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace("/(main)/gallery");
-                }
-              }}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-                gap: 12,
-              }}
-            >
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="lock-closed-outline" size={18} color="#111111" />
-              </View>
-              <View className="flex-1">
-                <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#111111" }}>
-                  Lock Vault
-                </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Outfit_400Regular", color: "#8E8E93" }}>
-                  Exit and require passcode to enter again
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-            </TouchableOpacity>
+                {/* Grouped Options Container (Zero Shadows) */}
+                <View
+                  style={{
+                    backgroundColor: "#F8F9FA",
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: "#EEF0F2",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Change Passcode */}
+                  <TouchableOpacity
+                    activeOpacity={0.65}
+                    onPress={() => {
+                      if (isNavigatingRef.current) return;
+                      isNavigatingRef.current = true;
+                      setTimeout(() => {
+                        isNavigatingRef.current = false;
+                      }, 1000);
+                      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+                      closeOptionsModal(() => {
+                        router.push({
+                          pathname: "/gallery/passcode",
+                          params: { mode: "change" },
+                        });
+                      });
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#EEF0F2",
+                      gap: 14,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 19,
+                        backgroundColor: "#FEECE9",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="key-outline" size={19} color="#EB5B49" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#111111", letterSpacing: -0.1 }}>
+                        Change Passcode
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Outfit_400Regular", color: "#8E8E93", marginTop: 1 }}>
+                        Update your 4-digit security code
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color="#C7C7CC" />
+                  </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setShowOptionsModal(false)}
-              style={{
-                marginTop: 12,
-                height: 46,
-                borderRadius: 23,
-                backgroundColor: "#F5F6F8",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 14.5, fontFamily: "Outfit_600SemiBold", color: "#111111" }}>
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+                  {/* Lock Vault */}
+                  <TouchableOpacity
+                    activeOpacity={0.65}
+                    onPress={() => {
+                      if (isNavigatingRef.current) return;
+                      isNavigatingRef.current = true;
+                      setTimeout(() => {
+                        isNavigatingRef.current = false;
+                      }, 1000);
+                      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+                      closeOptionsModal(() => {
+                        if (router.canGoBack()) {
+                          router.back();
+                        } else {
+                          router.replace("/(main)/gallery");
+                        }
+                      });
+                    }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      gap: 14,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 19,
+                        backgroundColor: "#F0F2F4",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="lock-closed-outline" size={19} color="#111111" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#111111", letterSpacing: -0.1 }}>
+                        Lock Vault
+                      </Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Outfit_400Regular", color: "#8E8E93", marginTop: 1 }}>
+                        Exit immediately and require passcode
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color="#C7C7CC" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </Animated.View>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );

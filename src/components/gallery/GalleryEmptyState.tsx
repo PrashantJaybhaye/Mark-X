@@ -215,29 +215,10 @@ export function GalleryEmptyState({
   title = "A canvas for your vision",
   description = "Save, organize, and explore your photos and visual inspirations in one place.",
 }: GalleryEmptyStateProps) {
-  const isVault = title !== "A canvas for your vision" && (title.toLowerCase().includes("hidden") || title.toLowerCase().includes("lock"));
-
   return (
     <View className="flex-1 w-full items-center justify-center px-6 pt-10 pb-24">
       <View className="items-center justify-center mb-5">
-        {isVault ? (
-          <View
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: "#F4F5F7",
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: "#E5E7EB",
-            }}
-          >
-            <Ionicons name="lock-closed-outline" size={36} color="#6B7280" />
-          </View>
-        ) : (
-          <GalleryIllustration />
-        )}
+        <GalleryIllustration />
       </View>
 
       <Text
