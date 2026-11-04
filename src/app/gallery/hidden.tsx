@@ -472,7 +472,11 @@ export default function MyEyesOnlyVaultScreen() {
                   } else {
                     router.push({
                       pathname: "/gallery/[id]",
-                      params: { id: pin.id, initialPin: JSON.stringify(pin) },
+                      params: {
+                        id: pin.id,
+                        initialPin: JSON.stringify(pin),
+                        source: "hidden",
+                      },
                     });
                   }
                 }}
@@ -501,11 +505,24 @@ export default function MyEyesOnlyVaultScreen() {
 
                 {/* Video Play Badge */}
                 {pin.mediaType === "video" && (
-                  <View className="absolute bottom-1.5 left-1.5 bg-black/60 rounded px-1.5 py-0.5 flex-row items-center gap-1">
-                    <Ionicons name="play" size={10} color="#FFFFFF" />
+                  <View
+                    className="absolute bottom-1.5 left-1.5 flex-row items-center px-1.5 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: "rgba(0, 0, 0, 0.58)",
+                      borderWidth: 0.5,
+                      borderColor: "rgba(255, 255, 255, 0.25)",
+                      shadowColor: "#000000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.35,
+                      shadowRadius: 2,
+                      elevation: 3,
+                      gap: 3,
+                    }}
+                  >
+                    <Ionicons name="play" size={8.5} color="#FFFFFF" style={{ marginLeft: 0.5 }} />
                     {pin.duration ? (
-                      <Text style={{ fontSize: 9.5, color: "#FFFFFF", fontFamily: "Outfit_500Medium" }}>
-                        {Math.round(pin.duration)}s
+                      <Text style={{ fontSize: 9, color: "#FFFFFF", fontFamily: "Outfit_600SemiBold", letterSpacing: 0.2 }}>
+                        {Math.floor(pin.duration / 60)}:{String(Math.floor(pin.duration % 60)).padStart(2, "0")}
                       </Text>
                     ) : null}
                   </View>

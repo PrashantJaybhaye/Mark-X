@@ -140,24 +140,43 @@ export const saveDriveItems = async (items: DriveItem[]) => {
   await recalculateTotalUsedStorageGB();
 };
 
+let memoryGalleryPins: GalleryPin[] = [];
+let memoryHiddenGalleryPins: GalleryPin[] = [];
+
+export const getMemoryGalleryPins = (): GalleryPin[] => memoryGalleryPins;
+export const setMemoryGalleryPins = (pins: GalleryPin[]): void => {
+  memoryGalleryPins = pins;
+};
+
+export const getMemoryHiddenGalleryPins = (): GalleryPin[] => memoryHiddenGalleryPins;
+export const setMemoryHiddenGalleryPins = (pins: GalleryPin[]): void => {
+  memoryHiddenGalleryPins = pins;
+};
+
 export const loadCachedGalleryPins = async (): Promise<GalleryPin[]> => {
   const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
-  return [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  memoryGalleryPins = sorted;
+  return sorted;
 };
 
 export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
   const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  memoryGalleryPins = sorted;
   await saveItem(STORAGE_KEYS.GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();
 };
 
 export const loadCachedHiddenGalleryPins = async (): Promise<GalleryPin[]> => {
   const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.HIDDEN_GALLERY_PINS, []);
-  return [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  memoryHiddenGalleryPins = sorted;
+  return sorted;
 };
 
 export const saveCachedHiddenGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
   const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  memoryHiddenGalleryPins = sorted;
   await saveItem(STORAGE_KEYS.HIDDEN_GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();
 };

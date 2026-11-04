@@ -29,7 +29,7 @@ import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import { safePickMultipleImages } from "../../services/nativePickerService";
 import { triggerHaptic } from "../../utils/haptics";
 import { uploadFileToMarkx } from "../../services/cloudflareStorage";
-import { loadCachedGalleryPins, saveCachedGalleryPins } from "../../services/storageService";
+import { loadCachedGalleryPins, saveCachedGalleryPins, setMemoryGalleryPins } from "../../services/storageService";
 import {
   fetchGalleryPinsPage,
   GALLERY_PAGE_LIMIT,
@@ -59,6 +59,7 @@ export default function GalleryScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const lastDocRef = useRef<any>(null);
   const isNavigatingRef = useRef(false);
+  const sortedPinsRef = useRef<GalleryPin[]>([]);
   const isMountedRef = useRef(true);
   const [spinAnim] = useState(() => new Animated.Value(0));
 
@@ -279,16 +280,29 @@ export default function GalleryScreen() {
         if (!isMounted) return;
         prefetchPinImages(latestPins);
         setPins((prev) => {
-          const map = new Map(prev.map((p) => [p.id, p]));
-          latestPins.forEach((item) => {
-            const existing = map.get(item.id);
-            map.set(item.id, {
+          const latestIds = new Set(latestPins.map((p) => p.id));
+          const prevMap = new Map(prev.map((p) => [p.id, p]));
+
+          const localUploading = prev.filter(
+            (p) => (p.uploadStatus === "uploading" || !p.imageUrl?.startsWith("http")) && !latestIds.has(p.id)
+          );
+
+          const mergedLatest = latestPins.map((item) => {
+            const existing = prevMap.get(item.id);
+            return {
               ...(existing || {}),
               ...item,
               localUri: item.localUri || existing?.localUri,
-            });
+            };
           });
-          return Array.from(map.values());
+
+          const remainingPrev = prev.filter(
+            (p) => !latestIds.has(p.id) && p.uploadStatus !== "uploading" && (p.imageUrl?.startsWith("http") ?? false)
+          );
+
+          const updated = [...localUploading, ...mergedLatest, ...remainingPrev];
+          saveCachedGalleryPins(updated);
+          return updated;
         });
         setIsLoading(false);
       },
@@ -323,9 +337,21 @@ export default function GalleryScreen() {
     }, 1000);
 
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    const sortedList = sortedPinsRef.current;
+    const pinIdx = sortedList ? sortedList.findIndex((p) => p.id === pin.id) : -1;
+
+    if (sortedList && sortedList.length > 0) {
+      setMemoryGalleryPins(sortedList);
+    }
+
     router.push({
       pathname: "/gallery/[id]",
-      params: { id: pin.id, initialPin: JSON.stringify(pin) },
+      params: {
+        id: pin.id,
+        initialPin: JSON.stringify(pin),
+        initialIndex: pinIdx >= 0 ? String(pinIdx) : "0",
+        source: "main",
+      },
     });
   }, [router, handleRetryFailedUploads]);
 
@@ -345,6 +371,7 @@ export default function GalleryScreen() {
     }
 
     const sortedPins = savedBucket.concat(unsavedBucket);
+    sortedPinsRef.current = sortedPins;
 
     sortedPins.forEach((pin) => {
       const estimatedHeight = Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 16;

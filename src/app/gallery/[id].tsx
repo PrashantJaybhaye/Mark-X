@@ -3,6 +3,7 @@ import {
   AppState,
   View,
   Text,
+  FlatList,
   TouchableOpacity,
   useWindowDimensions,
   ActivityIndicator,
@@ -27,8 +28,11 @@ import { resolvePlayableVideoUri } from "../../services/videoCacheService";
 import { triggerHaptic } from "../../utils/haptics";
 import {
   loadCachedGalleryPins,
+  loadCachedHiddenGalleryPins,
   saveCachedGalleryPins,
   syncGalleryStats,
+  getMemoryGalleryPins,
+  getMemoryHiddenGalleryPins,
 } from "../../services/storageService";
 import {
   updateGalleryPinInServer,
@@ -119,10 +123,10 @@ function InlineVideoPlayer({
   isMuted: boolean;
   onDoubleTap: () => void;
 }) {
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showPoster, setShowPoster] = useState(true);
-  const [isBuffering, setIsBuffering] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   const showPosterRef = useRef(true);
   const posterFadeAnim = useRef(new Animated.Value(1)).current;
@@ -134,7 +138,7 @@ function InlineVideoPlayer({
     p.loop = true;
     p.muted = isMuted;
     p.timeUpdateEventInterval = 0.1;
-    p.play();
+    p.pause();
   });
 
   const hidePosterSmoothly = useCallback(() => {
@@ -211,18 +215,19 @@ function InlineVideoPlayer({
     if (!player) return;
     if (isPlaying) {
       player.pause();
+      setShowPlayIcon(true);
+      playIconAnim.setValue(1);
+      Animated.timing(playIconAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: 100,
+        useNativeDriver: true,
+      }).start(() => setShowPlayIcon(false));
     } else {
+      hidePosterSmoothly();
       player.play();
+      setShowPlayIcon(false);
     }
-
-    setShowPlayIcon(true);
-    playIconAnim.setValue(1);
-    Animated.timing(playIconAnim, {
-      toValue: 0,
-      duration: 650,
-      delay: 150,
-      useNativeDriver: true,
-    }).start(() => setShowPlayIcon(false));
   };
 
   const handlePress = () => {
@@ -285,7 +290,28 @@ function InlineVideoPlayer({
         onPress={handlePress}
         className="absolute inset-0 items-center justify-center z-20"
       >
-        {showPlayIcon && (
+        {!isPlaying ? (
+          <View
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.55)",
+              borderWidth: 1,
+              borderColor: "rgba(255, 255, 255, 0.25)",
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 8,
+              elevation: 6,
+            }}
+            className="w-16 h-16 rounded-full items-center justify-center backdrop-blur-md"
+          >
+            <Ionicons
+              name="play"
+              size={32}
+              color="#FFFFFF"
+              style={{ marginLeft: 3 }}
+            />
+          </View>
+        ) : showPlayIcon ? (
           <Animated.View
             style={{
               opacity: playIconAnim,
@@ -297,17 +323,24 @@ function InlineVideoPlayer({
                   }),
                 },
               ],
+              backgroundColor: "rgba(0, 0, 0, 0.55)",
+              borderWidth: 1,
+              borderColor: "rgba(255, 255, 255, 0.25)",
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 8,
+              elevation: 6,
             }}
-            className="w-16 h-16 rounded-full bg-black/65 backdrop-blur-md items-center justify-center shadow-xl border border-white/20"
+            className="w-16 h-16 rounded-full items-center justify-center backdrop-blur-md"
           >
             <Ionicons
-              name={isPlaying ? "play" : "pause"}
+              name="pause"
               size={32}
               color="#FFFFFF"
-              style={isPlaying ? { marginLeft: 2 } : undefined}
             />
           </Animated.View>
-        )}
+        ) : null}
       </TouchableOpacity>
 
       <VideoProgressBar player={player} />
@@ -317,10 +350,15 @@ function InlineVideoPlayer({
 
 export default function GalleryDetailPage() {
   const router = useRouter();
-  const { id, initialPin } = useLocalSearchParams<{ id: string; initialPin?: string }>();
+  const { id, initialPin, initialIndex, source } = useLocalSearchParams<{
+    id: string;
+    initialPin?: string;
+    initialIndex?: string;
+    source?: string;
+  }>();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  const [pin, setPin] = useState<GalleryPin | null>(() => {
+  const [initialSelectedPin] = useState<GalleryPin | null>(() => {
     if (initialPin) {
       try {
         return normalizeGalleryPin(JSON.parse(initialPin));
@@ -331,7 +369,29 @@ export default function GalleryDetailPage() {
     return null;
   });
 
-  const [loading, setLoading] = useState(!pin);
+  const parsedInitIdx = initialIndex ? parseInt(initialIndex, 10) : 0;
+
+  const [allPins, setAllPins] = useState<GalleryPin[]>(() => {
+    const isHidden = source === "hidden";
+    const memPins = isHidden ? getMemoryHiddenGalleryPins() : getMemoryGalleryPins();
+    if (memPins && memPins.length > 0) {
+      return memPins.map(normalizeGalleryPin);
+    }
+    return initialSelectedPin ? [initialSelectedPin] : [];
+  });
+
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    const isHidden = source === "hidden";
+    const memPins = isHidden ? getMemoryHiddenGalleryPins() : getMemoryGalleryPins();
+    if (memPins && memPins.length > 0) {
+      const foundIdx = memPins.findIndex((p) => p.id === id);
+      if (foundIdx >= 0) return foundIdx;
+    }
+    return !isNaN(parsedInitIdx) && parsedInitIdx >= 0 ? parsedInitIdx : 0;
+  });
+
+  const [loading, setLoading] = useState<boolean>(!initialSelectedPin && allPins.length === 0);
+
   const [infoVisible, setInfoVisible] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
@@ -339,24 +399,14 @@ export default function GalleryDetailPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessageDialog, setExportMessageDialog] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [playableVideoUri, setPlayableVideoUri] = useState<string>(() => {
-    return pin?.localUri || pin?.imageUrl || "";
-  });
+
+  const flatListRef = useRef<FlatList>(null);
   const bookmarkScale = useRef(new Animated.Value(1)).current;
   const lastTapRef = useRef<number>(0);
+  const isInitialScrollDoneRef = useRef(allPins.length > 1);
 
-  useEffect(() => {
-    if (!pin || pin.mediaType !== "video") return;
-    let isMounted = true;
-    resolvePlayableVideoUri(pin).then((resolved) => {
-      if (isMounted && resolved) {
-        setPlayableVideoUri((prev) => (!prev ? resolved : prev));
-      }
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, [pin?.id, pin?.imageUrl, pin?.localUri, pin?.mediaType]);
+  // Active pin currently in view
+  const currentPin = allPins[currentIndex] || initialSelectedPin || null;
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -364,64 +414,96 @@ export default function GalleryDetailPage() {
     }
   }, []);
 
+  // Fetch all cached & server pins according to gallery source
   useEffect(() => {
     let isMounted = true;
-    const resolvePin = async () => {
-      if (!id) return;
 
-      const cached = await loadCachedGalleryPins();
-      const foundCached = cached.find((p) => p.id === id);
-      if (isMounted && foundCached) {
-        setPin(normalizeGalleryPin(foundCached));
-        setLoading(false);
+    const loadPins = async () => {
+      try {
+        const isHidden = source === "hidden";
+        const cached = isHidden ? await loadCachedHiddenGalleryPins() : await loadCachedGalleryPins();
+        if (cached && cached.length > 0 && isMounted) {
+          const normalized = cached.map(normalizeGalleryPin);
+          setAllPins((prev) => {
+            if (prev.length === normalized.length && prev[0]?.id === normalized[0]?.id) {
+              return prev;
+            }
+            return normalized;
+          });
+          const foundIdx = normalized.findIndex((p) => p.id === id);
+          if (foundIdx >= 0 && !isInitialScrollDoneRef.current) {
+            isInitialScrollDoneRef.current = true;
+            setCurrentIndex(foundIdx);
+            requestAnimationFrame(() => {
+              flatListRef.current?.scrollToIndex({ index: foundIdx, animated: false });
+            });
+          }
+          setLoading(false);
+        }
+
+        if (!isHidden) {
+          const serverPins = await fetchGalleryPinsFromServer();
+          if (!isMounted) return;
+
+          if (serverPins && serverPins.length > 0) {
+            const normalizedServer = serverPins.map(normalizeGalleryPin);
+            const serverIds = new Set(normalizedServer.map((p) => p.id));
+            const localOnly = (cached || []).filter((p) => !serverIds.has(p.id));
+            const fullList = [...localOnly, ...normalizedServer];
+            setAllPins(fullList);
+            const foundIdx = fullList.findIndex((p) => p.id === id);
+            if (foundIdx >= 0 && !isInitialScrollDoneRef.current) {
+              isInitialScrollDoneRef.current = true;
+              setCurrentIndex(foundIdx);
+              requestAnimationFrame(() => {
+                flatListRef.current?.scrollToIndex({ index: foundIdx, animated: false });
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[GalleryDetailPage] Error loading pins list:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-
-      const serverPins = await fetchGalleryPinsFromServer();
-      if (!isMounted) return;
-
-      if (!serverPins) {
-        setLoading(false);
-        return;
-      }
-
-      const remotePin = serverPins.find((p) => p.id === id);
-      if (remotePin) {
-        setPin({
-          ...remotePin,
-          localUri: remotePin.localUri || foundCached?.localUri,
-        });
-      } else if (!foundCached) {
-        setPin(null);
-      }
-      setLoading(false);
     };
 
-    resolvePin();
+    loadPins();
     return () => {
       isMounted = false;
     };
-  }, [id, router]);
+  }, [id, source]);
+
+  // Initial scroll anchor as soon as list is mounted
+  useEffect(() => {
+    if (allPins.length <= 1 || isInitialScrollDoneRef.current) return;
+    const targetIdx = allPins.findIndex((p) => p.id === id);
+    if (targetIdx >= 0 && flatListRef.current) {
+      isInitialScrollDoneRef.current = true;
+      flatListRef.current.scrollToIndex({ index: targetIdx, animated: false });
+    }
+  }, [allPins, id]);
 
   const updatePin = useCallback(async (updates: Partial<GalleryPin>) => {
-    if (!pin?.id) return;
-    const targetId = pin.id;
+    if (!currentPin?.id) return;
+    const targetId = currentPin.id;
 
-    setPin((prev) => (prev ? { ...prev, ...updates } : null));
+    setAllPins((prev) => prev.map((p) => (p.id === targetId ? { ...p, ...updates } : p)));
 
     try {
       const cached = await loadCachedGalleryPins();
       const updated = cached.map((p) => (p.id === targetId ? { ...p, ...updates } : p));
       await saveCachedGalleryPins(updated);
     } catch (err) {
-      console.warn("[id.tsx] Error updating cached pins:", err);
+      console.warn("[GalleryDetailPage] Error updating cached pins:", err);
     }
 
     try {
       await updateGalleryPinInServer(targetId, updates);
     } catch (err) {
-      console.warn("[id.tsx] Error syncing pin update to server:", err);
+      console.warn("[GalleryDetailPage] Error syncing pin update to server:", err);
     }
-  }, [pin?.id]);
+  }, [currentPin?.id]);
 
   const animateBookmarkBounce = () => {
     bookmarkScale.setValue(0.7);
@@ -434,10 +516,10 @@ export default function GalleryDetailPage() {
   };
 
   const handleSaveToggle = async () => {
-    if (!pin) return;
+    if (!currentPin) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     animateBookmarkBounce();
-    await updatePin({ saved: !pin.saved });
+    await updatePin({ saved: !currentPin.saved });
   };
 
   const handlePhotoPress = () => {
@@ -450,11 +532,11 @@ export default function GalleryDetailPage() {
   };
 
   const handleExport = async () => {
-    if (!pin || isExporting) return;
+    if (!currentPin || isExporting) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setIsExporting(true);
     try {
-      const result = await exportMediaToDevice(pin.imageUrl, pin.fileName);
+      const result = await exportMediaToDevice(currentPin.imageUrl, currentPin.fileName);
       if (result.success && result.savedToGallery) {
         triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
         setExportMessageDialog("Media saved directly to your device Photos.");
@@ -467,76 +549,69 @@ export default function GalleryDetailPage() {
   };
 
   const handleDeleteConfirm = () => {
-    if (!pin) return;
+    if (!currentPin) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     setDeleteDialogVisible(true);
   };
 
   const handlePerformDelete = async () => {
-    if (!pin || isDeleting) return;
+    if (!currentPin || isDeleting) return;
     setIsDeleting(true);
     try {
-      await deleteGalleryPinFromServer(pin.id);
+      const deletedId = currentPin.id;
+      await deleteGalleryPinFromServer(deletedId);
       const cached = await loadCachedGalleryPins();
-      const filtered = cached.filter((p) => p.id !== pin.id);
+      const filtered = cached.filter((p) => p.id !== deletedId);
       await saveCachedGalleryPins(filtered);
       await syncGalleryStats(filtered.length);
       setDeleteDialogVisible(false);
-      router.back();
+
+      if (allPins.length <= 1) {
+        router.back();
+      } else {
+        const nextList = allPins.filter((p) => p.id !== deletedId);
+        setAllPins(nextList);
+        const newIdx = Math.min(currentIndex, nextList.length - 1);
+        setCurrentIndex(newIdx);
+      }
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (loading && !pin) {
-    return (
-      <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="small" color="#007AFF" />
-      </View>
-    );
-  }
+  const handleMomentumScrollEnd = useCallback(
+    (e: any) => {
+      const offsetX = e.nativeEvent.contentOffset.x;
+      const newIndex = Math.round(offsetX / windowWidth);
+      if (newIndex >= 0 && newIndex !== currentIndex) {
+        setCurrentIndex(newIndex);
+      }
+    },
+    [windowWidth, currentIndex]
+  );
 
-  if (!pin) {
-    return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center px-6">
-        <Ionicons name="images-outline" size={48} color="#9CA3AF" />
-        <Text className="text-[17px] font-outfit-bold text-[#1C1C1E] mt-3">Media Not Found</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mt-4 px-6 py-2.5 bg-[#F2F2F7] rounded-full"
-        >
-          <Text className="text-[#007AFF] font-outfit-semibold text-[14px]">Go Back</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  const isVideo = pin.mediaType === "video";
-
-  const ratio = pin.aspectRatio && pin.aspectRatio > 0 ? pin.aspectRatio : 1;
-  const maxImgWidth = windowWidth - 16;
-  const maxImgHeight = windowHeight - 140;
-
-  let imgWidth = maxImgWidth;
-  let imgHeight = maxImgWidth / ratio;
-  if (imgHeight > maxImgHeight) {
-    imgHeight = maxImgHeight;
-    imgWidth = maxImgHeight * ratio;
-  }
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: windowWidth,
+      offset: windowWidth * index,
+      index,
+    }),
+    [windowWidth]
+  );
 
   const formattedDateHeader = useMemo(() => {
-    if (!pin) return { date: "", time: "" };
+    if (!currentPin) return { date: "", time: "" };
     let dateObj: Date | null = null;
-    if (pin.createdAt) {
-      if (typeof pin.createdAt === "object" && (pin.createdAt as any).seconds) {
-        dateObj = new Date((pin.createdAt as any).seconds * 1000);
-      } else if (typeof pin.createdAt === "string" || typeof pin.createdAt === "number") {
-        const parsed = new Date(pin.createdAt);
+    if (currentPin.createdAt) {
+      if (typeof currentPin.createdAt === "object" && (currentPin.createdAt as any).seconds) {
+        dateObj = new Date((currentPin.createdAt as any).seconds * 1000);
+      } else if (typeof currentPin.createdAt === "string" || typeof currentPin.createdAt === "number") {
+        const parsed = new Date(currentPin.createdAt);
         if (!isNaN(parsed.getTime())) dateObj = parsed;
       }
     }
     if (!dateObj) {
-      const match = pin.id.match(/\d{10,13}/) || (pin.fileName && pin.fileName.match(/\d{10,13}/));
+      const match = currentPin.id.match(/\d{10,13}/) || (currentPin.fileName && currentPin.fileName.match(/\d{10,13}/));
       if (match) {
         const num = parseInt(match[0], 10);
         dateObj = new Date(num > 100000000000 ? num : num * 1000);
@@ -556,42 +631,149 @@ export default function GalleryDetailPage() {
     });
 
     return { date: dateStr, time: timeStr };
-  }, [pin]);
+  }, [currentPin]);
+
+  if (loading && !currentPin) {
+    return (
+      <View className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator size="small" color="#007AFF" />
+      </View>
+    );
+  }
+
+  if (!currentPin) {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center px-6">
+        <Ionicons name="images-outline" size={48} color="#9CA3AF" />
+        <Text className="text-[17px] font-outfit-bold text-[#1C1C1E] mt-3">Media Not Found</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mt-4 px-6 py-2.5 bg-[#F2F2F7] rounded-full"
+        >
+          <Text className="text-[#007AFF] font-outfit-semibold text-[14px]">Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const isCurrentVideo = currentPin.mediaType === "video";
+
+  const renderMediaItem = useCallback(
+    ({ item, index }: { item: GalleryPin; index: number }) => {
+      const isItemVideo = item.mediaType === "video";
+      const isActive = index === currentIndex;
+      const ratio = item.aspectRatio && item.aspectRatio > 0 ? item.aspectRatio : 1;
+      const maxImgWidth = windowWidth - 16;
+      const maxImgHeight = windowHeight - 140;
+
+      let imgWidth = maxImgWidth;
+      let imgHeight = maxImgWidth / ratio;
+      if (imgHeight > maxImgHeight) {
+        imgHeight = maxImgHeight;
+        imgWidth = maxImgHeight * ratio;
+      }
+
+      return (
+        <View
+          style={{ width: windowWidth, height: "100%" }}
+          className="items-center justify-center px-2 py-4"
+        >
+          {isItemVideo ? (
+            <View
+              style={{
+                width: imgWidth,
+                height: imgHeight,
+                borderRadius: 20,
+                overflow: "hidden",
+                backgroundColor: "#F2F2F7",
+              }}
+            >
+              {isActive ? (
+                <InlineVideoPlayer
+                  key={item.id}
+                  sourceUrl={item.localUri || item.imageUrl}
+                  posterUrl={item.thumbnailUrl || item.imageUrl}
+                  blurHash={item.blurHash}
+                  fileName={item.fileName || "temp.mp4"}
+                  isMuted={isMuted}
+                  onDoubleTap={handleSaveToggle}
+                />
+              ) : (
+                <Image
+                  source={{ uri: item.thumbnailUrl || item.imageUrl }}
+                  placeholder={{ blurhash: item.blurHash || DEFAULT_BLURHASH }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={handlePhotoPress}
+              delayPressIn={80}
+              className="w-full h-full items-center justify-center"
+            >
+              <View
+                style={{
+                  width: imgWidth,
+                  height: imgHeight,
+                  borderRadius: 20,
+                  overflow: "hidden",
+                  backgroundColor: "#F2F2F7",
+                }}
+              >
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  placeholder={{ blurhash: item.blurHash || DEFAULT_BLURHASH }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  priority={isActive ? "high" : "normal"}
+                />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    },
+    [currentIndex, windowWidth, windowHeight, isMuted, handleSaveToggle, handlePhotoPress]
+  );
 
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
 
-      <View className="flex-1 items-center justify-center px-2 py-4 bg-white">
-        {isVideo ? (
-          <View
-            style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
-          >
-            <InlineVideoPlayer
-              sourceUrl={playableVideoUri || pin.imageUrl}
-              posterUrl={pin.thumbnailUrl || pin.imageUrl}
-              blurHash={pin.blurHash}
-              fileName={pin.fileName || "temp.mp4"}
-              isMuted={isMuted}
-              onDoubleTap={handleSaveToggle}
-            />
-          </View>
-        ) : (
-          <TouchableOpacity activeOpacity={1} onPress={handlePhotoPress} className="w-full h-full items-center justify-center">
-            <View
-              style={{ width: imgWidth, height: imgHeight, borderRadius: 20, overflow: "hidden", backgroundColor: "#F2F2F7" }}
-            >
-              <Image
-                source={{ uri: pin.imageUrl }}
-                style={{ width: "100%", height: "100%" }}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-            </View>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Horizontal Paging View with Native 60/120fps physics */}
+      <FlatList
+        ref={flatListRef}
+        data={allPins}
+        horizontal
+        pagingEnabled={true}
+        initialScrollIndex={allPins.length > 1 && currentIndex > 0 ? currentIndex : undefined}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+          }, 60);
+        }}
+        showsHorizontalScrollIndicator={false}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={false}
+        directionalLockEnabled={true}
+        overScrollMode="never"
+        scrollEventThrottle={16}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMediaItem}
+        getItemLayout={getItemLayout}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        bounces={true}
+        className="flex-1"
+      />
 
+      {/* Floating Top Navigation Header */}
       <View pointerEvents="box-none" className="absolute top-0 left-0 right-0 z-30">
         <SafeAreaView edges={["top"]}>
           <View className="flex-row items-center justify-between px-4 py-2 pt-4">
@@ -628,12 +810,12 @@ export default function GalleryDetailPage() {
                 className="text-[11px] text-[#8E8E93] text-center mt-0.5"
                 style={{ fontFamily: "Outfit_400Regular" }}
               >
-                {formattedDateHeader.time} {pin.fileSizeFormatted ? `· ${pin.fileSizeFormatted}` : ""}
+                {formattedDateHeader.time} {currentPin.fileSizeFormatted ? `· ${currentPin.fileSizeFormatted}` : ""}
               </Text>
             </TouchableOpacity>
 
             <View className="flex-row items-center gap-2">
-              {isVideo && (
+              {isCurrentVideo && (
                 <TouchableOpacity
                   activeOpacity={0.65}
                   onPress={() => {
@@ -663,6 +845,7 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
+      {/* Floating Bottom Toolbar */}
       <View className="absolute bottom-0 left-0 right-0 z-30">
         <SafeAreaView edges={["bottom"]} className="bg-white/95 backdrop-blur-md border-t border-[#E5E5EA]">
           <View className="flex-row items-center justify-around py-3 px-2">
@@ -688,9 +871,9 @@ export default function GalleryDetailPage() {
             >
               <Animated.View style={{ transform: [{ scale: bookmarkScale }] }}>
                 <Ionicons
-                  name={pin.saved ? "bookmark" : "bookmark-outline"}
+                  name={currentPin.saved ? "bookmark" : "bookmark-outline"}
                   size={24}
-                  color={pin.saved ? "#FF9500" : "#1C1C1E"}
+                  color={currentPin.saved ? "#FF9500" : "#1C1C1E"}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -719,11 +902,11 @@ export default function GalleryDetailPage() {
         </SafeAreaView>
       </View>
 
-      <GalleryPinInfoSheet visible={infoVisible} pin={pin} onClose={() => setInfoVisible(false)} />
+      <GalleryPinInfoSheet visible={infoVisible} pin={currentPin} onClose={() => setInfoVisible(false)} />
 
       <GalleryPinOptionsSheet
         visible={optionsVisible}
-        pin={pin}
+        pin={currentPin}
         onClose={() => setOptionsVisible(false)}
         onSaveToggle={handleSaveToggle}
         onHidePin={handleDeleteConfirm}

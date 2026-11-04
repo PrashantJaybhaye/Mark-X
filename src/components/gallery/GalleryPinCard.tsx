@@ -137,10 +137,31 @@ export const GalleryPinCard = React.memo(function GalleryPinCard({
         ) : null}
 
         {pin.mediaType === "video" && (
-          <View className="absolute top-2.5 right-2.5 bg-black/60 px-2 py-1 rounded-full flex-row items-center gap-1">
-            <Ionicons name="play" size={10} color="#FFFFFF" />
+          <View
+            className="absolute top-2.5 right-2.5 flex-row items-center px-2 py-0.5 rounded-full"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.58)",
+              borderWidth: 0.5,
+              borderColor: "rgba(255, 255, 255, 0.25)",
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 1.5 },
+              shadowOpacity: 0.45,
+              shadowRadius: 3,
+              elevation: 4,
+              gap: 3.5,
+            }}
+          >
+            <Ionicons name="play" size={9.5} color="#FFFFFF" style={{ marginLeft: 0.5 }} />
             {pin.duration ? (
-              <Text className="text-[10px] font-outfit text-white">
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: "Outfit_600SemiBold",
+                  color: "#FFFFFF",
+                  letterSpacing: 0.25,
+                  includeFontPadding: false,
+                }}
+              >
                 {Math.floor(pin.duration / 60)}:{String(Math.floor(pin.duration % 60)).padStart(2, "0")}
               </Text>
             ) : null}
