@@ -416,16 +416,12 @@ export default function DriveScreen() {
     );
   };
 
-  const handleShareFile = async (item: DriveItem) => {
+    const handleShareFile = async (item: DriveItem) => {
     if (item.isFolder) {
       triggerToast("Cannot Export", "error", "Folders cannot be exported as a single file");
       return;
     }
-    triggerToast(`Exporting "${getFileDisplayName(item.name, item.isFolder)}"...`, "export", "Preparing file attachment");
-    const result = await exportDriveFile(item);
-    if (!result.success && result.error) {
-      triggerToast("Export Failed", "error", result.error);
-    }
+    await exportDriveFile(item);
   };
 
   return (

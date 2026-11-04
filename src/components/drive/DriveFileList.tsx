@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useMemo } from "react";
-import { View, Text, FlatList, ListRenderItem } from "react-native";
+import { View, Text, FlatList, ListRenderItem, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { DriveItem } from "../../utils/driveFileTypes";
 import { DriveFileItem } from "./DriveFileItem";
@@ -132,6 +132,26 @@ function DriveFileListComponent({
     return null;
   }, [query, searchQuery, currentFolderId]);
 
+  const getItemLayout = useCallback(
+    (_: any, index: number) => {
+      if (viewMode === "grid") {
+        const ITEM_HEIGHT = 157;
+        return {
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * Math.floor(index / 2),
+          index,
+        };
+      }
+      const ITEM_HEIGHT = 74;
+      return {
+        length: ITEM_HEIGHT,
+        offset: ITEM_HEIGHT * index,
+        index,
+      };
+    },
+    [viewMode]
+  );
+
   const renderSeparator = useCallback(
     () => (viewMode === "grid" ? null : <View style={{ height: 10 }} />),
     [viewMode]
@@ -146,6 +166,8 @@ function DriveFileListComponent({
       keyExtractor={keyExtractor}
       numColumns={viewMode === "grid" ? 2 : 1}
       ItemSeparatorComponent={renderSeparator}
+      getItemLayout={getItemLayout}
+      updateCellsBatchingPeriod={50}
       ListEmptyComponent={listEmpty}
       contentContainerStyle={{
         paddingHorizontal: viewMode === "grid" ? 10 : 16,
@@ -156,10 +178,10 @@ function DriveFileListComponent({
       bounces={false}
       alwaysBounceVertical={false}
       overScrollMode="never"
-      removeClippedSubviews={false}
-      initialNumToRender={15}
-      maxToRenderPerBatch={10}
-      windowSize={11}
+      removeClippedSubviews={Platform.OS === "android"}
+      initialNumToRender={10}
+      maxToRenderPerBatch={8}
+      windowSize={5}
       scrollEventThrottle={16}
       keyboardShouldPersistTaps="handled"
     />

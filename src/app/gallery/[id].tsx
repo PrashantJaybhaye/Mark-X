@@ -38,6 +38,72 @@ import {
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
 import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
 
+const VideoProgressBar = React.memo(function VideoProgressBar({
+  player,
+}: {
+  player: any;
+}) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!player) return;
+
+    let lastProgress = -1;
+    const updateProgress = (currentTime?: number) => {
+      try {
+        const dur = player.duration;
+        const cur = typeof currentTime === "number" ? currentTime : player.currentTime;
+        if (dur > 0 && typeof cur === "number" && !isNaN(cur)) {
+          const pct = Math.min(Math.max((cur / dur) * 100, 0), 100);
+          if (Math.abs(pct - lastProgress) >= 0.2 || pct === 0 || pct === 100) {
+            lastProgress = pct;
+            setProgress(pct);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    updateProgress();
+
+    const timeSub = player.addListener("timeUpdate", (e: any) => {
+      updateProgress(e?.currentTime);
+    });
+
+    const statusSub = player.addListener("statusChange", () => {
+      updateProgress();
+    });
+
+    const sourceSub = player.addListener("sourceLoad", () => {
+      updateProgress();
+    });
+
+    const interval = setInterval(() => {
+      updateProgress();
+    }, 150);
+
+    return () => {
+      clearInterval(interval);
+      timeSub.remove();
+      statusSub.remove();
+      sourceSub.remove();
+    };
+  }, [player]);
+
+  return (
+    <View
+      pointerEvents="none"
+      className="absolute bottom-2 left-6 right-6 h-1 rounded-full bg-black/10 overflow-hidden z-20"
+    >
+      <View
+        className="h-full bg-[#007AFF] rounded-full"
+        style={{ width: `${progress}%` }}
+      />
+    </View>
+  );
+});
+
 function InlineVideoPlayer({
   sourceUrl,
   posterUrl,
@@ -55,11 +121,10 @@ function InlineVideoPlayer({
 }) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [showPoster, setShowPoster] = useState(true);
   const [isBuffering, setIsBuffering] = useState(true);
 
+  const showPosterRef = useRef(true);
   const posterFadeAnim = useRef(new Animated.Value(1)).current;
   const playIconAnim = useRef(new Animated.Value(0)).current;
   const lastTapRef = useRef<number>(0);
@@ -68,11 +133,13 @@ function InlineVideoPlayer({
   const player = useVideoPlayer(sourceUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
+    p.timeUpdateEventInterval = 0.1;
     p.play();
   });
 
   const hidePosterSmoothly = useCallback(() => {
-    if (!showPoster) return;
+    if (!showPosterRef.current) return;
+    showPosterRef.current = false;
     Animated.timing(posterFadeAnim, {
       toValue: 0,
       duration: 250,
@@ -81,11 +148,16 @@ function InlineVideoPlayer({
       setShowPoster(false);
       setIsBuffering(false);
     });
-  }, [showPoster, posterFadeAnim]);
+  }, [posterFadeAnim]);
 
   useEffect(() => {
     if (!player) return;
     player.muted = isMuted;
+    try {
+      player.timeUpdateEventInterval = 0.1;
+    } catch {
+      // ignore
+    }
 
     if (player.status === "readyToPlay" || player.playing) {
       hidePosterSmoothly();
@@ -102,15 +174,13 @@ function InlineVideoPlayer({
     });
 
     const timeSub = player.addListener("timeUpdate", (e) => {
-      setCurrentTime(e.currentTime);
       if (e.currentTime > 0) {
         hidePosterSmoothly();
         setIsBuffering(false);
       }
     });
 
-    const sourceSub = player.addListener("sourceLoad", (e) => {
-      if (e.duration) setDuration(e.duration);
+    const sourceSub = player.addListener("sourceLoad", () => {
       hidePosterSmoothly();
     });
 
@@ -173,8 +243,6 @@ function InlineVideoPlayer({
       }, DOUBLE_PRESS_DELAY);
     }
   };
-
-  const progressPercent = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
 
   return (
     <View className="relative w-full h-full items-center justify-center bg-black/5 overflow-hidden">
@@ -242,14 +310,7 @@ function InlineVideoPlayer({
         )}
       </TouchableOpacity>
 
-      {duration > 0 && (
-        <View className="absolute bottom-2 left-6 right-6 h-1 rounded-full bg-black/10 overflow-hidden z-20">
-          <View
-            className="h-full bg-[#007AFF] rounded-full"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </View>
-      )}
+      <VideoProgressBar player={player} />
     </View>
   );
 }
@@ -289,7 +350,7 @@ export default function GalleryDetailPage() {
     let isMounted = true;
     resolvePlayableVideoUri(pin).then((resolved) => {
       if (isMounted && resolved) {
-        setPlayableVideoUri(resolved);
+        setPlayableVideoUri((prev) => (!prev ? resolved : prev));
       }
     });
     return () => {

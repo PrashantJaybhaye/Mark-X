@@ -454,9 +454,9 @@ export function DriveFilePreviewScreen({
             onPress={handleShare}
             className="w-full py-3.5 rounded-full bg-[#F1F3F4] border border-[#E0E0E0] flex-row items-center justify-center"
           >
-            <Ionicons name="share-outline" size={18} color="#444746" style={{ marginRight: 8 }} />
+            <Ionicons name="download-outline" size={18} color="#444746" style={{ marginRight: 8 }} />
             <Text className="text-[14px] font-outfit-semibold text-[#444746]">
-              Share / Export File
+              Export / Download File
             </Text>
           </TouchableOpacity>
         </View>

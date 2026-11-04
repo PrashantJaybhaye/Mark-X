@@ -380,59 +380,6 @@ export async function uploadDriveFileToCloudflare(
 export async function exportDriveFile(
   item: DriveItem
 ): Promise<{ success: boolean; error?: string }> {
-  if (item.isFolder) {
-    return { success: false, error: "Folders cannot be exported as a single file." };
-  }
-
-  const targetUri = item.uri || item.cloudflareUrl;
-  if (!targetUri) {
-    return { success: false, error: "File location is not available to export." };
-  }
-
-  try {
-    let localShareUri = targetUri;
-
-    if (targetUri.startsWith("http://") || targetUri.startsWith("https://")) {
-      const cleanName = (item.name || "export_file").replace(/[^a-zA-Z0-9._-]/g, "_");
-      const cachePath = `${FileSystem.cacheDirectory}export_${Date.now()}_${cleanName}`;
-      const downloadRes = await FileSystem.downloadAsync(targetUri, cachePath);
-      if (downloadRes.status >= 200 && downloadRes.status < 300 && downloadRes.uri) {
-        localShareUri = downloadRes.uri;
-      } else {
-        return { success: false, error: "Failed to download file from cloud for export." };
-      }
-    }
-
-    const fileInfo = await FileSystem.getInfoAsync(localShareUri);
-    if (!fileInfo?.exists) {
-      if (item.cloudflareUrl && item.cloudflareUrl !== localShareUri) {
-        const cleanName = (item.name || "export_file").replace(/[^a-zA-Z0-9._-]/g, "_");
-        const cachePath = `${FileSystem.cacheDirectory}export_${Date.now()}_${cleanName}`;
-        const downloadRes = await FileSystem.downloadAsync(item.cloudflareUrl, cachePath);
-        if (downloadRes.status >= 200 && downloadRes.status < 300 && downloadRes.uri) {
-          localShareUri = downloadRes.uri;
-        } else {
-          return { success: false, error: "File does not exist on device and cloud download failed." };
-        }
-      } else {
-        return { success: false, error: "File was not found on device storage." };
-      }
-    }
-
-    const isAvailable = await Sharing.isAvailableAsync();
-    if (isAvailable) {
-      const mimeType = getMimeTypeForFile(item.name, item.mimeType);
-      await Sharing.shareAsync(localShareUri, {
-        mimeType,
-        dialogTitle: `Export ${item.name}`,
-        UTI: mimeType,
-      });
-      return { success: true };
-    } else {
-      return { success: false, error: "Native file sharing is not supported on this device." };
-    }
-  } catch (err: any) {
-    console.error("[DriveFirebaseService] exportDriveFile error:", err);
-    return { success: false, error: err?.message || "Failed to export file." };
-  }
+  const { downloadDriveFile } = await import("./driveDownloadService");
+  return downloadDriveFile(item);
 }

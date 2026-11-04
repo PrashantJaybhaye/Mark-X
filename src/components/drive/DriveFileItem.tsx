@@ -170,21 +170,31 @@ function DriveFileItemComponent({
   );
 }
 
+function getTimestampMillis(ts: any): number {
+  if (!ts) return 0;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "string") return new Date(ts).getTime();
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (ts instanceof Date) return ts.getTime();
+  return 0;
+}
+
 export const DriveFileItem = memo(
   DriveFileItemComponent,
   (prev, next) => {
     return (
       prev.item.id === next.item.id &&
       prev.item.name === next.item.name &&
-      prev.item.updatedAt === next.item.updatedAt &&
+      prev.item.isFolder === next.item.isFolder &&
+      prev.item.category === next.item.category &&
       prev.item.starred === next.item.starred &&
       prev.item.sharedBy === next.item.sharedBy &&
       prev.item.size === next.item.size &&
       prev.item.uri === next.item.uri &&
       prev.viewMode === next.viewMode &&
       prev.childCount === next.childCount &&
-      prev.onPress === next.onPress &&
-      prev.onOptionsPress === next.onOptionsPress
+      getTimestampMillis(prev.item.updatedAt) === getTimestampMillis(next.item.updatedAt)
     );
   }
 );

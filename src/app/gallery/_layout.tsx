@@ -7,13 +7,15 @@ export default function GalleryLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        animation: Platform.OS === "android" ? "fade" : "default",
+        animation: "slide_from_right",
         contentStyle: {
           backgroundColor: "#FFFFFF",
         },
       }}
     >
-      <Stack.Screen name="[id]" />
+      <Stack.Screen name="passcode" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="hidden" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="[id]" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }

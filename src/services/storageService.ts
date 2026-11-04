@@ -8,6 +8,7 @@ import { updateUserStats, getUserMetadata } from "./userService";
 const STORAGE_KEYS = {
   DRIVE_ITEMS: "@markx_drive_items_v1",
   GALLERY_PINS: "@markx_gallery_pins_v1",
+  HIDDEN_GALLERY_PINS: "@markx_hidden_gallery_pins_v1",
   NOTES: "@markx_notes_v1",
   USER_PREFERENCES: "@markx_user_preferences_v1",
 };
@@ -147,6 +148,17 @@ export const loadCachedGalleryPins = async (): Promise<GalleryPin[]> => {
 export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
   const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
   await saveItem(STORAGE_KEYS.GALLERY_PINS, sorted);
+  await recalculateTotalUsedStorageGB();
+};
+
+export const loadCachedHiddenGalleryPins = async (): Promise<GalleryPin[]> => {
+  const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.HIDDEN_GALLERY_PINS, []);
+  return [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+};
+
+export const saveCachedHiddenGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
+  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  await saveItem(STORAGE_KEYS.HIDDEN_GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();
 };
 

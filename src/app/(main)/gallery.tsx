@@ -480,6 +480,17 @@ export default function GalleryScreen() {
 
             <TouchableOpacity
               activeOpacity={0.7}
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/gallery/passcode");
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            >
+              <Ionicons name="eye-outline" size={20} color="#111111" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
               onPress={handleAddPhoto}
               hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
             >

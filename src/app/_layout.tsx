@@ -26,6 +26,7 @@ import { AnimatedSplashScreen } from "../components/splash/AnimatedSplashScreen"
 import { IncomingShareModal } from "../components/common/IncomingShareModal";
 import { IosDialog } from "../components/common/IosDialog";
 import "../services/BackgroundUploadService";
+import "../services/driveDownloadService";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -137,7 +138,7 @@ function RootLayoutContent({ isFontsReady }: { isFontsReady: boolean }) {
           <Stack.Screen name="(main)" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="note" />
-          <Stack.Screen name="gallery" />
+          <Stack.Screen name="gallery" options={{ animation: "slide_from_right" }} />
           <Stack.Screen
             name="camera"
             options={{
