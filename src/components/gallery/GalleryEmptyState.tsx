@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import Svg, {
   Path,
   Rect,
@@ -14,6 +15,8 @@ import Svg, {
 interface GalleryEmptyStateProps {
   cardWidth?: number;
   onAddPhoto?: () => void;
+  title?: string;
+  description?: string;
 }
 
 function GalleryIllustration() {
@@ -208,11 +211,33 @@ function GalleryIllustration() {
   );
 }
 
-export function GalleryEmptyState(_props: GalleryEmptyStateProps) {
+export function GalleryEmptyState({
+  title = "A canvas for your vision",
+  description = "Save, organize, and explore your photos and visual inspirations in one place.",
+}: GalleryEmptyStateProps) {
+  const isVault = title !== "A canvas for your vision" && (title.toLowerCase().includes("hidden") || title.toLowerCase().includes("lock"));
+
   return (
-    <View className="flex-1 w-full items-center justify-center px-6 pt-6 pb-24">
-      <View className="items-center justify-center mb-6">
-        <GalleryIllustration />
+    <View className="flex-1 w-full items-center justify-center px-6 pt-10 pb-24">
+      <View className="items-center justify-center mb-5">
+        {isVault ? (
+          <View
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: 40,
+              backgroundColor: "#F4F5F7",
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+            }}
+          >
+            <Ionicons name="lock-closed-outline" size={36} color="#6B7280" />
+          </View>
+        ) : (
+          <GalleryIllustration />
+        )}
       </View>
 
       <Text
@@ -220,15 +245,15 @@ export function GalleryEmptyState(_props: GalleryEmptyStateProps) {
         className="text-[20px] font-outfit-bold text-[#17181A] text-center tracking-tight"
         style={{ fontFamily: "Outfit_700Bold" }}
       >
-        A canvas for your vision
+        {title}
       </Text>
 
       <Text
         allowFontScaling={false}
-        className="text-[14px] font-outfit text-[#6B7078] text-center mt-2 px-5 leading-5 max-w-[300px]"
+        className="text-[14px] font-outfit text-[#6B7078] text-center mt-2 px-5 leading-5 max-w-[320px]"
         style={{ fontFamily: "Outfit_400Regular" }}
       >
-        Save, organize, and explore your photos and visual inspirations in one place.
+        {description}
       </Text>
     </View>
   );

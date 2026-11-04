@@ -25,6 +25,7 @@ interface GalleryPinOptionsSheetProps {
   onClose: () => void;
   onSaveToggle: (pinId: string) => void;
   onHidePin?: (pinId: string) => void;
+  onMoveToHidden?: (pinId: string) => void;
   onExport?: (pin: GalleryPin) => void;
   onInfo?: (pin: GalleryPin) => void;
 }
@@ -35,6 +36,7 @@ export function GalleryPinOptionsSheet({
   onClose,
   onSaveToggle,
   onHidePin,
+  onMoveToHidden,
   onExport,
   onInfo,
 }: GalleryPinOptionsSheetProps) {
@@ -227,6 +229,24 @@ export function GalleryPinOptionsSheet({
               </View>
 
               <View className="gap-0.5 mt-1">
+                                {onMoveToHidden && (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      if (activePin?.id) {
+                        onMoveToHidden(activePin.id);
+                        onClose();
+                      }
+                    }}
+                    className="flex-row items-center py-3.5 px-2 rounded-xl active:bg-black/[0.05]"
+                  >
+                    <Ionicons name="eye-off-outline" size={22} color="#1C1C1E" style={{ marginRight: 16 }} />
+                    <Text allowFontScaling={false} className="text-[15.5px] font-outfit-medium text-[#1C1C1E]">
+                      Hide Pin
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleExport}

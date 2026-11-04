@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { getIdToken } from "@react-native-firebase/auth";
 import { auth } from "./firebase";
 
 const SERVER_URL = process.env.EXPO_PUBLIC_CLOUDFLARE_WORKER_URL?.replace(/\/+$/, "");
@@ -42,7 +43,7 @@ export async function uploadFileToMarkx(
     const currentUser = auth.currentUser;
     if (currentUser) {
       try {
-        const idToken = await currentUser.getIdToken();
+        const idToken = await getIdToken(currentUser);
         if (idToken) {
           headers["Authorization"] = `Bearer ${idToken}`;
         }
@@ -124,7 +125,7 @@ export async function deleteFileFromMarkx(keyOrUrl: string): Promise<{ success: 
     const currentUser = auth.currentUser;
     if (currentUser) {
       try {
-        const idToken = await currentUser.getIdToken();
+        const idToken = await getIdToken(currentUser);
         if (idToken) {
           headers["Authorization"] = `Bearer ${idToken}`;
         }

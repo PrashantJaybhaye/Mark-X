@@ -39,6 +39,8 @@ import {
   subscribeLatestGalleryPins,
 } from "../../services/galleryFirebaseService";
 import { executeUploadWithRetry } from "../../services/BackgroundUploadService";
+import { movePinToHiddenGallery } from "../../services/hiddenGalleryFirebaseService";
+import { preloadHiddenPasscode } from "../../services/hiddenPasscodeService";
 
 export default function GalleryScreen() {
   const router = useRouter();
@@ -262,6 +264,7 @@ export default function GalleryScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    preloadHiddenPasscode();
 
     loadCachedGalleryPins().then((cached) => {
       if (isMounted && cached.length > 0) {
@@ -337,7 +340,10 @@ export default function GalleryScreen() {
     }, 1000);
 
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    const sortedList = sortedPinsRef.current;
+    const sortedList =
+      sortedPinsRef.current && sortedPinsRef.current.length > 0
+        ? sortedPinsRef.current
+        : pins.filter((p) => !p.hidden);
     const pinIdx = sortedList ? sortedList.findIndex((p) => p.id === pin.id) : -1;
 
     if (sortedList && sortedList.length > 0) {
@@ -353,7 +359,7 @@ export default function GalleryScreen() {
         source: "main",
       },
     });
-  }, [router, handleRetryFailedUploads]);
+  }, [router, handleRetryFailedUploads, pins]);
 
   const { leftPins, rightPins } = useMemo(() => {
     const left: GalleryPin[] = [];
@@ -366,6 +372,7 @@ export default function GalleryScreen() {
 
     for (let i = 0; i < pins.length; i++) {
       const pin = pins[i];
+      if (pin.hidden) continue;
       if (pin.saved) savedBucket.push(pin);
       else unsavedBucket.push(pin);
     }
@@ -402,6 +409,16 @@ export default function GalleryScreen() {
       return updated;
     });
     await deleteGalleryPinFromServer(pinId);
+  };
+
+  const handleMoveToHidden = async (pinId: string) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    setPins((prev) => {
+      const updated = prev.filter((p) => p.id !== pinId);
+      saveCachedGalleryPins(updated);
+      return updated;
+    });
+    await movePinToHiddenGallery(pinId);
   };
 
   const handleRefreshPress = async () => {
@@ -508,6 +525,11 @@ export default function GalleryScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
+                if (isNavigatingRef.current) return;
+                isNavigatingRef.current = true;
+                setTimeout(() => {
+                  isNavigatingRef.current = false;
+                }, 1000);
                 triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
                 router.push("/gallery/passcode");
               }}
@@ -587,6 +609,7 @@ export default function GalleryScreen() {
         onClose={() => setOptionsPin(null)}
         onSaveToggle={handleSaveToggle}
         onHidePin={handleHidePin}
+        onMoveToHidden={handleMoveToHidden}
         onInfo={(pin) => setInfoPin(pin)}
       />
 

@@ -12,6 +12,7 @@ export interface GalleryPin {
   likes: number;
   isLiked?: boolean;
   saved?: boolean;
+  hidden?: boolean;
   uploadStatus?: "uploading" | "synced" | "failed";
 
   width?: number;
@@ -179,6 +180,7 @@ export function normalizeGalleryPin(pin: any): GalleryPin {
     likes: typeof pin.likes === "number" ? pin.likes : 0,
     isLiked: !!pin.isLiked,
     saved: !!pin.saved,
+    hidden: !!pin.hidden,
     uploadStatus,
     createdAt: pin.createdAt,
     updatedAt: pin.updatedAt,

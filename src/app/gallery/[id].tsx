@@ -30,6 +30,7 @@ import {
   loadCachedGalleryPins,
   loadCachedHiddenGalleryPins,
   saveCachedGalleryPins,
+  saveCachedHiddenGalleryPins,
   syncGalleryStats,
   getMemoryGalleryPins,
   getMemoryHiddenGalleryPins,
@@ -39,6 +40,7 @@ import {
   deleteGalleryPinFromServer,
   fetchGalleryPinsFromServer,
 } from "../../services/galleryFirebaseService";
+import { deleteHiddenGalleryPinFromServer } from "../../services/hiddenGalleryFirebaseService";
 import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
 import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
 
@@ -375,20 +377,25 @@ export default function GalleryDetailPage() {
     const isHidden = source === "hidden";
     const memPins = isHidden ? getMemoryHiddenGalleryPins() : getMemoryGalleryPins();
     if (memPins && memPins.length > 0) {
-      return memPins.map(normalizeGalleryPin);
+      const normalized = memPins.map(normalizeGalleryPin);
+      const filtered = isHidden ? normalized : normalized.filter((p) => !p.hidden);
+      if (initialSelectedPin && !filtered.some((p) => p.id === id)) {
+        return [initialSelectedPin, ...filtered];
+      }
+      return filtered;
     }
     return initialSelectedPin ? [initialSelectedPin] : [];
   });
 
-  const [currentIndex, setCurrentIndex] = useState<number>(() => {
-    const isHidden = source === "hidden";
-    const memPins = isHidden ? getMemoryHiddenGalleryPins() : getMemoryGalleryPins();
-    if (memPins && memPins.length > 0) {
-      const foundIdx = memPins.findIndex((p) => p.id === id);
-      if (foundIdx >= 0) return foundIdx;
-    }
-    return !isNaN(parsedInitIdx) && parsedInitIdx >= 0 ? parsedInitIdx : 0;
-  });
+  const resolvedTargetIndex = useMemo(() => {
+    const idx = allPins.findIndex((p) => p.id === id);
+    if (idx >= 0) return idx;
+    return !isNaN(parsedInitIdx) && parsedInitIdx >= 0 && parsedInitIdx < allPins.length
+      ? parsedInitIdx
+      : 0;
+  }, [allPins, id, parsedInitIdx]);
+
+  const [currentIndex, setCurrentIndex] = useState<number>(resolvedTargetIndex);
 
   const [loading, setLoading] = useState<boolean>(!initialSelectedPin && allPins.length === 0);
 
@@ -403,10 +410,32 @@ export default function GalleryDetailPage() {
   const flatListRef = useRef<FlatList>(null);
   const bookmarkScale = useRef(new Animated.Value(1)).current;
   const lastTapRef = useRef<number>(0);
-  const isInitialScrollDoneRef = useRef(allPins.length > 1);
+  const isInitialScrollDoneRef = useRef(false);
 
-  // Active pin currently in view
-  const currentPin = allPins[currentIndex] || initialSelectedPin || null;
+  // Active pin currently in view (accurate fallback to tapped pin id)
+  const currentPin =
+    allPins[currentIndex] ||
+    (id ? allPins.find((p) => p.id === id) : null) ||
+    initialSelectedPin ||
+    null;
+
+  // Auto-lock if viewing hidden media when app backgrounded
+  useEffect(() => {
+    if (source !== "hidden") return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        try {
+          if (router.canDismiss()) {
+            router.dismissAll();
+          }
+        } catch {
+          // ignore if not dismissible
+        }
+        router.replace("/(main)/gallery");
+      }
+    });
+    return () => sub.remove();
+  }, [source, router]);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -414,9 +443,14 @@ export default function GalleryDetailPage() {
     }
   }, []);
 
-  // Fetch all cached & server pins according to gallery source
+  // Fetch cached pins only as fallback if memory was empty (e.g. reload or deep-link)
   useEffect(() => {
     let isMounted = true;
+
+    if (allPins.length > 1) {
+      setLoading(false);
+      return;
+    }
 
     const loadPins = async () => {
       try {
@@ -424,41 +458,19 @@ export default function GalleryDetailPage() {
         const cached = isHidden ? await loadCachedHiddenGalleryPins() : await loadCachedGalleryPins();
         if (cached && cached.length > 0 && isMounted) {
           const normalized = cached.map(normalizeGalleryPin);
-          setAllPins((prev) => {
-            if (prev.length === normalized.length && prev[0]?.id === normalized[0]?.id) {
-              return prev;
-            }
-            return normalized;
-          });
-          const foundIdx = normalized.findIndex((p) => p.id === id);
-          if (foundIdx >= 0 && !isInitialScrollDoneRef.current) {
-            isInitialScrollDoneRef.current = true;
+          const filtered = isHidden ? normalized : normalized.filter((p) => !p.hidden);
+          const fullList =
+            initialSelectedPin && !filtered.some((p) => p.id === id)
+              ? [initialSelectedPin, ...filtered]
+              : filtered;
+
+          setAllPins(fullList);
+          const foundIdx = fullList.findIndex((p) => p.id === id);
+          if (foundIdx >= 0) {
             setCurrentIndex(foundIdx);
             requestAnimationFrame(() => {
               flatListRef.current?.scrollToIndex({ index: foundIdx, animated: false });
             });
-          }
-          setLoading(false);
-        }
-
-        if (!isHidden) {
-          const serverPins = await fetchGalleryPinsFromServer();
-          if (!isMounted) return;
-
-          if (serverPins && serverPins.length > 0) {
-            const normalizedServer = serverPins.map(normalizeGalleryPin);
-            const serverIds = new Set(normalizedServer.map((p) => p.id));
-            const localOnly = (cached || []).filter((p) => !serverIds.has(p.id));
-            const fullList = [...localOnly, ...normalizedServer];
-            setAllPins(fullList);
-            const foundIdx = fullList.findIndex((p) => p.id === id);
-            if (foundIdx >= 0 && !isInitialScrollDoneRef.current) {
-              isInitialScrollDoneRef.current = true;
-              setCurrentIndex(foundIdx);
-              requestAnimationFrame(() => {
-                flatListRef.current?.scrollToIndex({ index: foundIdx, animated: false });
-              });
-            }
           }
         }
       } catch (err) {
@@ -472,17 +484,28 @@ export default function GalleryDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, source]);
+  }, [id, source, allPins.length, initialSelectedPin]);
 
-  // Initial scroll anchor as soon as list is mounted
+  // Initial scroll anchor as soon as list is mounted to ensure the tapped pin is immediately displayed
   useEffect(() => {
-    if (allPins.length <= 1 || isInitialScrollDoneRef.current) return;
-    const targetIdx = allPins.findIndex((p) => p.id === id);
-    if (targetIdx >= 0 && flatListRef.current) {
-      isInitialScrollDoneRef.current = true;
-      flatListRef.current.scrollToIndex({ index: targetIdx, animated: false });
+    if (isInitialScrollDoneRef.current) return;
+    if (resolvedTargetIndex >= 0 && resolvedTargetIndex < allPins.length) {
+      if (resolvedTargetIndex !== currentIndex) {
+        setCurrentIndex(resolvedTargetIndex);
+      }
+      if (resolvedTargetIndex > 0) {
+        const timer = setTimeout(() => {
+          if (!isInitialScrollDoneRef.current && flatListRef.current) {
+            isInitialScrollDoneRef.current = true;
+            flatListRef.current.scrollToIndex({ index: resolvedTargetIndex, animated: false });
+          }
+        }, 30);
+        return () => clearTimeout(timer);
+      } else {
+        isInitialScrollDoneRef.current = true;
+      }
     }
-  }, [allPins, id]);
+  }, [resolvedTargetIndex, allPins.length, currentIndex]);
 
   const updatePin = useCallback(async (updates: Partial<GalleryPin>) => {
     if (!currentPin?.id) return;
@@ -490,20 +513,30 @@ export default function GalleryDetailPage() {
 
     setAllPins((prev) => prev.map((p) => (p.id === targetId ? { ...p, ...updates } : p)));
 
-    try {
-      const cached = await loadCachedGalleryPins();
-      const updated = cached.map((p) => (p.id === targetId ? { ...p, ...updates } : p));
-      await saveCachedGalleryPins(updated);
-    } catch (err) {
-      console.warn("[GalleryDetailPage] Error updating cached pins:", err);
-    }
+    if (source === "hidden") {
+      try {
+        const cached = await loadCachedHiddenGalleryPins();
+        const updated = cached.map((p) => (p.id === targetId ? { ...p, ...updates } : p));
+        await saveCachedHiddenGalleryPins(updated);
+      } catch (err) {
+        console.warn("[GalleryDetailPage] Error updating cached hidden pins:", err);
+      }
+    } else {
+      try {
+        const cached = await loadCachedGalleryPins();
+        const updated = cached.map((p) => (p.id === targetId ? { ...p, ...updates } : p));
+        await saveCachedGalleryPins(updated);
+      } catch (err) {
+        console.warn("[GalleryDetailPage] Error updating cached pins:", err);
+      }
 
-    try {
-      await updateGalleryPinInServer(targetId, updates);
-    } catch (err) {
-      console.warn("[GalleryDetailPage] Error syncing pin update to server:", err);
+      try {
+        await updateGalleryPinInServer(targetId, updates);
+      } catch (err) {
+        console.warn("[GalleryDetailPage] Error syncing pin update to server:", err);
+      }
     }
-  }, [currentPin?.id]);
+  }, [currentPin?.id, source]);
 
   const animateBookmarkBounce = () => {
     bookmarkScale.setValue(0.7);
@@ -559,11 +592,18 @@ export default function GalleryDetailPage() {
     setIsDeleting(true);
     try {
       const deletedId = currentPin.id;
-      await deleteGalleryPinFromServer(deletedId);
-      const cached = await loadCachedGalleryPins();
-      const filtered = cached.filter((p) => p.id !== deletedId);
-      await saveCachedGalleryPins(filtered);
-      await syncGalleryStats(filtered.length);
+      if (source === "hidden") {
+        await deleteHiddenGalleryPinFromServer(deletedId);
+        const cached = await loadCachedHiddenGalleryPins();
+        const filtered = cached.filter((p) => p.id !== deletedId);
+        await saveCachedHiddenGalleryPins(filtered);
+      } else {
+        await deleteGalleryPinFromServer(deletedId);
+        const cached = await loadCachedGalleryPins();
+        const filtered = cached.filter((p) => p.id !== deletedId);
+        await saveCachedGalleryPins(filtered);
+        await syncGalleryStats(filtered.length);
+      }
       setDeleteDialogVisible(false);
 
       if (allPins.length <= 1) {
@@ -751,16 +791,30 @@ export default function GalleryDetailPage() {
         data={allPins}
         horizontal
         pagingEnabled={true}
-        initialScrollIndex={allPins.length > 1 && currentIndex > 0 ? currentIndex : undefined}
+        initialScrollIndex={
+          resolvedTargetIndex > 0 && resolvedTargetIndex < allPins.length
+            ? resolvedTargetIndex
+            : undefined
+        }
+        onLayout={() => {
+          if (
+            !isInitialScrollDoneRef.current &&
+            resolvedTargetIndex > 0 &&
+            resolvedTargetIndex < allPins.length
+          ) {
+            isInitialScrollDoneRef.current = true;
+            flatListRef.current?.scrollToIndex({ index: resolvedTargetIndex, animated: false });
+          }
+        }}
         onScrollToIndexFailed={(info) => {
           setTimeout(() => {
             flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
-          }, 60);
+          }, 50);
         }}
         showsHorizontalScrollIndicator={false}
-        initialNumToRender={2}
-        maxToRenderPerBatch={2}
-        windowSize={3}
+        initialNumToRender={resolvedTargetIndex > 0 ? resolvedTargetIndex + 2 : 2}
+        maxToRenderPerBatch={3}
+        windowSize={5}
         removeClippedSubviews={false}
         directionalLockEnabled={true}
         overScrollMode="never"

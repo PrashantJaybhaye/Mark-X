@@ -1,92 +1,265 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { auth } from "./firebase";
+import * as Crypto from "expo-crypto";
+import { doc, getDoc, setDoc, serverTimestamp } from "@react-native-firebase/firestore";
+import { auth, db } from "./firebase";
 
-const PASSCODE_STORAGE_KEY_PREFIX = "markx_my_eyes_only_passcode_";
+const PASSCODE_HASH_STORAGE_PREFIX = "markx_vault_passcode_hash_";
+const LEGACY_PASSCODE_STORAGE_PREFIX = "markx_my_eyes_only_passcode_";
+const VAULT_SALT_SECRET = "markx_vault_salt_v1_";
 
-function getStorageKey(): string {
-  const uid = auth.currentUser?.uid || "guest";
-  return `${PASSCODE_STORAGE_KEY_PREFIX}${uid}`;
+// Fast in-memory cache to guarantee zero-latency rendering and instant verification
+let cachedVaultState: {
+  uid: string;
+  hasPasscode: boolean;
+  passcodeHash?: string | null;
+} | null = null;
+
+function getHashStorageKey(uid: string): string {
+  return `${PASSCODE_HASH_STORAGE_PREFIX}${uid}`;
+}
+
+function getLegacyStorageKey(uid: string): string {
+  return `${LEGACY_PASSCODE_STORAGE_PREFIX}${uid}`;
+}
+
+/**
+ * Computes a salted SHA-256 cryptographic hash of the 4-digit passcode.
+ * Plaintext passcodes are NEVER sent to Firestore or stored in cloud databases.
+ */
+export async function hashPasscode(passcode: string, uid: string): Promise<string> {
+  const saltedPayload = `${VAULT_SALT_SECRET}::${uid}::${passcode}::${VAULT_SALT_SECRET}`;
+  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, saltedPayload);
+}
+
+/**
+ * Synchronous check from memory if passcode presence is known.
+ */
+export function getCachedHasHiddenPasscode(): boolean | null {
+  const currentUid = auth.currentUser?.uid || "guest";
+  if (cachedVaultState && cachedVaultState.uid === currentUid) {
+    return cachedVaultState.hasPasscode;
+  }
+  return null;
+}
+
+/**
+ * Preload passcode presence in background so UI renders with 0ms delay.
+ */
+export function preloadHiddenPasscode(): void {
+  hasHiddenPasscode().catch(() => {});
 }
 
 /**
  * Check if the user has created a My Eyes Only passcode.
+ * Checks:
+ * 1. In-memory cache (0ms)
+ * 2. Local device storage (SecureStore / AsyncStorage)
+ * 3. Firestore cloud user doc (for cross-device synchronization, exactly like Snapchat)
  */
 export async function hasHiddenPasscode(): Promise<boolean> {
-  const key = getStorageKey();
+  const currentUid = auth.currentUser?.uid || "guest";
+
+  // 1. In-memory hot check
+  if (cachedVaultState && cachedVaultState.uid === currentUid) {
+    return cachedVaultState.hasPasscode;
+  }
+
+  const hashKey = getHashStorageKey(currentUid);
+  let localHash: string | null = null;
+
+  // 2. Local device SecureStore check
   try {
     const isAvailable = await SecureStore.isAvailableAsync();
     if (isAvailable) {
-      const code = await SecureStore.getItemAsync(key);
-      if (code && code.length === 4) return true;
+      localHash = await SecureStore.getItemAsync(hashKey);
     }
   } catch {}
 
-  try {
-    const fallback = await AsyncStorage.getItem(key);
-    return Boolean(fallback && fallback.length === 4);
-  } catch {
-    return false;
+  if (!localHash) {
+    try {
+      localHash = await AsyncStorage.getItem(hashKey);
+    } catch {}
   }
+
+  // Check legacy plaintext fallback if upgrading
+  if (!localHash) {
+    const legacyKey = getLegacyStorageKey(currentUid);
+    try {
+      const isAvailable = await SecureStore.isAvailableAsync();
+      const legacyCode = isAvailable ? await SecureStore.getItemAsync(legacyKey) : null;
+      if (legacyCode && legacyCode.length === 4) {
+        // Automatically migrate legacy plaintext code to SHA-256 hash
+        localHash = await hashPasscode(legacyCode, currentUid);
+        await saveLocalHash(currentUid, localHash);
+        if (currentUid !== "guest") {
+          syncHashToFirestore(currentUid, localHash).catch(() => {});
+        }
+      }
+    } catch {}
+  }
+
+  if (localHash) {
+    cachedVaultState = {
+      uid: currentUid,
+      hasPasscode: true,
+      passcodeHash: localHash,
+    };
+    return true;
+  }
+
+  // 3. Cross-device check: If not on this device, check Firestore cloud account
+  if (currentUid !== "guest") {
+    try {
+      const userDocRef = doc(db, "users", currentUid);
+      const snapshot = await getDoc(userDocRef);
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const cloudHash = data?.hiddenVault?.passcodeHash;
+        if (cloudHash && typeof cloudHash === "string" && cloudHash.length > 0) {
+          // Sync cloud hash down to this device for instant offline access
+          await saveLocalHash(currentUid, cloudHash);
+          cachedVaultState = {
+            uid: currentUid,
+            hasPasscode: true,
+            passcodeHash: cloudHash,
+          };
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn("[HiddenPasscodeService] Error fetching cloud vault state:", err);
+    }
+  }
+
+  cachedVaultState = {
+    uid: currentUid,
+    hasPasscode: false,
+    passcodeHash: null,
+  };
+  return false;
 }
 
 /**
  * Set a new 4-digit passcode for My Eyes Only.
+ * Hashes with SHA-256 + salt, saves to local SecureStore, and syncs hash to Firestore.
  */
 export async function setHiddenPasscode(passcode: string): Promise<void> {
-  const key = getStorageKey();
+  const currentUid = auth.currentUser?.uid || "guest";
+  const hash = await hashPasscode(passcode, currentUid);
+
+  // Update memory cache immediately
+  cachedVaultState = {
+    uid: currentUid,
+    hasPasscode: true,
+    passcodeHash: hash,
+  };
+
+  // 1. Save hash to local device
+  await saveLocalHash(currentUid, hash);
+
+  // Clean up any legacy plaintext key
+  const legacyKey = getLegacyStorageKey(currentUid);
   try {
     const isAvailable = await SecureStore.isAvailableAsync();
-    if (isAvailable) {
-      await SecureStore.setItemAsync(key, passcode);
-    }
+    if (isAvailable) await SecureStore.deleteItemAsync(legacyKey);
+    await AsyncStorage.removeItem(legacyKey);
   } catch {}
 
-  try {
-    await AsyncStorage.setItem(key, passcode);
-  } catch (err) {
-    console.warn("[HiddenPasscodeService] Failed to set passcode:", err);
+  // 2. Sync hashed passcode to Firestore user document (cross-device support)
+  if (currentUid !== "guest") {
+    await syncHashToFirestore(currentUid, hash);
   }
 }
 
 /**
- * Verify if entered passcode matches stored passcode.
+ * Verify if entered passcode matches stored hash.
  */
 export async function verifyHiddenPasscode(enteredCode: string): Promise<boolean> {
-  const key = getStorageKey();
-  let storedCode: string | null = null;
+  const currentUid = auth.currentUser?.uid || "guest";
+  const expectedEnteredHash = await hashPasscode(enteredCode, currentUid);
 
-  try {
-    const isAvailable = await SecureStore.isAvailableAsync();
-    if (isAvailable) {
-      storedCode = await SecureStore.getItemAsync(key);
-    }
-  } catch {}
-
-  if (!storedCode) {
-    try {
-      storedCode = await AsyncStorage.getItem(key);
-    } catch {}
+  // 1. Fast memory verification
+  if (cachedVaultState && cachedVaultState.uid === currentUid && cachedVaultState.passcodeHash) {
+    return cachedVaultState.passcodeHash === expectedEnteredHash;
   }
 
-  return storedCode === enteredCode;
+  // 2. Ensure local / cloud hash is fetched
+  const hasCode = await hasHiddenPasscode();
+  if (!hasCode || !cachedVaultState?.passcodeHash) {
+    return false;
+  }
+
+  return cachedVaultState.passcodeHash === expectedEnteredHash;
 }
 
 /**
  * Reset passcode for My Eyes Only.
  */
 export async function resetHiddenPasscode(): Promise<void> {
-  const key = getStorageKey();
+  const currentUid = auth.currentUser?.uid || "guest";
+  const hashKey = getHashStorageKey(currentUid);
+  const legacyKey = getLegacyStorageKey(currentUid);
+
+  cachedVaultState = {
+    uid: currentUid,
+    hasPasscode: false,
+    passcodeHash: null,
+  };
+
   try {
     const isAvailable = await SecureStore.isAvailableAsync();
     if (isAvailable) {
-      await SecureStore.deleteItemAsync(key);
+      await SecureStore.deleteItemAsync(hashKey);
+      await SecureStore.deleteItemAsync(legacyKey);
     }
   } catch {}
 
   try {
-    await AsyncStorage.removeItem(key);
+    await AsyncStorage.removeItem(hashKey);
+    await AsyncStorage.removeItem(legacyKey);
+  } catch {}
+
+  if (currentUid !== "guest") {
+    try {
+      const userDocRef = doc(db, "users", currentUid);
+      await setDoc(userDocRef, { hiddenVault: { passcodeHash: null, updatedAt: serverTimestamp() } }, { merge: true });
+    } catch {}
+  }
+}
+
+// ---------------- Helpers ----------------
+
+async function saveLocalHash(uid: string, hash: string): Promise<void> {
+  const hashKey = getHashStorageKey(uid);
+  try {
+    const isAvailable = await SecureStore.isAvailableAsync();
+    if (isAvailable) {
+      await SecureStore.setItemAsync(hashKey, hash);
+    }
+  } catch {}
+
+  try {
+    await AsyncStorage.setItem(hashKey, hash);
   } catch (err) {
-    console.warn("[HiddenPasscodeService] Failed to reset passcode:", err);
+    console.warn("[HiddenPasscodeService] Failed to set local hash:", err);
+  }
+}
+
+async function syncHashToFirestore(uid: string, hash: string): Promise<void> {
+  try {
+    const userDocRef = doc(db, "users", uid);
+    await setDoc(
+      userDocRef,
+      {
+        hiddenVault: {
+          passcodeHash: hash,
+          updatedAt: serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn("[HiddenPasscodeService] Failed to sync passcode hash to Firestore:", err);
   }
 }

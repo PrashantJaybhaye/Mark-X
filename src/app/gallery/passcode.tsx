@@ -7,6 +7,8 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   ActivityIndicator,
+  BackHandler,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -19,6 +21,7 @@ import {
   hasHiddenPasscode,
   verifyHiddenPasscode,
   setHiddenPasscode,
+  getCachedHasHiddenPasscode,
 } from "../../services/hiddenPasscodeService";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -26,8 +29,9 @@ export default function MyEyesOnlyPasscodeScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSetupMode, setIsSetupMode] = useState(false);
+  const cachedHas = getCachedHasHiddenPasscode();
+  const [isLoading, setIsLoading] = useState(() => (cachedHas !== null || mode === "change" ? false : true));
+  const [isSetupMode, setIsSetupMode] = useState(() => (mode === "change" || cachedHas === false));
   const [setupStep, setSetupStep] = useState<"initial" | "confirm">("initial");
   const [firstPasscode, setFirstPasscode] = useState("");
   const [enteredPin, setEnteredPin] = useState("");
@@ -42,6 +46,7 @@ export default function MyEyesOnlyPasscodeScreen() {
     new Animated.Value(1),
     new Animated.Value(1),
   ]).current;
+  const isNavigatingRef = useRef(false);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -58,7 +63,6 @@ export default function MyEyesOnlyPasscodeScreen() {
 
         if (mode === "change" || !hasCode) {
           setIsSetupMode(true);
-          setSetupStep("initial");
         } else {
           setIsSetupMode(false);
         }
@@ -73,7 +77,59 @@ export default function MyEyesOnlyPasscodeScreen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [mode]);
+
+  // Clean, context-aware back navigation
+  const handleBackAction = useCallback(() => {
+    if (isNavigatingRef.current) return;
+    if (isSetupMode && setupStep === "confirm") {
+      setSetupStep("initial");
+      setEnteredPin("");
+      setFirstPasscode("");
+      setErrorMessage(null);
+      setHasError(false);
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+      return;
+    }
+
+    isNavigatingRef.current = true;
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
+
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(main)/gallery");
+    }
+  }, [isSetupMode, setupStep, router]);
+
+  // Android hardware back handler
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBackAction();
+      return true;
+    };
+
+    const backSub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => backSub.remove();
+  }, [handleBackAction]);
+
+  // Security: clear entered PIN if app is backgrounded
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        setEnteredPin("");
+        setErrorMessage(null);
+        setHasError(false);
+        if (isSetupMode && setupStep === "confirm") {
+          setSetupStep("initial");
+          setFirstPasscode("");
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [isSetupMode, setupStep]);
 
   const triggerShake = useCallback(() => {
     setHasError(true);
@@ -94,17 +150,18 @@ export default function MyEyesOnlyPasscodeScreen() {
   const animateDash = (index: number) => {
     const anim = dashScaleAnims[index];
     if (anim) {
-      anim.setValue(1.35);
+      anim.setValue(1.22);
       Animated.spring(anim, {
         toValue: 1,
-        friction: 4,
-        tension: 180,
+        friction: 6,
+        tension: 240,
         useNativeDriver: true,
       }).start();
     }
   };
 
   const handleKeyPress = (digit: string) => {
+    if (isNavigatingRef.current) return;
     if (enteredPin.length >= 4) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setErrorMessage(null);
@@ -115,11 +172,14 @@ export default function MyEyesOnlyPasscodeScreen() {
     animateDash(enteredPin.length);
 
     if (nextPin.length === 4) {
-      handleComplete(nextPin);
+      setTimeout(() => {
+        handleComplete(nextPin);
+      }, 40);
     }
   };
 
   const handleBackspace = () => {
+    if (isNavigatingRef.current) return;
     if (enteredPin.length === 0) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setErrorMessage(null);
@@ -128,6 +188,8 @@ export default function MyEyesOnlyPasscodeScreen() {
   };
 
   const handleComplete = async (pin: string) => {
+    if (isNavigatingRef.current) return;
+
     if (isSetupMode) {
       if (setupStep === "initial") {
         setFirstPasscode(pin);
@@ -136,9 +198,24 @@ export default function MyEyesOnlyPasscodeScreen() {
         triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
       } else {
         if (pin === firstPasscode) {
-          await setHiddenPasscode(pin);
-          triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-          router.replace("/gallery/hidden");
+          isNavigatingRef.current = true;
+          try {
+            await setHiddenPasscode(pin);
+            triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+            if (mode === "change") {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/gallery/hidden");
+              }
+            } else {
+              router.replace("/gallery/hidden");
+            }
+          } finally {
+            setTimeout(() => {
+              isNavigatingRef.current = false;
+            }, 1000);
+          }
         } else {
           triggerShake();
           setErrorMessage("Passcodes didn't match. Try again.");
@@ -148,13 +225,25 @@ export default function MyEyesOnlyPasscodeScreen() {
         }
       }
     } else {
-      const isValid = await verifyHiddenPasscode(pin);
-      if (isValid) {
-        triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-        router.replace("/gallery/hidden");
-      } else {
+      isNavigatingRef.current = true;
+      try {
+        const isValid = await verifyHiddenPasscode(pin);
+        if (isValid) {
+          triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+          router.replace("/gallery/hidden");
+          setTimeout(() => {
+            isNavigatingRef.current = false;
+          }, 1000);
+        } else {
+          isNavigatingRef.current = false;
+          triggerShake();
+          setErrorMessage("Incorrect passcode. Try again.");
+          setEnteredPin("");
+        }
+      } catch {
+        isNavigatingRef.current = false;
         triggerShake();
-        setErrorMessage("Incorrect passcode. Try again.");
+        setErrorMessage("Something went wrong. Try again.");
         setEnteredPin("");
       }
     }
@@ -170,11 +259,16 @@ export default function MyEyesOnlyPasscodeScreen() {
 
   const titleText = isSetupMode
     ? setupStep === "initial"
-      ? "Create your passcode"
+      ? mode === "change"
+        ? "Enter new passcode"
+        : "Create your passcode"
       : "Retype your passcode"
     : "Enter your passcode";
 
-  const subtitleText = "You will use this to log in securely";
+  const subtitleText =
+    mode === "change"
+      ? "Set a new 4-digit passcode for your vault"
+      : "You will use this to log in securely";
 
   const keypadRows = [
     ["1", "2", "3"],
@@ -189,7 +283,7 @@ export default function MyEyesOnlyPasscodeScreen() {
       {/* Top Header Bar - Identical header level to other pages */}
       <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10 }} className="flex-row items-center justify-between">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBackAction}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           activeOpacity={0.6}
           style={{ width: 40, height: 40, justifyContent: "center" }}
@@ -290,7 +384,8 @@ export default function MyEyesOnlyPasscodeScreen() {
               {row.map((digit) => (
                 <TouchableOpacity
                   key={digit}
-                  activeOpacity={0.25}
+                  activeOpacity={0.2}
+                  delayPressIn={0}
                   onPress={() => handleKeyPress(digit)}
                   style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
                 >
@@ -315,7 +410,8 @@ export default function MyEyesOnlyPasscodeScreen() {
 
             {/* Zero */}
             <TouchableOpacity
-              activeOpacity={0.25}
+              activeOpacity={0.2}
+              delayPressIn={0}
               onPress={() => handleKeyPress("0")}
               style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
             >
@@ -333,7 +429,8 @@ export default function MyEyesOnlyPasscodeScreen() {
 
             {/* Backspace */}
             <TouchableOpacity
-              activeOpacity={0.25}
+              activeOpacity={0.2}
+              delayPressIn={0}
               onPress={handleBackspace}
               disabled={enteredPin.length === 0}
               style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}

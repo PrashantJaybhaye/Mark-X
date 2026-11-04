@@ -153,15 +153,28 @@ export const setMemoryHiddenGalleryPins = (pins: GalleryPin[]): void => {
   memoryHiddenGalleryPins = pins;
 };
 
+function sortPinsChronologically(pins: GalleryPin[]): GalleryPin[] {
+  return [...pins].sort((a, b) => {
+    const aSaved = a.saved ? 1 : 0;
+    const bSaved = b.saved ? 1 : 0;
+    if (bSaved !== aSaved) return bSaved - aSaved;
+    const aTime = (a.createdAt as any)?.seconds || (typeof a.createdAt === "number" ? a.createdAt : 0);
+    const bTime = (b.createdAt as any)?.seconds || (typeof b.createdAt === "number" ? b.createdAt : 0);
+    return bTime - aTime;
+  });
+}
+
 export const loadCachedGalleryPins = async (): Promise<GalleryPin[]> => {
   const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.GALLERY_PINS, []);
-  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
-  memoryGalleryPins = sorted;
+  const sorted = sortPinsChronologically(pins);
+  if (memoryGalleryPins.length === 0) {
+    memoryGalleryPins = sorted;
+  }
   return sorted;
 };
 
 export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
-  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  const sorted = sortPinsChronologically(pins);
   memoryGalleryPins = sorted;
   await saveItem(STORAGE_KEYS.GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();
@@ -169,13 +182,15 @@ export const saveCachedGalleryPins = async (pins: GalleryPin[]): Promise<void> =
 
 export const loadCachedHiddenGalleryPins = async (): Promise<GalleryPin[]> => {
   const pins = await loadItem<GalleryPin[]>(STORAGE_KEYS.HIDDEN_GALLERY_PINS, []);
-  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
-  memoryHiddenGalleryPins = sorted;
+  const sorted = sortPinsChronologically(pins);
+  if (memoryHiddenGalleryPins.length === 0) {
+    memoryHiddenGalleryPins = sorted;
+  }
   return sorted;
 };
 
 export const saveCachedHiddenGalleryPins = async (pins: GalleryPin[]): Promise<void> => {
-  const sorted = [...pins].sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+  const sorted = sortPinsChronologically(pins);
   memoryHiddenGalleryPins = sorted;
   await saveItem(STORAGE_KEYS.HIDDEN_GALLERY_PINS, sorted);
   await recalculateTotalUsedStorageGB();

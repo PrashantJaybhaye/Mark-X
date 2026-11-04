@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
+  AppState,
   View,
   Text,
   TouchableOpacity,
@@ -10,39 +11,34 @@ import {
   StatusBar as RNStatusBar,
   ActivityIndicator,
   Modal,
+  BackHandler,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
-
-import {
-  GalleryPin,
-  formatBytes,
-  createLocalThumbnail,
-} from "../../utils/galleryData";
-import { auth } from "../../services/firebase";
-import { safePickMultipleImages } from "../../services/nativePickerService";
+import { GalleryPin } from "../../utils/galleryData";
 import { triggerHaptic } from "../../utils/haptics";
-import { uploadFileToMarkx } from "../../services/cloudflareStorage";
 import {
   loadCachedHiddenGalleryPins,
   saveCachedHiddenGalleryPins,
-  loadCachedGalleryPins,
+  setMemoryHiddenGalleryPins,
 } from "../../services/storageService";
+import { GalleryPinCard } from "../../components/gallery/GalleryPinCard";
+import { GalleryPinOptionsSheet } from "../../components/gallery/GalleryPinOptionsSheet";
+import { GalleryPinInfoSheet } from "../../components/gallery/GalleryPinInfoSheet";
+import { GalleryMasonrySkeleton } from "../../components/gallery/GallerySkeleton";
+import { GalleryEmptyState } from "../../components/gallery/GalleryEmptyState";
 import {
   fetchHiddenGalleryPinsPage,
   HIDDEN_GALLERY_PAGE_LIMIT,
-  addHiddenGalleryPinToServer,
   deleteHiddenGalleryPinFromServer,
   subscribeHiddenGalleryPins,
   movePinToMainGallery,
-  movePinToHiddenGallery,
+  moveMultiplePinsToMainGallery,
+  deleteMultipleHiddenGalleryPins,
 } from "../../services/hiddenGalleryFirebaseService";
-import { fetchGalleryPinsPage } from "../../services/galleryFirebaseService";
-import { executeUploadWithRetry } from "../../services/BackgroundUploadService";
 import { IosDialog } from "../../components/common/IosDialog";
 
 export default function MyEyesOnlyVaultScreen() {
@@ -60,20 +56,154 @@ export default function MyEyesOnlyVaultScreen() {
   // Dialogs
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false);
-  const [unhideSuccessDialog, setUnhideSuccessDialog] = useState(false);
+  const pendingOperationIdsRef = useRef<Set<string>>(new Set());
 
   // Options Modal
   const [showOptionsModal, setShowOptionsModal] = useState(false);
 
-  // Import Modal
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [mainGalleryPins, setMainGalleryPins] = useState<GalleryPin[]>([]);
-  const [importingId, setImportingId] = useState<string | null>(null);
+  const gutter = 6;
+  const sideMargin = 8;
+  const columnWidth = (windowWidth - sideMargin * 2 - gutter) / 2;
 
-  const numColumns = 3;
-  const gridGap = 4;
-  const totalGaps = gridGap * (numColumns - 1);
-  const itemWidth = (windowWidth - 24 - totalGaps) / numColumns;
+  const [optionsPin, setOptionsPin] = useState<GalleryPin | null>(null);
+  const [infoPin, setInfoPin] = useState<GalleryPin | null>(null);
+  const sortedPinsRef = useRef<GalleryPin[]>([]);
+  const isNavigatingRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      isNavigatingRef.current = false;
+    }, [])
+  );
+
+  const { leftPins, rightPins } = useMemo(() => {
+    const left: GalleryPin[] = [];
+    const right: GalleryPin[] = [];
+    let leftHeight = 0;
+    let rightHeight = 0;
+
+    const savedBucket: GalleryPin[] = [];
+    const unsavedBucket: GalleryPin[] = [];
+
+    for (let i = 0; i < pins.length; i++) {
+      const pin = pins[i];
+      if (pin.saved) savedBucket.push(pin);
+      else unsavedBucket.push(pin);
+    }
+
+    const sortedPins = savedBucket.concat(unsavedBucket);
+    sortedPinsRef.current = sortedPins;
+
+    sortedPins.forEach((pin) => {
+      const estimatedHeight = Math.min(Math.max(columnWidth / pin.aspectRatio, 120), 320) + 16;
+      if (leftHeight <= rightHeight) {
+        left.push(pin);
+        leftHeight += estimatedHeight;
+      } else {
+        right.push(pin);
+        rightHeight += estimatedHeight;
+      }
+    });
+
+    return { leftPins: left, rightPins: right };
+  }, [pins, columnWidth]);
+
+  const handleSelectPin = useCallback((pin: GalleryPin) => {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+    }, 1000);
+
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    const sortedList =
+      sortedPinsRef.current && sortedPinsRef.current.length > 0
+        ? sortedPinsRef.current
+        : pins.filter((p) => !!p.hidden);
+    const pinIdx = sortedList ? sortedList.findIndex((p) => p.id === pin.id) : -1;
+
+    if (sortedList && sortedList.length > 0) {
+      setMemoryHiddenGalleryPins(sortedList);
+    }
+
+    router.push({
+      pathname: "/gallery/[id]",
+      params: {
+        id: pin.id,
+        initialPin: JSON.stringify(pin),
+        initialIndex: pinIdx >= 0 ? String(pinIdx) : "0",
+        source: "hidden",
+      },
+    });
+  }, [pins, router]);
+
+  const handleSaveToggle = async (pinId: string) => {
+    setPins((prev) => {
+      const updated = prev.map((p) => (p.id === pinId ? { ...p, saved: !p.saved } : p));
+      saveCachedHiddenGalleryPins(updated);
+      return updated;
+    });
+  };
+
+  const handleDeleteSinglePin = async (pinId: string) => {
+    setPins((prev) => {
+      const updated = prev.filter((p) => p.id !== pinId);
+      saveCachedHiddenGalleryPins(updated);
+      return updated;
+    });
+    pendingOperationIdsRef.current.add(pinId);
+    try {
+      await deleteHiddenGalleryPinFromServer(pinId);
+    } finally {
+      pendingOperationIdsRef.current.delete(pinId);
+    }
+  };
+
+  // Auto-lock vault on app minimize / background
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace("/(main)/gallery");
+        }
+      }
+    });
+    return () => sub.remove();
+  }, [router]);
+
+  // Handle Android hardware back button
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showOptionsModal) {
+        setShowOptionsModal(false);
+        return true;
+      }
+      if (showUnhideConfirm) {
+        setShowUnhideConfirm(false);
+        return true;
+      }
+      if (showDeleteConfirm) {
+        setShowDeleteConfirm(false);
+        return true;
+      }
+      if (isSelectMode) {
+        setIsSelectMode(false);
+        setSelectedIds(new Set());
+        return true;
+      }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(main)/gallery");
+      }
+      return true;
+    };
+
+    const backSub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => backSub.remove();
+  }, [showOptionsModal, showUnhideConfirm, showDeleteConfirm, isSelectMode, router]);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -110,7 +240,9 @@ export default function MyEyesOnlyVaultScreen() {
         setPins((prev) => {
           const uploadingPins = prev.filter((p) => p.uploadStatus === "uploading");
           const uploadingIds = new Set(uploadingPins.map((p) => p.id));
-          const filtered = serverPins.filter((p) => !uploadingIds.has(p.id));
+          const filtered = serverPins.filter(
+            (p) => !uploadingIds.has(p.id) && !pendingOperationIdsRef.current.has(p.id)
+          );
           const merged = [...uploadingPins, ...filtered];
           saveCachedHiddenGalleryPins(merged);
           return merged;
@@ -125,105 +257,6 @@ export default function MyEyesOnlyVaultScreen() {
       unsub();
     };
   }, []);
-
-  // Add photos directly to My Eyes Only
-  const handleAddPhotos = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    const results = await safePickMultipleImages(5);
-    if (!results || results.length === 0) return;
-
-    const newPins: GalleryPin[] = await Promise.all(
-      results.map(async (result, idx) => {
-        const ratio =
-          result.width && result.height
-            ? Math.max(Math.min(result.width / result.height, 1.4), 0.6)
-            : 0.75;
-        const isVideo = result.type === "video";
-        const timestamp = Date.now() + idx;
-        const fileName = `${timestamp}${isVideo ? ".mp4" : ".jpg"}`;
-        const fileSize = result.fileSize || (isVideo ? 14800000 : 2800000);
-        const thumbnailUrl = await createLocalThumbnail(result.uri, 350);
-
-        return {
-          id: `myeyes-pin-${timestamp}-${Math.random().toString(36).slice(2, 6)}`,
-          fileName,
-          author: auth.currentUser?.displayName || "You",
-          imageUrl: result.uri,
-          localUri: result.uri,
-          thumbnailUrl,
-          mediaType: isVideo ? "video" : "image",
-          ...(isVideo && typeof result.duration === "number" ? { duration: result.duration } : {}),
-          aspectRatio: ratio,
-          width: result.width || 1080,
-          height: result.height || 1440,
-          fileSize,
-          fileSizeFormatted: formatBytes(fileSize),
-          mimeType: result.mimeType || (isVideo ? "video/mp4" : "image/jpeg"),
-          likes: 0,
-          isLiked: false,
-          saved: false,
-          uploadStatus: "uploading",
-        };
-      })
-    );
-
-    setPins((prev) => {
-      const updated = [...newPins, ...prev];
-      saveCachedHiddenGalleryPins(updated);
-      return updated;
-    });
-
-    newPins.forEach(async (pin) => {
-      await addHiddenGalleryPinToServer(pin);
-      try {
-        const isVideo = pin.mediaType === "video";
-        const mime = pin.mimeType || (isVideo ? "video/mp4" : "image/jpeg");
-        const safeFileName = pin.fileName || `${pin.id}.${isVideo ? "mp4" : "jpg"}`;
-        const res = await executeUploadWithRetry(
-          { id: pin.id, localUri: pin.imageUrl, mimeType: mime, fileName: safeFileName, maxRetries: 3 },
-          (uri, mType, fName, onProg) => uploadFileToMarkx(uri, mType, fName, onProg)
-        );
-        if (res.success && res.url) {
-          setPins((curr) => {
-            const updated = curr.map((p) => (p.id === pin.id ? { ...p, imageUrl: res.url!, uploadStatus: "synced" as const } : p));
-            saveCachedHiddenGalleryPins(updated);
-            return updated;
-          });
-        }
-      } catch (e) {
-        console.warn("[MyEyesOnly] Upload failed:", e);
-      }
-    });
-  };
-
-  // Import Modal handling
-  const handleOpenImportModal = async () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    setShowImportModal(true);
-    try {
-      const mainCached = await loadCachedGalleryPins();
-      if (mainCached && mainCached.length > 0) {
-        setMainGalleryPins(mainCached);
-      }
-      const res = await fetchGalleryPinsPage(null, 50);
-      if (res && res.pins && res.pins.length > 0) {
-        setMainGalleryPins(res.pins);
-      }
-    } catch (err) {
-      console.warn("[Hidden] Error loading main pins for import:", err);
-    }
-  };
-
-  const handleImportSinglePin = async (pinId: string) => {
-    setImportingId(pinId);
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-    const success = await movePinToHiddenGallery(pinId);
-    if (success) {
-      setMainGalleryPins((prev) => prev.filter((p) => p.id !== pinId));
-      loadCachedHiddenGalleryPins().then(setPins);
-    }
-    setImportingId(null);
-  };
 
   // Toggle selection
   const toggleSelectPin = (id: string) => {
@@ -255,10 +288,12 @@ export default function MyEyesOnlyVaultScreen() {
     setIsSelectMode(false);
     setSelectedIds(new Set());
 
-    for (const id of targets) {
-      await movePinToMainGallery(id);
+    targets.forEach((id) => pendingOperationIdsRef.current.add(id));
+    try {
+      await moveMultiplePinsToMainGallery(targets);
+    } finally {
+      targets.forEach((id) => pendingOperationIdsRef.current.delete(id));
     }
-    setUnhideSuccessDialog(true);
   };
 
   // Delete selected
@@ -277,8 +312,11 @@ export default function MyEyesOnlyVaultScreen() {
     setIsSelectMode(false);
     setSelectedIds(new Set());
 
-    for (const id of targets) {
-      await deleteHiddenGalleryPinFromServer(id);
+    targets.forEach((id) => pendingOperationIdsRef.current.add(id));
+    try {
+      await deleteMultipleHiddenGalleryPins(targets);
+    } finally {
+      targets.forEach((id) => pendingOperationIdsRef.current.delete(id));
     }
   };
 
@@ -287,8 +325,8 @@ export default function MyEyesOnlyVaultScreen() {
       <StatusBar style="dark" />
 
       {/* Top Header Bar */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }} className="flex-row items-center justify-between">
-        {/* Left: Back Chevron */}
+      <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#F2F2F2]">
+        {/* Left: Apple Photos Chevron + Label */}
         <TouchableOpacity
           onPress={() => {
             if (isSelectMode) {
@@ -298,28 +336,32 @@ export default function MyEyesOnlyVaultScreen() {
               router.back();
             }
           }}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          activeOpacity={0.6}
-          style={{ width: 40, height: 40, justifyContent: "center" }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.65}
+          className="flex-row items-center min-w-[70px]"
         >
-          <Ionicons name="chevron-back" size={26} color="#000000" />
+          <Ionicons name="chevron-back" size={23} color="#111111" />
         </TouchableOpacity>
 
-        {/* Center: Title & Count */}
-        <View className="items-center">
+        {/* Center: Title with Lock Badge */}
+        <View className="items-center justify-center flex-1 px-2">
           <View className="flex-row items-center gap-1.5">
-            <Ionicons name="lock-closed" size={13} color="#111111" />
-            <Text style={{ fontSize: 16, fontFamily: "Outfit_700Bold", color: "#111111" }}>
-              My Eyes Only
+              <Ionicons name="lock-closed" size={14} color="#111111" />
+            <Text
+              numberOfLines={1}
+              style={{ fontSize: 17, fontFamily: "Outfit_700Bold", color: "#111111", letterSpacing: -0.3 }}
+            >
+              {isSelectMode
+                ? selectedIds.size > 0
+                  ? `${selectedIds.size} Selected`
+                  : "Select Items"
+                : "Hidden"}
             </Text>
           </View>
-          <Text style={{ fontSize: 11, fontFamily: "Outfit_500Medium", color: "#8E8E93" }}>
-            {pins.length} {pins.length === 1 ? "Snap" : "Snaps"}
-          </Text>
         </View>
 
-        {/* Right: Select toggle and Add button */}
-        <View className="flex-row items-center gap-3">
+        {/* Right: Select pill & Circular action buttons */}
+        <View className="flex-row items-center justify-end gap-2.5 min-w-[70px]">
           {pins.length > 0 && (
             <TouchableOpacity
               onPress={() => {
@@ -328,422 +370,260 @@ export default function MyEyesOnlyVaultScreen() {
                 setSelectedIds(new Set());
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.6}
+              activeOpacity={0.65}
+              className="px-3.5 py-1.5 rounded-full bg-[#F0F2F4] border border-[#E5E7EB]"
             >
-              <Text style={{ fontSize: 14.5, fontFamily: "Outfit_600SemiBold", color: isSelectMode ? "#EF4444" : "#EB5B49" }}>
-                {isSelectMode ? "Cancel" : "Select"}
+              <Text style={{ fontSize: 13, fontFamily: "Outfit_600SemiBold", color: isSelectMode ? "#EF4444" : "#111111" }}>
+                {isSelectMode ? "Done" : "Select"}
               </Text>
             </TouchableOpacity>
           )}
 
           {!isSelectMode && (
-            <>
-              <TouchableOpacity
-                onPress={handleAddPhotos}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                activeOpacity={0.6}
-              >
-                <Ionicons name="add" size={24} color="#111111" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setShowOptionsModal(true);
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                activeOpacity={0.6}
-              >
-                <Ionicons name="ellipsis-horizontal" size={20} color="#111111" />
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setShowOptionsModal(true);
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              activeOpacity={0.65}
+              className="w-9 h-9 rounded-full bg-[#F0F2F4] border border-[#E5E7EB] items-center justify-center"
+            >
+              <Ionicons name="ellipsis-horizontal" size={17} color="#111111" />
+            </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Main Content Area */}
-      {isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="small" color="#EB5B49" />
-        </View>
-      ) : pins.length === 0 ? (
-        /* Authentic Snapchat-style Empty State */
-        <View className="flex-1 items-center justify-center px-8">
-          {/* Stylized Padlock Badge */}
-          <View
-            style={{
-              width: 88,
-              height: 88,
-              borderRadius: 44,
-              backgroundColor: "#FFFFFF",
-              borderWidth: 2,
-              borderColor: "#111111",
-              shadowColor: "#000000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.08,
-              shadowRadius: 10,
-              elevation: 3,
-            }}
-            className="items-center justify-center mb-5 relative"
-          >
-            <View
-              style={{
-                position: "absolute",
-                top: 6,
-                right: 8,
-                width: 14,
-                height: 14,
-                borderRadius: 7,
-                backgroundColor: "#EB5B49",
-                borderWidth: 1.5,
-                borderColor: "#111111",
-              }}
+      {/* Main Content Area - Identical structure & logic to Gallery Tab */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: sideMargin,
+          paddingTop: 8,
+          paddingBottom: isSelectMode ? 85 : 20,
+        }}
+      >
+        {isLoading || isRefreshing ? (
+          <GalleryMasonrySkeleton cardWidth={columnWidth} />
+        ) : pins.length === 0 ? (
+          <View className="flex-1 w-full items-center justify-center py-20">
+            <GalleryEmptyState
+              cardWidth={columnWidth}
+              title="Nothing in Hidden"
+              description="Hide photos and videos from your gallery to keep them private."
             />
-            <Ionicons name="lock-closed" size={38} color="#111111" />
           </View>
-
-          <Text style={{ fontSize: 22, fontFamily: "Outfit_700Bold", color: "#111111", letterSpacing: -0.3 }} className="text-center mb-2">
-            Nothing in My Eyes Only
-          </Text>
-
-          <Text style={{ fontSize: 14.5, fontFamily: "Outfit_400Regular", color: "#71767B", lineHeight: 21 }} className="text-center max-w-[280px] mb-8">
-            Move photos and videos here so only you can see them.
-          </Text>
-
-          {/* Action Buttons with Brand Orange Theme */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleAddPhotos}
-            style={{
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: "#EB5B49",
-              paddingHorizontal: 28,
-            }}
-            className="flex-row items-center justify-center gap-2 shadow-xs"
-          >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#FFFFFF" }}>
-              Add Photos & Videos
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleOpenImportModal}
-            style={{
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: "#F5F6F8",
-              borderWidth: 1,
-              borderColor: "#E9EBEF",
-              paddingHorizontal: 22,
-            }}
-            className="mt-3.5 flex-row items-center justify-center gap-2"
-          >
-            <Ionicons name="albums-outline" size={17} color="#111111" />
-            <Text style={{ fontSize: 14, fontFamily: "Outfit_500Medium", color: "#111111" }}>
-              Import from Gallery
-            </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        /* Media Grid */
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 12,
-            paddingTop: 10,
-            paddingBottom: isSelectMode ? 90 : 30,
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: gridGap,
-          }}
-        >
-          {pins.map((pin) => {
-            const isSelected = selectedIds.has(pin.id);
-            return (
-              <TouchableOpacity
-                key={pin.id}
-                activeOpacity={0.8}
-                onPress={() => {
-                  if (isSelectMode) {
-                    toggleSelectPin(pin.id);
-                  } else {
-                    router.push({
-                      pathname: "/gallery/[id]",
-                      params: {
-                        id: pin.id,
-                        initialPin: JSON.stringify(pin),
-                        source: "hidden",
-                      },
-                    });
-                  }
-                }}
-                onLongPress={() => {
-                  if (!isSelectMode) {
-                    setIsSelectMode(true);
-                    setSelectedIds(new Set([pin.id]));
-                    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-                  }
-                }}
-                style={{
-                  width: itemWidth,
-                  height: itemWidth * 1.25,
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  backgroundColor: "#F5F6F8",
-                }}
-                className="relative"
-              >
-                <Image
-                  source={{ uri: pin.thumbnailUrl || pin.imageUrl }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                />
-
-                {/* Video Play Badge */}
-                {pin.mediaType === "video" && (
-                  <View
-                    className="absolute bottom-1.5 left-1.5 flex-row items-center px-1.5 py-0.5 rounded-full"
-                    style={{
-                      backgroundColor: "rgba(0, 0, 0, 0.58)",
-                      borderWidth: 0.5,
-                      borderColor: "rgba(255, 255, 255, 0.25)",
-                      shadowColor: "#000000",
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.35,
-                      shadowRadius: 2,
-                      elevation: 3,
-                      gap: 3,
-                    }}
-                  >
-                    <Ionicons name="play" size={8.5} color="#FFFFFF" style={{ marginLeft: 0.5 }} />
-                    {pin.duration ? (
-                      <Text style={{ fontSize: 9, color: "#FFFFFF", fontFamily: "Outfit_600SemiBold", letterSpacing: 0.2 }}>
-                        {Math.floor(pin.duration / 60)}:{String(Math.floor(pin.duration % 60)).padStart(2, "0")}
-                      </Text>
-                    ) : null}
+        ) : (
+          <View className="flex-row w-full" style={{ gap: gutter }}>
+            {/* Left Column */}
+            <View style={{ width: columnWidth }}>
+              {leftPins.map((pin) => {
+                const isSelected = selectedIds.has(pin.id);
+                return (
+                  <View key={pin.id} className="relative">
+                    <GalleryPinCard
+                      pin={pin}
+                      cardWidth={columnWidth}
+                      onPress={(p: GalleryPin) => {
+                        if (isSelectMode) {
+                          toggleSelectPin(p.id);
+                        } else {
+                          handleSelectPin(p);
+                        }
+                      }}
+                      onOptionsPress={(p: GalleryPin) => {
+                        if (!isSelectMode) setOptionsPin(p);
+                      }}
+                    />
+                    {isSelectMode && (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => toggleSelectPin(pin.id)}
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isSelected ? "#007AFF" : "rgba(0,0,0,0.45)",
+                          borderWidth: 1.5,
+                          borderColor: "#FFFFFF",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 30,
+                        }}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </TouchableOpacity>
+                    )}
                   </View>
-                )}
+                );
+              })}
+            </View>
 
-                {/* Multi-Select Circle */}
-                {isSelectMode && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 6,
-                      right: 6,
-                      width: 22,
-                      height: 22,
-                      borderRadius: 11,
-                      backgroundColor: isSelected ? "#EB5B49" : "rgba(0,0,0,0.3)",
-                      borderWidth: 1.5,
-                      borderColor: "#FFFFFF",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+            {/* Right Column */}
+            <View style={{ width: columnWidth }}>
+              {rightPins.map((pin) => {
+                const isSelected = selectedIds.has(pin.id);
+                return (
+                  <View key={pin.id} className="relative">
+                    <GalleryPinCard
+                      pin={pin}
+                      cardWidth={columnWidth}
+                      onPress={(p: GalleryPin) => {
+                        if (isSelectMode) {
+                          toggleSelectPin(p.id);
+                        } else {
+                          handleSelectPin(p);
+                        }
+                      }}
+                      onOptionsPress={(p: GalleryPin) => {
+                        if (!isSelectMode) setOptionsPin(p);
+                      }}
+                    />
+                    {isSelectMode && (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => toggleSelectPin(pin.id)}
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: isSelected ? "#007AFF" : "rgba(0,0,0,0.45)",
+                          borderWidth: 1.5,
+                          borderColor: "#FFFFFF",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 30,
+                        }}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                      </TouchableOpacity>
+                    )}
                   </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </ScrollView>
 
-      {/* Multi-Select Bottom Action Bar */}
+      {/* Sleek Floating Capsule (Zero Shadows, Centered Floating Pill) */}
       {isSelectMode && (
         <View
+          pointerEvents="box-none"
           style={{
             position: "absolute",
-            bottom: 0,
+            bottom: Platform.OS === "ios" ? 32 : 20,
             left: 0,
             right: 0,
-            backgroundColor: "#FFFFFF",
-            borderTopWidth: 1,
-            borderTopColor: "#F3F4F6",
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            shadowColor: "#000000",
-            shadowOffset: { width: 0, height: -3 },
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            elevation: 10,
+            alignItems: "center",
+            zIndex: 50,
           }}
-          className="flex-row items-center justify-between"
         >
-          <Text style={{ fontSize: 13.5, fontFamily: "Outfit_600SemiBold", color: "#111111" }}>
-            {selectedIds.size} Selected
-          </Text>
-
-          <View className="flex-row items-center gap-3">
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#FFFFFF",
+              borderRadius: 24,
+              borderWidth: 1.5,
+              borderColor: "#E5E7EB",
+              paddingVertical: 5,
+              paddingHorizontal: 6,
+            }}
+          >
+            {/* Move to Gallery Action */}
             <TouchableOpacity
-              onPress={() => setShowUnhideConfirm(true)}
-              disabled={selectedIds.size === 0}
-              style={{
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: "#F5F6F8",
-                paddingHorizontal: 16,
-                borderWidth: 1,
-                borderColor: "#E9EBEF",
-                opacity: selectedIds.size > 0 ? 1 : 0.4,
+              activeOpacity={0.7}
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setShowUnhideConfirm(true);
               }}
-              className="flex-row items-center gap-1.5"
+              disabled={selectedIds.size === 0}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                paddingVertical: 7,
+                paddingHorizontal: 14,
+                borderRadius: 19,
+                backgroundColor: selectedIds.size > 0 ? "#111111" : "transparent",
+                opacity: selectedIds.size > 0 ? 1 : 0.35,
+              }}
             >
-              <Ionicons name="eye-outline" size={16} color="#111111" />
-              <Text style={{ fontSize: 13, fontFamily: "Outfit_500Medium", color: "#111111" }}>
-                Move to Gallery
+              <Ionicons
+                name="eye-outline"
+                size={17}
+                color={selectedIds.size > 0 ? "#FFFFFF" : "#8E8E93"}
+              />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: "Outfit_600SemiBold",
+                  color: selectedIds.size > 0 ? "#FFFFFF" : "#8E8E93",
+                }}
+              >
+                {selectedIds.size > 0 ? `Unhide (${selectedIds.size})` : "Unhide"}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setShowDeleteConfirm(true)}
-              disabled={selectedIds.size === 0}
+            {/* Vertical Divider */}
+            <View
               style={{
-                height: 38,
-                borderRadius: 19,
-                backgroundColor: "#FEE2E2",
-                paddingHorizontal: 16,
-                opacity: selectedIds.size > 0 ? 1 : 0.4,
+                width: 1,
+                height: 18,
+                backgroundColor: "#E5E7EB",
+                marginHorizontal: 3,
               }}
-              className="flex-row items-center gap-1.5"
+            />
+
+            {/* Delete Action */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setShowDeleteConfirm(true);
+              }}
+              disabled={selectedIds.size === 0}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingVertical: 7,
+                paddingHorizontal: 14,
+                borderRadius: 19,
+                backgroundColor: selectedIds.size > 0 ? "#FEE2E2" : "transparent",
+                opacity: selectedIds.size > 0 ? 1 : 0.35,
+              }}
             >
-              <Ionicons name="trash-outline" size={16} color="#EF4444" />
-              <Text style={{ fontSize: 13, fontFamily: "Outfit_600SemiBold", color: "#EF4444" }}>
+              <Ionicons
+                name="trash-outline"
+                size={16}
+                color={selectedIds.size > 0 ? "#EF4444" : "#8E8E93"}
+              />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontFamily: "Outfit_600SemiBold",
+                  color: selectedIds.size > 0 ? "#EF4444" : "#8E8E93",
+                }}
+              >
                 Delete
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
-
-      {/* Import from Gallery Modal */}
-      <Modal
-        visible={showImportModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowImportModal(false)}
-      >
-        <View className="flex-1 bg-black/45 justify-end">
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setShowImportModal(false)}
-            className="flex-1"
-          />
-          <View
-            style={{
-              maxHeight: "82%",
-              backgroundColor: "#FFFFFF",
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              paddingBottom: 24,
-            }}
-            className="w-full shadow-2xl"
-          >
-            {/* Sheet Handle */}
-            <View className="w-10 h-1.5 rounded-full bg-[#D1D1D6] self-center mt-3 mb-2" />
-
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-5 py-2.5 border-b border-[#F2F2F7]">
-              <TouchableOpacity
-                onPress={() => setShowImportModal(false)}
-                activeOpacity={0.6}
-                className="py-1"
-              >
-                <Text style={{ fontSize: 16, fontFamily: "Outfit_500Medium", color: "#8E8E93" }}>Cancel</Text>
-              </TouchableOpacity>
-
-              <View className="items-center">
-                <Text style={{ fontSize: 16, fontFamily: "Outfit_700Bold", color: "#111111" }}>
-                  Move to My Eyes Only
-                </Text>
-                <Text style={{ fontSize: 11, fontFamily: "Outfit_400Regular", color: "#8E8E93" }}>
-                  {mainGalleryPins.length} photos available
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setShowImportModal(false)}
-                activeOpacity={0.6}
-                className="py-1"
-              >
-                <Text style={{ fontSize: 16, fontFamily: "Outfit_600SemiBold", color: "#EB5B49" }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Photo List */}
-            {mainGalleryPins.length === 0 ? (
-              <View className="py-16 items-center px-8">
-                <Ionicons name="images-outline" size={32} color="#8E8E93" />
-                <Text style={{ fontSize: 15, fontFamily: "Outfit_600SemiBold", color: "#111111", marginTop: 8 }}>
-                  No Photos to Import
-                </Text>
-                <Text style={{ fontSize: 13, fontFamily: "Outfit_400Regular", color: "#8E8E93", textAlign: "center", marginTop: 4 }}>
-                  All photos in your gallery are already moved to My Eyes Only.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{
-                  padding: 8,
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: 6,
-                }}
-              >
-                {mainGalleryPins.map((item) => {
-                  const mItemWidth = (windowWidth - 16 - 12) / 3;
-                  const isThisImporting = importingId === item.id;
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      activeOpacity={0.8}
-                      onPress={() => handleImportSinglePin(item.id)}
-                      disabled={isThisImporting}
-                      style={{
-                        width: mItemWidth,
-                        height: mItemWidth,
-                        borderRadius: 12,
-                        overflow: "hidden",
-                        backgroundColor: "#F5F6F8",
-                      }}
-                      className="relative"
-                    >
-                      <Image
-                        source={{ uri: item.thumbnailUrl || item.imageUrl }}
-                        style={{ width: "100%", height: "100%" }}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                      />
-
-                      {/* Video badge */}
-                      {item.mediaType === "video" && (
-                        <View className="absolute bottom-1.5 left-1.5 bg-black/60 rounded px-1.5 py-0.5">
-                          <Ionicons name="play" size={10} color="#FFFFFF" />
-                        </View>
-                      )}
-
-                      {/* Add overlay */}
-                      <View className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 items-center justify-center shadow-xs">
-                        {isThisImporting ? (
-                          <ActivityIndicator size="small" color="#EB5B49" style={{ transform: [{ scale: 0.6 }] }} />
-                        ) : (
-                          <Ionicons name="add" size={16} color="#EB5B49" />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
 
       {/* Delete Confirmation Dialog */}
       <IosDialog
@@ -779,28 +659,29 @@ export default function MyEyesOnlyVaultScreen() {
             onPress: () => setShowUnhideConfirm(false),
           },
           {
-            text: "Move to Gallery",
+            text: "Move",
             style: "default",
-            bold: true,
+            bold: false,
             onPress: handleConfirmUnhide,
           },
         ]}
       />
 
-      {/* Unhide Success Dialog */}
-      <IosDialog
-        visible={unhideSuccessDialog}
-        onClose={() => setUnhideSuccessDialog(false)}
-        title="Moved to Gallery"
-        message="The items have been moved back to your main gallery."
-        actions={[
-          {
-            text: "OK",
-            style: "default",
-            bold: true,
-            onPress: () => setUnhideSuccessDialog(false),
-          },
-        ]}
+
+      {/* Individual Pin Options Sheet & Info Sheet (from Gallery tab) */}
+      <GalleryPinOptionsSheet
+        pin={optionsPin}
+        visible={!!optionsPin}
+        onClose={() => setOptionsPin(null)}
+        onSaveToggle={handleSaveToggle}
+        onHidePin={handleDeleteSinglePin}
+        onInfo={(p) => setInfoPin(p)}
+      />
+
+      <GalleryPinInfoSheet
+        pin={infoPin}
+        visible={!!infoPin}
+        onClose={() => setInfoPin(null)}
       />
 
       {/* Options Bottom Sheet */}
@@ -833,6 +714,11 @@ export default function MyEyesOnlyVaultScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
+                if (isNavigatingRef.current) return;
+                isNavigatingRef.current = true;
+                setTimeout(() => {
+                  isNavigatingRef.current = false;
+                }, 1000);
                 setShowOptionsModal(false);
                 triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
                 router.push({
@@ -866,9 +752,18 @@ export default function MyEyesOnlyVaultScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
+                if (isNavigatingRef.current) return;
+                isNavigatingRef.current = true;
+                setTimeout(() => {
+                  isNavigatingRef.current = false;
+                }, 1000);
                 setShowOptionsModal(false);
                 triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-                router.replace("/(main)/gallery");
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(main)/gallery");
+                }
               }}
               style={{
                 flexDirection: "row",
