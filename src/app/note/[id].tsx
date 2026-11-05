@@ -34,6 +34,7 @@ import {
 import { triggerHaptic } from "../../utils/haptics";
 import {
   BlockType,
+  BLOCK_TYPOGRAPHY,
   cleanLinesToMarkdown,
   getActiveFormatsAtSelection,
   NoteLine,
@@ -58,6 +59,7 @@ export default function NoteDetailScreen() {
 
   const bodyInputRef = useRef<TextInput | null>(null);
   const titleInputRef = useRef<TextInput | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
 
   const [isPinned, setIsPinned] = useState(false);
   const [createdAt, setCreatedAt] = useState("");
@@ -115,10 +117,45 @@ export default function NoteDetailScreen() {
     };
   }, [id, isNewNote]);
 
+  const getActiveLineIndex = useCallback((selPos: number): number => {
+    const { activeLineIdx } = getActiveFormatsAtSelection(
+      latestLinesRef.current,
+      selPos,
+      selPos
+    );
+    return activeLineIdx;
+  }, []);
+
+  const scrollToCursor = useCallback((selPos?: number) => {
+    const pos = selPos ?? activeSelectionRef.current.start;
+    const currentLines = latestLinesRef.current;
+    if (!currentLines || currentLines.length === 0) return;
+
+    const activeLineIdx = getActiveLineIndex(pos);
+    let yOffset = 60;
+    for (let i = 0; i < activeLineIdx && i < currentLines.length; i++) {
+      const line = currentLines[i];
+      const lh = BLOCK_TYPOGRAPHY[line?.type]?.lineHeight || 24;
+      yOffset += lh;
+    }
+
+    scrollViewRef.current?.scrollTo({
+      y: Math.max(0, yOffset - 100),
+      animated: true,
+    });
+  }, [getActiveLineIndex]);
+
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
-      (e) => setKeyboardHeight(e.endCoordinates.height)
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setTimeout(() => {
+          if (bodyInputRef.current?.isFocused()) {
+            scrollToCursor();
+          }
+        }, 120);
+      }
     );
     const hideSub = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
@@ -128,7 +165,7 @@ export default function NoteDetailScreen() {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [scrollToCursor]);
 
   useEffect(() => {
     if (showFormatSheet) {
@@ -223,6 +260,8 @@ export default function NoteDetailScreen() {
   const handleFinishEditing = async () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     Keyboard.dismiss();
+    titleInputRef.current?.blur();
+    bodyInputRef.current?.blur();
     setIsEditing(false);
     setShowFormatSheet(false);
     const currentBody = cleanLinesToMarkdown(latestLinesRef.current);
@@ -298,15 +337,6 @@ export default function NoteDetailScreen() {
     }
     router.back();
   };
-
-  const getActiveLineIndex = useCallback((selPos: number): number => {
-    const { activeLineIdx } = getActiveFormatsAtSelection(
-      latestLinesRef.current,
-      selPos,
-      selPos
-    );
-    return activeLineIdx;
-  }, []);
 
   const checkActiveFormats = useCallback((sel: { start: number; end: number }) => {
     const { styleName, activeFormats: nextFormats } = getActiveFormatsAtSelection(
@@ -531,6 +561,7 @@ export default function NoteDetailScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} className="flex-1">
         <ScrollView
+          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -546,92 +577,69 @@ export default function NoteDetailScreen() {
           }}
         >
           {/* Permanent Title TextInput */}
-          <Pressable
-            disabled={inEditMode}
-            pointerEvents={inEditMode ? "box-none" : "auto"}
-            onPress={() => {
-              if (!inEditMode) {
-                setIsEditing(true);
-                setTimeout(() => titleInputRef.current?.focus(), 50);
-              }
+          <TextInput
+            ref={titleInputRef}
+            value={title}
+            showSoftInputOnFocus={!showFormatSheet}
+            onFocus={() => {
+              setIsEditing(true);
+              scrollViewRef.current?.scrollTo({ y: 0, animated: true });
             }}
-          >
-            <TextInput
-              ref={titleInputRef}
-              value={title}
-              editable={inEditMode}
-              pointerEvents={inEditMode ? "auto" : "none"}
-              showSoftInputOnFocus={!showFormatSheet}
-              onFocus={() => {
-                setIsEditing(true);
-              }}
-              onChangeText={handleTitleChange}
-              placeholder="Title"
-              placeholderTextColor="#C7C7CC"
-              returnKeyType="next"
-              onSubmitEditing={() => bodyInputRef.current?.focus()}
-              blurOnSubmit={false}
-              allowFontScaling={false}
-              className="p-0 mb-3 text-[#111111]"
-              style={{
-                fontFamily: "Outfit_700Bold",
-                fontSize: 30,
-                lineHeight: 38,
-                paddingVertical: 0,
-                paddingHorizontal: 0,
-                includeFontPadding: false,
-              }}
-            />
-          </Pressable>
+            onChangeText={handleTitleChange}
+            placeholder="Title"
+            placeholderTextColor="#C7C7CC"
+            returnKeyType="next"
+            onSubmitEditing={() => bodyInputRef.current?.focus()}
+            blurOnSubmit={false}
+            allowFontScaling={false}
+            className="p-0 mb-3 text-[#111111]"
+            style={{
+              fontFamily: "Outfit_700Bold",
+              fontSize: 30,
+              lineHeight: 38,
+              paddingVertical: 0,
+              paddingHorizontal: 0,
+              includeFontPadding: false,
+            }}
+          />
 
           {/* Permanent Body TextInput */}
           <View style={{ minHeight: 320 }}>
-            <Pressable
-              disabled={inEditMode}
-              style={{ minHeight: 300 }}
-              pointerEvents={inEditMode ? "box-none" : "auto"}
-              onPress={() => {
-                if (!inEditMode) {
-                  setIsEditing(true);
-                  setTimeout(() => bodyInputRef.current?.focus(), 50);
+            <TextInput
+              ref={bodyInputRef}
+              showSoftInputOnFocus={!showFormatSheet}
+              onChangeText={handleBodyChange}
+              onSelectionChange={(e) => {
+                activeSelectionRef.current = e.nativeEvent.selection;
+                if (showFormatSheet) {
+                  checkActiveFormats(e.nativeEvent.selection);
                 }
               }}
+              onFocus={() => {
+                setIsEditing(true);
+                setTimeout(() => {
+                  scrollToCursor();
+                }, 120);
+              }}
+              placeholder="Type your note here..."
+              placeholderTextColor="#C7C7CC"
+              multiline={true}
+              scrollEnabled={false}
+              allowFontScaling={false}
+              style={{
+                fontFamily: "Outfit_400Regular",
+                fontSize: 16,
+                lineHeight: 24,
+                color: "#1C1C1E",
+                minHeight: 300,
+                paddingVertical: 0,
+                paddingHorizontal: 0,
+                textAlignVertical: "top",
+                includeFontPadding: false,
+              }}
             >
-              <TextInput
-                ref={bodyInputRef}
-                editable={inEditMode}
-                pointerEvents={inEditMode ? "auto" : "none"}
-                showSoftInputOnFocus={!showFormatSheet}
-                onChangeText={handleBodyChange}
-                onSelectionChange={(e) => {
-                  activeSelectionRef.current = e.nativeEvent.selection;
-                  if (showFormatSheet) {
-                    checkActiveFormats(e.nativeEvent.selection);
-                  }
-                }}
-                onFocus={() => {
-                  setIsEditing(true);
-                }}
-                placeholder="Type your note here..."
-                placeholderTextColor="#C7C7CC"
-                multiline={true}
-                scrollEnabled={false}
-                allowFontScaling={false}
-                style={{
-                  fontFamily: "Outfit_400Regular",
-                  fontSize: 16,
-                  lineHeight: 24,
-                  color: "#1C1C1E",
-                  minHeight: 300,
-                  paddingVertical: 0,
-                  paddingHorizontal: 0,
-                  textAlignVertical: "top",
-                  includeFontPadding: false,
-                }}
-              >
-                {renderCleanEditorLines(lines)}
-              </TextInput>
-            </Pressable>
+              {renderCleanEditorLines(lines)}
+            </TextInput>
 
             {/* Tap-below empty area to focus */}
             <Pressable
@@ -641,10 +649,10 @@ export default function NoteDetailScreen() {
                   setShowFormatSheet(false);
                   return;
                 }
-                if (!inEditMode) {
-                  setIsEditing(true);
-                  setTimeout(() => bodyInputRef.current?.focus(), 50);
-                }
+                setIsEditing(true);
+                const endPos = latestBodyRef.current?.length || 0;
+                bodyInputRef.current?.setSelection(endPos, endPos);
+                bodyInputRef.current?.focus();
               }}
             />
           </View>

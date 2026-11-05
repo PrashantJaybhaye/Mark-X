@@ -5,6 +5,7 @@ import {
   StatusBar as RNStatusBar,
   TouchableOpacity,
   useWindowDimensions,
+  Text,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -231,6 +232,19 @@ export default function HomeScreen() {
               onUploadFile={handleUploadFile}
               onAddPhoto={handleAddPhoto}
             />
+          </View>
+
+          {/* Blue Branding Strip Line */}
+          <View style={{ width: "100%", flexDirection: "row", alignItems: "center", marginBottom: 10, paddingHorizontal: 2 }}>
+            <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: "#3E140A" }} />
+            <Text
+              allowFontScaling={false}
+              style={{ fontSize: 10.5, fontFamily: "Outfit_700Bold", letterSpacing: 1.5, color: "#3E140A", marginHorizontal: 8, textTransform: "uppercase" }}
+
+            >
+              Private Cloud Vault
+            </Text>
+            <View style={{ flex: 1, height: 2, borderRadius: 2, backgroundColor: "#3E140A", opacity: 0.25 }} />
           </View>
 
           <View className="w-full gap-3.5">
