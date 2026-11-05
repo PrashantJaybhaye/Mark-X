@@ -35,6 +35,8 @@ import {
   loadUserPreferences,
   saveUserPreferences,
   recalculateTotalUsedStorageGB,
+  loadDriveItems,
+  countDriveFiles,
 } from "../../services/storageService";
 import { auth } from "../../services/firebase";
 import { getUserMetadata, subscribeUserStats } from "../../services/userService";
@@ -66,12 +68,13 @@ export default function HomeScreen() {
 
   const refreshCounts = React.useCallback(async (explicitUid?: string) => {
     try {
-
       const recalculatedGB = await recalculateTotalUsedStorageGB();
+      const driveItems = await loadDriveItems();
+      const driveFileCount = countDriveFiles(driveItems);
 
       const prefs = await loadUserPreferences();
       if (prefs.stats) {
-        applyStats({ ...prefs.stats, usedStorageGB: recalculatedGB });
+        applyStats({ ...prefs.stats, usedStorageGB: recalculatedGB, driveCount: driveFileCount });
       }
 
       const uid = explicitUid || user?.uid || auth.currentUser?.uid;
@@ -79,7 +82,7 @@ export default function HomeScreen() {
         const metadata = await getUserMetadata(uid);
         if (metadata && metadata.stats) {
           const finalGB = recalculatedGB;
-          const mergedStats = { ...metadata.stats, usedStorageGB: finalGB };
+          const mergedStats = { ...metadata.stats, usedStorageGB: finalGB, driveCount: driveFileCount };
           applyStats(mergedStats);
           await saveUserPreferences({ ...prefs, stats: mergedStats });
         } else if (!prefs.stats) {
@@ -93,7 +96,6 @@ export default function HomeScreen() {
   }, [user?.uid, applyStats]);
 
   React.useEffect(() => {
-
     const timer = setTimeout(() => {
       setIsStatsLoading(false);
     }, 2500);
@@ -104,9 +106,13 @@ export default function HomeScreen() {
     refreshCounts(uid);
 
     const unsubscribe = subscribeUserStats(uid, (stats) => {
-      applyStats(stats);
-      loadUserPreferences().then((prefs) => {
-        saveUserPreferences({ ...prefs, stats }).catch(console.warn);
+      loadDriveItems().then((items) => {
+        const driveFileCount = countDriveFiles(items);
+        const correctedStats = { ...stats, driveCount: driveFileCount };
+        applyStats(correctedStats);
+        loadUserPreferences().then((prefs) => {
+          saveUserPreferences({ ...prefs, stats: correctedStats }).catch(console.warn);
+        });
       });
     });
 

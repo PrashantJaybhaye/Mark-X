@@ -812,10 +812,10 @@ export default function GalleryDetailPage() {
           }, 50);
         }}
         showsHorizontalScrollIndicator={false}
-        initialNumToRender={resolvedTargetIndex > 0 ? resolvedTargetIndex + 2 : 2}
-        maxToRenderPerBatch={3}
-        windowSize={5}
-        removeClippedSubviews={false}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={Platform.OS === "android"}
         directionalLockEnabled={true}
         overScrollMode="never"
         scrollEventThrottle={16}

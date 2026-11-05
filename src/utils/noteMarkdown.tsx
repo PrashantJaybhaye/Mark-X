@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Text } from "react-native";
 
@@ -178,15 +179,29 @@ export function parseMarkdownToLines(raw: string): NoteLine[] {
         text = todoMatch[4];
         checked = todoMatch[3].toLowerCase() === "x";
       } else {
-        const bulletMatch = line.match(/^(\s*)[•\-\*–—]\s+(.*)$/);
-        if (bulletMatch) {
-          type = "bullet";
-          text = bulletMatch[2];
+        const unicodeCheckedMatch = line.match(/^(\s*)(\uf21e|\uf21f|☑)\s*(.*)$/);
+        if (unicodeCheckedMatch) {
+          type = "todo";
+          text = unicodeCheckedMatch[3];
+          checked = true;
         } else {
-          const numMatch = line.match(/^(\s*)\d+[\.\)]\s+(.*)$/);
-          if (numMatch) {
-            type = "numbered";
-            text = numMatch[2];
+          const unicodeUncheckedMatch = line.match(/^(\s*)(\uf2cc|\uf501|☐|○|◯)\s*(.*)$/);
+          if (unicodeUncheckedMatch) {
+            type = "todo";
+            text = unicodeUncheckedMatch[3];
+            checked = false;
+          } else {
+            const bulletMatch = line.match(/^(\s*)[•\-\*–—]\s+(.*)$/);
+            if (bulletMatch) {
+              type = "bullet";
+              text = bulletMatch[2];
+            } else {
+              const numMatch = line.match(/^(\s*)\d+[\.\)]\s+(.*)$/);
+              if (numMatch) {
+                type = "numbered";
+                text = numMatch[2];
+              }
+            }
           }
         }
       }
@@ -214,7 +229,7 @@ export function cleanLinesToMarkdown(lines: NoteLine[]): string {
 
 export function getLinePrefix(line: NoteLine, idx: number): string {
   if (!line) return "";
-  if (line.type === "todo") return line.checked ? "☑ " : "☐ ";
+  if (line.type === "todo") return line.checked ? "\uf21e " : "\uf2cc ";
   if (line.type === "bullet") return "• ";
   if (line.type === "numbered") return `${idx + 1}. `;
   return "";
@@ -222,11 +237,13 @@ export function getLinePrefix(line: NoteLine, idx: number): string {
 
 export function parseLinePrefix(raw: string = ""): { cleanText: string; isTodo: boolean; checked: boolean; isBullet: boolean; isNumbered: boolean } {
   const safe = raw || "";
-  if (safe.startsWith("☑ ")) {
-    return { cleanText: safe.slice(2), isTodo: true, checked: true, isBullet: false, isNumbered: false };
+  const checkedTodoMatch = safe.match(/^(\uf21e|\uf21f|☑|●|✔|✓|\[[xX]\])\s*/);
+  if (checkedTodoMatch) {
+    return { cleanText: safe.slice(checkedTodoMatch[0].length), isTodo: true, checked: true, isBullet: false, isNumbered: false };
   }
-  if (safe.startsWith("☐ ")) {
-    return { cleanText: safe.slice(2), isTodo: true, checked: false, isBullet: false, isNumbered: false };
+  const uncheckedTodoMatch = safe.match(/^(\uf2cc|\uf501|☐|○|◯|\[\s*\])\s*/);
+  if (uncheckedTodoMatch) {
+    return { cleanText: safe.slice(uncheckedTodoMatch[0].length), isTodo: true, checked: false, isBullet: false, isNumbered: false };
   }
   if (safe.startsWith("• ")) {
     return { cleanText: safe.slice(2), isTodo: false, checked: false, isBullet: true, isNumbered: false };
@@ -325,19 +342,16 @@ export function reconcileEditorLines(newRawLines: string[], prevLines: NoteLine[
     const diff = safeRaw.length - safePrev.length;
     let splitIdx = 0;
     while (
-      splitIdx < safePrev.length &&
+      splitIdx < safePrev.length - 1 &&
       parseLinePrefix(safeRaw[splitIdx] ?? "").cleanText === safePrev[splitIdx]?.text
     ) {
       splitIdx++;
     }
 
     const prevAtSplit = safePrev[splitIdx];
-    const inheritType: BlockType =
-      prevAtSplit?.type === "todo" && (prevAtSplit.text || "").trim().length > 0
-        ? "todo"
-        : prevAtSplit?.type === "bullet"
-        ? "bullet"
-        : "paragraph";
+    const isPrevEmpty = !prevAtSplit?.text || prevAtSplit.text.trim().length === 0;
+    const isPrevMarked = prevAtSplit?.type === "todo" || prevAtSplit?.type === "bullet";
+    const exitMark = isPrevEmpty && isPrevMarked;
 
     for (let i = 0; i < splitIdx; i++) {
       result.push(safePrev[i]);
@@ -346,8 +360,17 @@ export function reconcileEditorLines(newRawLines: string[], prevLines: NoteLine[
     const p0 = parseLinePrefix(safeRaw[splitIdx] ?? "");
     result.push({
       ...(safePrev[splitIdx] || { id: generateLineId(), type: "paragraph" }),
+      type: exitMark ? "paragraph" : (prevAtSplit?.type || "paragraph"),
+      checked: exitMark ? false : (safePrev[splitIdx]?.checked || false),
       text: reconcileLineText(p0.cleanText, safePrev[splitIdx]?.text || ""),
     });
+
+    const inheritType: BlockType =
+      !isPrevEmpty && prevAtSplit?.type === "todo"
+        ? "todo"
+        : !isPrevEmpty && prevAtSplit?.type === "bullet"
+        ? "bullet"
+        : "paragraph";
 
     for (let i = 1; i <= diff; i++) {
       const pNew = parseLinePrefix(safeRaw[splitIdx + i] ?? "");
@@ -600,7 +623,11 @@ export function getActiveFormatsAtSelection(
   return { activeLineIdx: targetLineIdx, styleName, activeFormats };
 }
 
-export function renderCleanEditorLines(lines: NoteLine[]) {
+export function renderCleanEditorLines(
+  lines: NoteLine[],
+  onToggleTodo?: (idx: number) => void,
+  onLineLayout?: (idx: number, y: number, height: number) => void
+) {
   if (!lines || lines.length === 0) return null;
   const total = lines.length;
 
@@ -609,9 +636,7 @@ export function renderCleanEditorLines(lines: NoteLine[]) {
     const fontStyle = BLOCK_TYPOGRAPHY[line.type] || BLOCK_TYPOGRAPHY.paragraph;
 
     let prefix = "";
-    if (line.type === "todo") {
-      prefix = line.checked ? "☑ " : "☐ ";
-    } else if (line.type === "bullet") {
+    if (line.type === "bullet") {
       prefix = "• ";
     } else if (line.type === "numbered") {
       prefix = `${idx + 1}. `;
@@ -620,8 +645,25 @@ export function renderCleanEditorLines(lines: NoteLine[]) {
     const { text: cleanText, formats } = parseFormattedText(line.text || "");
 
     return (
-      <Text key={line.id || `line-${idx}`} style={fontStyle}>
-        {prefix !== "" ? (
+      <Text
+        key={line.id || `line-${idx}`}
+        style={fontStyle}
+        onLayout={
+          onLineLayout
+            ? (e) => onLineLayout(idx, e.nativeEvent.layout.y, e.nativeEvent.layout.height)
+            : undefined
+        }
+      >
+        {line.type === "todo" ? (
+          <Text style={{ color: "#E5A93C", fontSize: fontStyle.fontSize }}>
+            <Ionicons
+              name={line.checked ? "checkmark-circle" : "ellipse-outline"}
+              size={fontStyle.fontSize + 1}
+              color="#E5A93C"
+            />
+            {" "}
+          </Text>
+        ) : prefix !== "" ? (
           <Text style={{ color: "#E5A93C", fontFamily: "Outfit_700Bold", fontSize: fontStyle.fontSize }}>
             {prefix}
           </Text>

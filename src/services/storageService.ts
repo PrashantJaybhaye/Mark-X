@@ -73,6 +73,10 @@ function parseSizeToBytes(sizeStr?: string): number {
   }
 }
 
+export function countDriveFiles(items: DriveItem[]): number {
+  return items.filter((item) => !item.isFolder && item.category !== "folder").length;
+}
+
 export async function recalculateTotalUsedStorageGB(): Promise<number> {
   try {
     let totalBytes = 0;
@@ -83,6 +87,7 @@ export async function recalculateTotalUsedStorageGB(): Promise<number> {
     }
 
     const driveItems = await loadDriveItems();
+    const driveFileCount = countDriveFiles(driveItems);
     for (const item of driveItems) {
       if (item.size) {
         totalBytes += parseSizeToBytes(item.size);
@@ -96,7 +101,7 @@ export async function recalculateTotalUsedStorageGB(): Promise<number> {
 
     const rawGB = totalBytes / (1024 * 1024 * 1024);
     const usedGB = totalBytes > 0 ? Math.max(0.01, parseFloat(rawGB.toFixed(3))) : 0;
-    await updateStats({ usedStorageGB: usedGB });
+    await updateStats({ usedStorageGB: usedGB, driveCount: driveFileCount });
     return usedGB;
   } catch (err) {
     console.warn("[StorageService] Failed to calculate total storage:", err);
@@ -136,7 +141,8 @@ export const forceSyncAllStats = async () => {
 export const loadDriveItems = () => loadItem<DriveItem[]>(STORAGE_KEYS.DRIVE_ITEMS, []);
 export const saveDriveItems = async (items: DriveItem[]) => {
   await saveItem(STORAGE_KEYS.DRIVE_ITEMS, items);
-  await updateStats({ driveCount: items.length });
+  const fileCount = countDriveFiles(items);
+  await updateStats({ driveCount: fileCount });
   await recalculateTotalUsedStorageGB();
 };
 

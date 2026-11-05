@@ -12,6 +12,7 @@ import {
   ScrollView,
   Share,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -126,23 +127,44 @@ export default function NoteDetailScreen() {
     return activeLineIdx;
   }, []);
 
-  const scrollToCursor = useCallback((selPos?: number) => {
-    const pos = selPos ?? activeSelectionRef.current.start;
-    const currentLines = latestLinesRef.current;
-    if (!currentLines || currentLines.length === 0) return;
+  const [lineLayouts, setLineLayouts] = useState<{ [idx: number]: { y: number; height: number } }>({});
+  const lineLayoutsRef = useRef<{ [idx: number]: { y: number; height: number } }>({});
+  const scrollThrottleRef = useRef<NodeJS.Timeout | null>(null);
 
-    const activeLineIdx = getActiveLineIndex(pos);
-    let yOffset = 60;
-    for (let i = 0; i < activeLineIdx && i < currentLines.length; i++) {
-      const line = currentLines[i];
-      const lh = BLOCK_TYPOGRAPHY[line?.type]?.lineHeight || 24;
-      yOffset += lh;
-    }
-
-    scrollViewRef.current?.scrollTo({
-      y: Math.max(0, yOffset - 100),
-      animated: true,
+  const handleLineLayout = useCallback((idx: number, y: number, height: number) => {
+    lineLayoutsRef.current[idx] = { y, height };
+    setLineLayouts((prev) => {
+      if (prev[idx]?.y === y && prev[idx]?.height === height) return prev;
+      return { ...prev, [idx]: { y, height } };
     });
+  }, []);
+
+  const scrollToCursor = useCallback((selPos?: number) => {
+    if (scrollThrottleRef.current) clearTimeout(scrollThrottleRef.current);
+    scrollThrottleRef.current = setTimeout(() => {
+      const pos = selPos ?? activeSelectionRef.current.start;
+      const currentLines = latestLinesRef.current;
+      if (!currentLines || currentLines.length === 0) return;
+
+      const activeLineIdx = getActiveLineIndex(pos);
+      const measured = lineLayoutsRef.current[activeLineIdx];
+
+      let targetY = 60;
+      if (measured && typeof measured.y === "number") {
+        targetY += measured.y;
+      } else {
+        for (let i = 0; i < activeLineIdx && i < currentLines.length; i++) {
+          const line = currentLines[i];
+          const lh = BLOCK_TYPOGRAPHY[line?.type]?.lineHeight || 24;
+          targetY += lh;
+        }
+      }
+
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, targetY - 100),
+        animated: true,
+      });
+    }, 40);
   }, [getActiveLineIndex]);
 
   useEffect(() => {
@@ -404,6 +426,21 @@ export default function NoteDetailScreen() {
     updateBodyAndSave(newBody);
   };
 
+  const handleToggleTodoLine = useCallback((lineIdx: number) => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    const currentLines = latestLinesRef.current;
+    if (!currentLines || !currentLines[lineIdx]) return;
+    const target = currentLines[lineIdx];
+    if (target.type !== "todo") return;
+
+    const updated = [...currentLines];
+    updated[lineIdx] = { ...target, checked: !target.checked };
+    setLines(updated);
+    latestLinesRef.current = updated;
+    const md = cleanLinesToMarkdown(updated);
+    updateBodyAndSave(md);
+  }, []);
+
   const handleInsertChecklist = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(true);
@@ -605,15 +642,72 @@ export default function NoteDetailScreen() {
 
           {/* Permanent Body TextInput */}
           <View style={{ minHeight: 320 }}>
+            {/* Dedicated checklist circle touch targets in left margin */}
+            <View
+              pointerEvents="box-none"
+              style={{ position: "absolute", top: 0, left: 0, width: 36, bottom: 0, zIndex: 10 }}
+            >
+              {lines.map((line, idx) => {
+                if (line.type !== "todo") return null;
+                const layout = lineLayouts[idx];
+                let topY = layout?.y;
+                if (topY === undefined) {
+                  topY = 0;
+                  for (let i = 0; i < idx; i++) {
+                    topY += BLOCK_TYPOGRAPHY[lines[i].type]?.lineHeight || 24;
+                  }
+                }
+                const h = layout?.height || BLOCK_TYPOGRAPHY.todo.lineHeight || 24;
+                return (
+                  <Pressable
+                    key={`circle-tap-${line.id || idx}`}
+                    hitSlop={{ top: 8, bottom: 8, left: 16, right: 10 }}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      handleToggleTodoLine(idx);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: topY,
+                      left: 0,
+                      width: 36,
+                      height: h,
+                      justifyContent: "flex-start",
+                    }}
+                  />
+                );
+              })}
+            </View>
+
             <TextInput
               ref={bodyInputRef}
               showSoftInputOnFocus={!showFormatSheet}
               onChangeText={handleBodyChange}
               onSelectionChange={(e) => {
-                activeSelectionRef.current = e.nativeEvent.selection;
+                const sel = e.nativeEvent.selection;
+                activeSelectionRef.current = sel;
                 if (showFormatSheet) {
-                  checkActiveFormats(e.nativeEvent.selection);
+                  checkActiveFormats(sel);
                 }
+
+                // If cursor lands inside the 2-character prefix of a todo line, nudge it after the prefix
+                if (sel.start === sel.end) {
+                  let offset = 0;
+                  for (let i = 0; i < lines.length; i++) {
+                    const l = lines[i];
+                    const prefixLen = l.type === "todo" ? 2 : 0;
+                    const lineLen = prefixLen + (l.text || "").length + (i < lines.length - 1 ? 1 : 0);
+                    if (l.type === "todo" && sel.start >= offset && sel.start < offset + prefixLen) {
+                      const safePos = offset + prefixLen;
+                      bodyInputRef.current?.setSelection(safePos, safePos);
+                      return;
+                    }
+                    offset += lineLen;
+                  }
+                }
+
+                // Smoothly follow cursor while typing or navigating
+                scrollToCursor(sel.start);
               }}
               onFocus={() => {
                 setIsEditing(true);
@@ -638,7 +732,7 @@ export default function NoteDetailScreen() {
                 includeFontPadding: false,
               }}
             >
-              {renderCleanEditorLines(lines)}
+              {renderCleanEditorLines(lines, handleToggleTodoLine, handleLineLayout)}
             </TextInput>
 
             {/* Tap-below empty area to focus */}
