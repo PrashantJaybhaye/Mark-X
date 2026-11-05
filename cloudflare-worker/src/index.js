@@ -7,18 +7,50 @@
  * - HEAD method support for video players inspecting duration/content-length.
  */
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, HEAD, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Auth-Key, Authorization, Range",
+  "Access-Control-Allow-Headers": "Content-Type, X-Auth-Key, Authorization, Range, X-User-Id",
   "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, ETag",
+  ...SECURITY_HEADERS,
 };
 
 const jsonResponse = (data, status = 200) =>
   Response.json(data, { status, headers: CORS_HEADERS });
 
+// In-memory rate limiting per client IP (sliding window per minute)
+const uploadRateLimiter = new Map();
+const UPLOAD_RATE_LIMIT = 30; // max 30 uploads per minute per IP
+const UPLOAD_RATE_WINDOW_MS = 60 * 1000;
+
+function checkUploadRateLimit(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown-ip";
+  const now = Date.now();
+  let record = uploadRateLimiter.get(ip);
+  if (!record || now > record.resetTime) {
+    uploadRateLimiter.set(ip, { count: 1, resetTime: now + UPLOAD_RATE_WINDOW_MS });
+    return true;
+  }
+  if (record.count >= UPLOAD_RATE_LIMIT) {
+    return false;
+  }
+  record.count++;
+  return true;
+}
+
 function isAuthorized(request, env) {
-  if (!env.UPLOAD_SECRET) return true;
+  // Fail closed: Never allow write/delete if authorization secret is not configured
+  if (!env.UPLOAD_SECRET) {
+    console.error("Worker authorization rejected: UPLOAD_SECRET is not configured.");
+    return false;
+  }
   const xAuth = request.headers.get("X-Auth-Key");
   const authHeader = request.headers.get("Authorization");
   const bearerToken = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
@@ -67,6 +99,13 @@ export default {
     // 1. Upload Handler (POST /upload)
     // ==========================================
     if (request.method === "POST" && url.pathname === "/upload") {
+      if (!checkUploadRateLimit(request)) {
+        return jsonResponse(
+          { success: false, error: "Rate limit exceeded: Too many upload requests. Please wait a moment." },
+          429
+        );
+      }
+
       if (!isAuthorized(request, env)) {
         return jsonResponse({ success: false, error: "Unauthorized: Invalid or missing authorization credentials" }, 401);
       }

@@ -8,6 +8,32 @@ const PASSCODE_HASH_STORAGE_PREFIX = "markx_vault_passcode_hash_";
 const LEGACY_PASSCODE_STORAGE_PREFIX = "markx_my_eyes_only_passcode_";
 const VAULT_SALT_SECRET = "markx_vault_salt_v1_";
 
+const MAX_ATTEMPTS_BEFORE_LOCK = 5;
+const LOCKOUT_DURATION_MS = 30 * 1000; // 30 seconds
+
+// In-memory lockout and rate-limiting tracking to stop automated brute-force attacks
+let failedAttemptsCount = 0;
+let lockedUntilTimestamp = 0;
+
+/**
+ * Returns remaining seconds if vault passcode entry is locked due to repeated failures.
+ */
+export function getPasscodeLockoutRemainingSeconds(): number {
+  const now = Date.now();
+  if (lockedUntilTimestamp > now) {
+    return Math.ceil((lockedUntilTimestamp - now) / 1000);
+  }
+  return 0;
+}
+
+/**
+ * Reset lockout state.
+ */
+export function clearPasscodeLockout(): void {
+  failedAttemptsCount = 0;
+  lockedUntilTimestamp = 0;
+}
+
 // Fast in-memory cache to guarantee zero-latency rendering and instant verification
 let cachedVaultState: {
   uid: string;
@@ -173,30 +199,49 @@ export async function setHiddenPasscode(passcode: string): Promise<void> {
 }
 
 /**
- * Verify if entered passcode matches stored hash.
+ * Verify if entered passcode matches stored hash with brute-force lockout protection.
  */
 export async function verifyHiddenPasscode(enteredCode: string): Promise<boolean> {
+  const remaining = getPasscodeLockoutRemainingSeconds();
+  if (remaining > 0) {
+    throw new Error(`Too many incorrect attempts. Please wait ${remaining}s.`);
+  }
+
   const currentUid = auth.currentUser?.uid || "guest";
   const expectedEnteredHash = await hashPasscode(enteredCode, currentUid);
 
+  let isValid = false;
+
   // 1. Fast memory verification
   if (cachedVaultState && cachedVaultState.uid === currentUid && cachedVaultState.passcodeHash) {
-    return cachedVaultState.passcodeHash === expectedEnteredHash;
+    isValid = cachedVaultState.passcodeHash === expectedEnteredHash;
+  } else {
+    // 2. Ensure local / cloud hash is fetched
+    const hasCode = await hasHiddenPasscode();
+    if (hasCode && cachedVaultState?.passcodeHash) {
+      isValid = cachedVaultState.passcodeHash === expectedEnteredHash;
+    }
   }
 
-  // 2. Ensure local / cloud hash is fetched
-  const hasCode = await hasHiddenPasscode();
-  if (!hasCode || !cachedVaultState?.passcodeHash) {
+  if (isValid) {
+    clearPasscodeLockout();
+    return true;
+  } else {
+    failedAttemptsCount++;
+    if (failedAttemptsCount >= MAX_ATTEMPTS_BEFORE_LOCK) {
+      lockedUntilTimestamp = Date.now() + LOCKOUT_DURATION_MS;
+      const waitSec = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+      throw new Error(`Too many incorrect attempts. Locked for ${waitSec}s.`);
+    }
     return false;
   }
-
-  return cachedVaultState.passcodeHash === expectedEnteredHash;
 }
 
 /**
  * Reset passcode for My Eyes Only.
  */
 export async function resetHiddenPasscode(): Promise<void> {
+  clearPasscodeLockout();
   const currentUid = auth.currentUser?.uid || "guest";
   const hashKey = getHashStorageKey(currentUid);
   const legacyKey = getLegacyStorageKey(currentUid);

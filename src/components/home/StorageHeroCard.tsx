@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import { Animated, Text, TouchableOpacity, View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
+import { MarkXMonogram } from "../common/MarkXLogo";
 
 interface StorageHeroCardProps {
   usedStorage?: string;
@@ -63,7 +64,19 @@ export function StorageHeroCardSkeleton() {
         </View>
       </View>
 
-      <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
+      <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10 overflow-hidden relative">
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            right: -24,
+            top: -16,
+            transform: [{ rotate: "8deg" }],
+          }}
+        >
+          <MarkXMonogram size={175} color="#FFFFFF" opacity={0.1} />
+        </View>
+
         <View className="flex-row justify-between items-start mb-1">
           <View>
             <Animated.View
@@ -192,7 +205,19 @@ export function StorageHeroCard({
         </View>
       </View>
 
-      <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10">
+      <View className="w-full rounded-[24px] bg-[#EB5B49] p-5 -mt-10 overflow-hidden relative">
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            right: -24,
+            top: -16,
+            transform: [{ rotate: "8deg" }],
+          }}
+        >
+          <MarkXMonogram size={175} color="#FFFFFF" opacity={0.1} />
+        </View>
+
         <View className="flex-row justify-between items-start mb-1">
           <View>
             <Text

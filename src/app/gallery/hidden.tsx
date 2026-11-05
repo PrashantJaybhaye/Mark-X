@@ -431,7 +431,7 @@ export default function MyEyesOnlyVaultScreen() {
         contentContainerStyle={{
           flexGrow: 1,
           paddingHorizontal: sideMargin,
-          paddingTop: 8,
+          paddingTop: 14,
           paddingBottom: isSelectMode ? 85 : 20,
         }}
       >

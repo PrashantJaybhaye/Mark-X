@@ -7,6 +7,35 @@ interface MarkXLogoProps extends SvgProps {
   color?: string;
 }
 
+export function MarkXMonogram({
+  size = 120,
+  color = "#FFFFFF",
+  opacity = 0.09,
+  ...props
+}: {
+  size?: number | string;
+  color?: string;
+  opacity?: number;
+} & SvgProps) {
+  return (
+    <Svg
+      viewBox="1490 0 405 240"
+      width={size}
+      height={typeof size === "number" ? Math.round((size * 240) / 405) : "100%"}
+      fill="none"
+      {...props}
+    >
+      <Path
+        d="M 1665.0,182.0 L 1616.0,137.0 L 1614.0,137.0 L 1504.0,225.0 L 1491.0,237.0 L 1601.0,237.0 L 1659.0,189.0 Z M 1714.0,58.0 L 1768.0,105.0 L 1891.0,4.0 L 1773.0,4.0 L 1714.0,56.0 Z M 1494.0,4.0 L 1620.0,107.0 L 1770.0,237.0 L 1878.0,237.0 L 1610.0,4.0 Z"
+        fill={color}
+        fillOpacity={opacity}
+        fillRule="evenodd"
+        clipRule="evenodd"
+      />
+    </Svg>
+  );
+}
+
 export function MarkXLogo({
   width = 125,
   height = 16,

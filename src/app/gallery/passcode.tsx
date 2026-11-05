@@ -22,6 +22,7 @@ import {
   verifyHiddenPasscode,
   setHiddenPasscode,
   getCachedHasHiddenPasscode,
+  getPasscodeLockoutRemainingSeconds,
 } from "../../services/hiddenPasscodeService";
 import { triggerHaptic } from "../../utils/haptics";
 
@@ -162,6 +163,12 @@ export default function MyEyesOnlyPasscodeScreen() {
 
   const handleKeyPress = (digit: string) => {
     if (isNavigatingRef.current) return;
+    const remaining = getPasscodeLockoutRemainingSeconds();
+    if (remaining > 0) {
+      triggerShake();
+      setErrorMessage(`Too many failed attempts. Locked for ${remaining}s.`);
+      return;
+    }
     if (enteredPin.length >= 4) return;
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setErrorMessage(null);
@@ -240,10 +247,10 @@ export default function MyEyesOnlyPasscodeScreen() {
           setErrorMessage("Incorrect passcode. Try again.");
           setEnteredPin("");
         }
-      } catch {
+      } catch (err: any) {
         isNavigatingRef.current = false;
         triggerShake();
-        setErrorMessage("Something went wrong. Try again.");
+        setErrorMessage(err?.message || "Something went wrong. Try again.");
         setEnteredPin("");
       }
     }
