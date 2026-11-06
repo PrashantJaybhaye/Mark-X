@@ -122,6 +122,15 @@ export default function HomeScreen() {
     };
   }, [user?.uid, refreshCounts, applyStats]);
 
+  const loadCachedStats = React.useCallback(async () => {
+    try {
+      const prefs = await loadUserPreferences();
+      if (prefs.stats) {
+        applyStats(prefs.stats);
+      }
+    } catch (_e) {}
+  }, [applyStats]);
+
   const isNavigatingRef = React.useRef(false);
 
   useFocusEffect(
@@ -131,8 +140,8 @@ export default function HomeScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-      refreshCounts();
-    }, [refreshCounts])
+      loadCachedStats();
+    }, [loadCachedStats])
   );
 
   const handleUploadFile = () => {

@@ -146,12 +146,15 @@ export function listenCurrentDeviceRevocation(
           return;
         }
 
-        const isRevoked =
-          !docSnap ||
-          (typeof docSnap.exists === "function" ? !docSnap.exists() : !docSnap.exists);
+        // Only trigger revocation if the server explicitly confirmed the document does not exist.
+        // Ignore offline/cached missing states during network reconnects or poor connectivity.
+        const isFromCache = docSnap?.metadata?.fromCache ?? false;
+        const exists = Boolean(
+          docSnap && (typeof docSnap.exists === "function" ? docSnap.exists() : docSnap.exists)
+        );
 
-        if (isRevoked) {
-          console.warn("[deviceSyncService] Session revoked remotely from another device.");
+        if (!exists && !isFromCache) {
+          console.warn("[deviceSyncService] Session revoked remotely from another device (server-confirmed).");
           onRevoked();
         }
       },

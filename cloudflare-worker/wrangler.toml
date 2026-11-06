@@ -2,7 +2,11 @@ name = "mark-x-storage"
 main = "src/index.js"
 compatibility_date = "2024-09-01"
 
-# Bind R2 bucket for Mark-X gallery files
+# Bind R2 bucket for Mark-X media and files
 [[r2_buckets]]
 binding = "MARK_X_BUCKET"
 bucket_name = "mark-x-gallery"
+
+# Note on Secrets:
+# Do not place plaintext secrets here. Store UPLOAD_SECRET securely via:
+#   npx wrangler secret put UPLOAD_SECRET

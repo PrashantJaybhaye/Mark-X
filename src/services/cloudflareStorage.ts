@@ -108,10 +108,10 @@ export async function deleteFileFromMarkx(keyOrUrl: string): Promise<{ success: 
     if (key.startsWith("http://") || key.startsWith("https://")) {
       try {
         const parsed = new URL(key);
-        key = parsed.pathname.replace(/^\/+/, "");
+        key = decodeURIComponent(parsed.pathname).replace(/^\/+/, "");
       } catch {
         const parts = key.split("/");
-        key = parts.slice(3).join("/");
+        key = decodeURIComponent(parts.slice(3).join("/"));
       }
     }
 
@@ -133,7 +133,9 @@ export async function deleteFileFromMarkx(keyOrUrl: string): Promise<{ success: 
       } catch {}
     }
 
-    const deleteEndpoint = `${SERVER_URL}/${encodeURIComponent(key)}`;
+    // Preserve slash segments while URL-encoding individual path parts
+    const encodedPath = key.split("/").map(encodeURIComponent).join("/");
+    const deleteEndpoint = `${SERVER_URL}/${encodedPath}`;
     const response = await fetch(deleteEndpoint, {
       method: "DELETE",
       headers,

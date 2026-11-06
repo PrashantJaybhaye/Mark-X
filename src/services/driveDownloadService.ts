@@ -2,11 +2,18 @@ import notifee, {
   AndroidImportance,
 } from "@notifee/react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
-import ReactNativeBlobUtil from "react-native-blob-util";
 import { DriveItem } from "../utils/driveFileTypes";
 import { getMimeTypeForFile } from "./nativeFileOpenerService";
 import { emitDriveToast } from "./driveToastService";
+
+// Safely resolve optional react-native-blob-util without crashing clean CI/EAS builds
+let ReactNativeBlobUtil: any = null;
+try {
+  const mod = require("react-native-blob-util");
+  ReactNativeBlobUtil = mod?.default || mod;
+} catch {}
 
 const DOWNLOAD_CHANNEL_ID = "downloads_channel";
 
@@ -273,6 +280,27 @@ export async function downloadDriveFile(
           }
         } catch (cpErr: any) {
           console.warn("[DriveDownloadService] Fallback to DownloadDir copy failed:", cpErr?.message);
+        }
+      }
+
+      // 3. Fallback if MediaStore / DownloadDir was unavailable: save into documentDirectory and share
+      if (!savedToMediaStore && finalSavedPath === tempDownloadedUri) {
+        try {
+          const dest = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${exactFileName}`;
+          await FileSystem.copyAsync({
+            from: tempDownloadedUri,
+            to: dest,
+          }).catch(() => {});
+          finalSavedPath = dest;
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(dest, {
+              mimeType,
+              dialogTitle: `Save ${exactFileName}`,
+            });
+          }
+        } catch (fErr) {
+          console.warn("[DriveDownloadService] Standard document copy fallback notice:", fErr);
         }
       }
     } else {

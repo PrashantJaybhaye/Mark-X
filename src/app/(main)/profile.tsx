@@ -20,12 +20,6 @@ import { useAuth } from "../../context/AuthContext";
 import { useBiometrics } from "../../context/BiometricsContext";
 import { triggerHaptic } from "../../utils/haptics";
 import { clearAppCache, getAppCacheSize } from "../../services/cacheCleaner";
-import {
-  getOrFetchCachedImage,
-  forceRefetchCachedImage,
-  checkAndSyncDailyImage,
-  recordBannerSyncedToday,
-} from "../../services/cachedImageService";
 
 const PROFILE_BANNER_URL = "https://repo-asset.vercel.app/mark/profile-banner.webp";
 
@@ -74,21 +68,7 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    getOrFetchCachedImage(PROFILE_BANNER_URL, "profile-banner.webp").then((uri) => {
-      if (isMounted && uri) {
-        setBannerUri(uri);
-      }
-    });
-
-    checkAndSyncDailyImage(PROFILE_BANNER_URL, "profile-banner.webp", (newUri) => {
-      if (isMounted && newUri) {
-        setBannerUri(newUri);
-      }
-    });
-
     return () => {
-      isMounted = false;
       if (bannerTapTimerRef.current) {
         clearTimeout(bannerTapTimerRef.current);
       }
@@ -106,12 +86,8 @@ export default function ProfileScreen() {
     if (bannerTapCountRef.current >= 6) {
       bannerTapCountRef.current = 0;
       setIsRefetchingBanner(true);
-
-      forceRefetchCachedImage(PROFILE_BANNER_URL, "profile-banner.webp").then((newUri) => {
-        setBannerUri(`${newUri}?t=${Date.now()}`);
-        setIsRefetchingBanner(false);
-        recordBannerSyncedToday("profile-banner.webp");
-      });
+      setBannerUri(`${PROFILE_BANNER_URL}?t=${Date.now()}`);
+      setTimeout(() => setIsRefetchingBanner(false), 600);
     } else {
       bannerTapTimerRef.current = setTimeout(() => {
         bannerTapCountRef.current = 0;
@@ -127,10 +103,6 @@ export default function ProfileScreen() {
       if (Platform.OS === "android") {
         RNStatusBar.setBarStyle("dark-content");
       }
-
-      checkAndSyncDailyImage(PROFILE_BANNER_URL, "profile-banner.webp", (newUri) => {
-        setBannerUri(newUri);
-      });
 
       return () => {
         setIsFocused(false);

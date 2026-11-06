@@ -1,6 +1,5 @@
 export * from "./BackgroundUploadService";
 export * from "./biometricsService";
-export * from "./cachedImageService";
 export * from "./cacheCleaner";
 export * from "./cloudflareStorage";
 export * from "./deviceSyncService";

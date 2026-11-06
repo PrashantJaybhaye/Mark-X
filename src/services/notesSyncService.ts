@@ -88,6 +88,40 @@ export function sortNotesChronologically(notes: NoteItem[]): NoteItem[] {
   });
 }
 
+/**
+ * Safely merges incoming server notes with local offline storage to guarantee
+ * that offline notes created or updated while disconnected are never lost.
+ */
+async function mergeWithLocalNotes(serverNotes: NoteItem[], customUid?: string): Promise<NoteItem[]> {
+  const localNotes = await loadNotes();
+  const serverIdSet = new Set(serverNotes.map((n) => n.id));
+  const merged: NoteItem[] = [];
+
+  // 1. Process server notes and pick newer local revisions if edited offline
+  for (const sNote of serverNotes) {
+    const localMatch = localNotes.find((ln) => ln.id === sNote.id);
+    if (localMatch && (localMatch.updatedAtMs || 0) > (sNote.updatedAtMs || 0)) {
+      // Local version has newer edits; keep local and push to server
+      merged.push(localMatch);
+      syncNoteToFirestore(localMatch, customUid).catch(() => {});
+    } else {
+      merged.push(sNote);
+    }
+  }
+
+  // 2. Preserve notes created locally that do not exist on the server yet
+  for (const lNote of localNotes) {
+    if (!serverIdSet.has(lNote.id)) {
+      merged.push(lNote);
+      syncNoteToFirestore(lNote, customUid).catch(() => {});
+    }
+  }
+
+  const sorted = sortNotesChronologically(merged);
+  await saveNotes(sorted);
+  return sorted;
+}
+
 export function subscribeToNotesServer(
   onUpdate: (notes: NoteItem[]) => void,
   customUid?: string
@@ -108,9 +142,8 @@ export function subscribeToNotesServer(
           serverNotes.push(normalizeNoteItem(docSnap.data(), docSnap.id));
         });
 
-        const sorted = sortNotesChronologically(serverNotes);
-        await saveNotes(sorted);
-        onUpdate(sorted);
+        const merged = await mergeWithLocalNotes(serverNotes, customUid);
+        onUpdate(merged);
       },
       (error: any) => {
         if (
@@ -187,9 +220,7 @@ export async function fetchNotesFromServer(customUid?: string): Promise<NoteItem
       serverNotes.push(normalizeNoteItem(d.data(), d.id));
     });
 
-    const sorted = sortNotesChronologically(serverNotes);
-    await saveNotes(sorted);
-    return sorted;
+    return await mergeWithLocalNotes(serverNotes, customUid);
   } catch (err) {
     console.warn("[NotesSyncService] fetchNotesFromServer failed, returning local cache:", err);
     return await loadNotes();
