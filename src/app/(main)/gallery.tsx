@@ -279,28 +279,38 @@ export default function GalleryScreen() {
     loadFirstPage(pins.length === 0);
 
     const unsubscribe = subscribeLatestGalleryPins(
-      (latestPins) => {
+      (latestPins, removedIds = []) => {
         if (!isMounted) return;
+        const removedSet = new Set(removedIds);
         prefetchPinImages(latestPins);
         setPins((prev) => {
           const latestIds = new Set(latestPins.map((p) => p.id));
           const prevMap = new Map(prev.map((p) => [p.id, p]));
 
           const localUploading = prev.filter(
-            (p) => (p.uploadStatus === "uploading" || !p.imageUrl?.startsWith("http")) && !latestIds.has(p.id)
+            (p) =>
+              (p.uploadStatus === "uploading" || !p.imageUrl?.startsWith("http")) &&
+              !latestIds.has(p.id) &&
+              !removedSet.has(p.id)
           );
 
-          const mergedLatest = latestPins.map((item) => {
-            const existing = prevMap.get(item.id);
-            return {
-              ...(existing || {}),
-              ...item,
-              localUri: item.localUri || existing?.localUri,
-            };
-          });
+          const mergedLatest = latestPins
+            .filter((p) => !removedSet.has(p.id))
+            .map((item) => {
+              const existing = prevMap.get(item.id);
+              return {
+                ...(existing || {}),
+                ...item,
+                localUri: item.localUri || existing?.localUri,
+              };
+            });
 
           const remainingPrev = prev.filter(
-            (p) => !latestIds.has(p.id) && p.uploadStatus !== "uploading" && (p.imageUrl?.startsWith("http") ?? false)
+            (p) =>
+              !latestIds.has(p.id) &&
+              !removedSet.has(p.id) &&
+              p.uploadStatus !== "uploading" &&
+              (p.imageUrl?.startsWith("http") ?? false)
           );
 
           const updated = [...localUploading, ...mergedLatest, ...remainingPrev];

@@ -26,6 +26,45 @@ import {
 } from "../../services/hiddenPasscodeService";
 import { triggerHaptic } from "../../utils/haptics";
 
+const KEYPAD_ROWS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+];
+
+/**
+ * Memoized Keypad button responding instantaneously on finger touch-down (onPressIn)
+ * to eliminate mobile tap latency.
+ */
+const KeypadButton = React.memo(function KeypadButton({
+  digit,
+  onPressIn,
+}: {
+  digit: string;
+  onPressIn: (digit: string) => void;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.25}
+      delayPressIn={0}
+      onPressIn={() => onPressIn(digit)}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
+    >
+      <Text
+        style={{
+          fontSize: 34,
+          fontFamily: "Outfit_600SemiBold",
+          color: "#000000",
+          textAlign: "center",
+        }}
+      >
+        {digit}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
 export default function MyEyesOnlyPasscodeScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -38,6 +77,10 @@ export default function MyEyesOnlyPasscodeScreen() {
   const [enteredPin, setEnteredPin] = useState("");
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Synchronous ref to prevent stale closure delays or dropped rapid taps
+  const pinRef = useRef("");
+  const hasErrorRef = useRef(false);
 
   // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -85,10 +128,12 @@ export default function MyEyesOnlyPasscodeScreen() {
     if (isNavigatingRef.current) return;
     if (isSetupMode && setupStep === "confirm") {
       setSetupStep("initial");
+      pinRef.current = "";
       setEnteredPin("");
       setFirstPasscode("");
       setErrorMessage(null);
       setHasError(false);
+      hasErrorRef.current = false;
       triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
       return;
     }
@@ -120,9 +165,11 @@ export default function MyEyesOnlyPasscodeScreen() {
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
+        pinRef.current = "";
         setEnteredPin("");
         setErrorMessage(null);
         setHasError(false);
+        hasErrorRef.current = false;
         if (isSetupMode && setupStep === "confirm") {
           setSetupStep("initial");
           setFirstPasscode("");
@@ -134,6 +181,7 @@ export default function MyEyesOnlyPasscodeScreen() {
 
   const triggerShake = useCallback(() => {
     setHasError(true);
+    hasErrorRef.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     shakeAnim.setValue(0);
     Animated.sequence([
@@ -144,24 +192,26 @@ export default function MyEyesOnlyPasscodeScreen() {
       Animated.timing(shakeAnim, { toValue: 3, duration: 40, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
     ]).start(() => {
-      setTimeout(() => setHasError(false), 500);
+      setTimeout(() => {
+        setHasError(false);
+        hasErrorRef.current = false;
+      }, 500);
     });
   }, [shakeAnim]);
 
-  const animateDash = (index: number) => {
+  const animateDash = useCallback((index: number) => {
     const anim = dashScaleAnims[index];
     if (anim) {
-      anim.setValue(1.22);
-      Animated.spring(anim, {
+      anim.setValue(1.18);
+      Animated.timing(anim, {
         toValue: 1,
-        friction: 6,
-        tension: 240,
+        duration: 120,
         useNativeDriver: true,
       }).start();
     }
-  };
+  }, [dashScaleAnims]);
 
-  const handleKeyPress = (digit: string) => {
+  const handleKeyPress = useCallback((digit: string) => {
     if (isNavigatingRef.current) return;
     const remaining = getPasscodeLockoutRemainingSeconds();
     if (remaining > 0) {
@@ -169,30 +219,47 @@ export default function MyEyesOnlyPasscodeScreen() {
       setErrorMessage(`Too many failed attempts. Locked for ${remaining}s.`);
       return;
     }
-    if (enteredPin.length >= 4) return;
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    setErrorMessage(null);
-    setHasError(false);
 
-    const nextPin = enteredPin + digit;
+    if (pinRef.current.length >= 4) return;
+
+    // Instant touch feedback
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+
+    if (hasErrorRef.current) {
+      setHasError(false);
+      setErrorMessage(null);
+      hasErrorRef.current = false;
+    }
+
+    const nextPin = pinRef.current + digit;
+    pinRef.current = nextPin;
     setEnteredPin(nextPin);
-    animateDash(enteredPin.length);
+    animateDash(nextPin.length - 1);
 
     if (nextPin.length === 4) {
-      setTimeout(() => {
+      // Ensure UI renders the 4th dash smoothly before navigation/verification starts
+      requestAnimationFrame(() => {
         handleComplete(nextPin);
-      }, 40);
+      });
     }
-  };
+  }, [triggerShake, animateDash]);
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     if (isNavigatingRef.current) return;
-    if (enteredPin.length === 0) return;
+    if (pinRef.current.length === 0) return;
+
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    setErrorMessage(null);
-    setHasError(false);
-    setEnteredPin((prev) => prev.slice(0, -1));
-  };
+
+    if (hasErrorRef.current) {
+      setHasError(false);
+      setErrorMessage(null);
+      hasErrorRef.current = false;
+    }
+
+    const nextPin = pinRef.current.slice(0, -1);
+    pinRef.current = nextPin;
+    setEnteredPin(nextPin);
+  }, []);
 
   const handleComplete = async (pin: string) => {
     if (isNavigatingRef.current) return;
@@ -200,6 +267,7 @@ export default function MyEyesOnlyPasscodeScreen() {
     if (isSetupMode) {
       if (setupStep === "initial") {
         setFirstPasscode(pin);
+        pinRef.current = "";
         setEnteredPin("");
         setSetupStep("confirm");
         triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
@@ -226,6 +294,7 @@ export default function MyEyesOnlyPasscodeScreen() {
         } else {
           triggerShake();
           setErrorMessage("Passcodes didn't match. Try again.");
+          pinRef.current = "";
           setEnteredPin("");
           setFirstPasscode("");
           setSetupStep("initial");
@@ -245,12 +314,14 @@ export default function MyEyesOnlyPasscodeScreen() {
           isNavigatingRef.current = false;
           triggerShake();
           setErrorMessage("Incorrect passcode. Try again.");
+          pinRef.current = "";
           setEnteredPin("");
         }
       } catch (err: any) {
         isNavigatingRef.current = false;
         triggerShake();
         setErrorMessage(err?.message || "Something went wrong. Try again.");
+        pinRef.current = "";
         setEnteredPin("");
       }
     }
@@ -277,17 +348,11 @@ export default function MyEyesOnlyPasscodeScreen() {
       ? "Set a new 4-digit passcode for your vault"
       : "You will use this to log in securely";
 
-  const keypadRows = [
-    ["1", "2", "3"],
-    ["4", "5", "6"],
-    ["7", "8", "9"],
-  ];
-
   return (
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <StatusBar style="dark" />
 
-      {/* Top Header Bar - Identical header level to other pages */}
+      {/* Top Header Bar */}
       <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 10 }} className="flex-row items-center justify-between">
         <TouchableOpacity
           onPress={handleBackAction}
@@ -300,7 +365,7 @@ export default function MyEyesOnlyPasscodeScreen() {
         <View style={{ width: 40, height: 40 }} />
       </View>
 
-      {/* Main Content Column - Centered Vertically */}
+      {/* Main Content Column */}
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 28, marginTop: -56 }}>
         {/* Prominent Mark X Logo */}
         <View style={{ marginBottom: 20 }} className="items-center justify-center">
@@ -384,29 +449,16 @@ export default function MyEyesOnlyPasscodeScreen() {
           ) : null}
         </View>
 
-        {/* Keypad: Clean SemiBold, Pure Numerals (No letters) */}
+        {/* Keypad: Clean SemiBold, Pure Numerals */}
         <View style={{ width: "100%", maxWidth: 300, gap: 20 }}>
-          {keypadRows.map((row, rIdx) => (
+          {KEYPAD_ROWS.map((row, rIdx) => (
             <View key={rIdx} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               {row.map((digit) => (
-                <TouchableOpacity
+                <KeypadButton
                   key={digit}
-                  activeOpacity={0.2}
-                  delayPressIn={0}
-                  onPress={() => handleKeyPress(digit)}
-                  style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 34,
-                      fontFamily: "Outfit_600SemiBold",
-                      color: "#000000",
-                      textAlign: "center",
-                    }}
-                  >
-                    {digit}
-                  </Text>
-                </TouchableOpacity>
+                  digit={digit}
+                  onPressIn={handleKeyPress}
+                />
               ))}
             </View>
           ))}
@@ -416,30 +468,18 @@ export default function MyEyesOnlyPasscodeScreen() {
             <View style={{ width: 80, height: 68 }} />
 
             {/* Zero */}
-            <TouchableOpacity
-              activeOpacity={0.2}
-              delayPressIn={0}
-              onPress={() => handleKeyPress("0")}
-              style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
-            >
-              <Text
-                style={{
-                  fontSize: 34,
-                  fontFamily: "Outfit_600SemiBold",
-                  color: "#000000",
-                  textAlign: "center",
-                }}
-              >
-                0
-              </Text>
-            </TouchableOpacity>
+            <KeypadButton
+              digit="0"
+              onPressIn={handleKeyPress}
+            />
 
             {/* Backspace */}
             <TouchableOpacity
-              activeOpacity={0.2}
+              activeOpacity={0.25}
               delayPressIn={0}
-              onPress={handleBackspace}
+              onPressIn={handleBackspace}
               disabled={enteredPin.length === 0}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{ width: 80, height: 68, alignItems: "center", justifyContent: "center" }}
             >
               <Ionicons

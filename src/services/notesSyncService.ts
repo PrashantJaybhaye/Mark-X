@@ -88,17 +88,27 @@ export function sortNotesChronologically(notes: NoteItem[]): NoteItem[] {
   });
 }
 
+// Track deleted note IDs in this session to prevent resurrecting remotely deleted notes
+const knownDeletedNoteIds = new Set<string>();
+
 /**
  * Safely merges incoming server notes with local offline storage to guarantee
- * that offline notes created or updated while disconnected are never lost.
+ * that offline notes created or updated while disconnected are never lost,
+ * while ensuring that remotely deleted notes are never resurrected.
  */
-async function mergeWithLocalNotes(serverNotes: NoteItem[], customUid?: string): Promise<NoteItem[]> {
+async function mergeWithLocalNotes(
+  serverNotes: NoteItem[],
+  removedIds: string[] = [],
+  customUid?: string
+): Promise<NoteItem[]> {
+  removedIds.forEach((id) => knownDeletedNoteIds.add(id));
   const localNotes = await loadNotes();
   const serverIdSet = new Set(serverNotes.map((n) => n.id));
   const merged: NoteItem[] = [];
 
   // 1. Process server notes and pick newer local revisions if edited offline
   for (const sNote of serverNotes) {
+    if (knownDeletedNoteIds.has(sNote.id)) continue;
     const localMatch = localNotes.find((ln) => ln.id === sNote.id);
     if (localMatch && (localMatch.updatedAtMs || 0) > (sNote.updatedAtMs || 0)) {
       // Local version has newer edits; keep local and push to server
@@ -109,8 +119,9 @@ async function mergeWithLocalNotes(serverNotes: NoteItem[], customUid?: string):
     }
   }
 
-  // 2. Preserve notes created locally that do not exist on the server yet
+  // 2. Preserve notes created locally that do not exist on the server yet (and were NOT deleted)
   for (const lNote of localNotes) {
+    if (knownDeletedNoteIds.has(lNote.id)) continue;
     if (!serverIdSet.has(lNote.id)) {
       merged.push(lNote);
       syncNoteToFirestore(lNote, customUid).catch(() => {});
@@ -137,12 +148,21 @@ export function subscribeToNotesServer(
       async (snapshot: FirebaseFirestoreTypes.QuerySnapshot) => {
         if (!snapshot) return;
 
+        const removedIds: string[] = [];
+        if (typeof snapshot.docChanges === "function") {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === "removed") {
+              removedIds.push(change.doc.id);
+            }
+          });
+        }
+
         const serverNotes: NoteItem[] = [];
         snapshot.forEach((docSnap: FirebaseFirestoreTypes.QueryDocumentSnapshot) => {
           serverNotes.push(normalizeNoteItem(docSnap.data(), docSnap.id));
         });
 
-        const merged = await mergeWithLocalNotes(serverNotes, customUid);
+        const merged = await mergeWithLocalNotes(serverNotes, removedIds, customUid);
         onUpdate(merged);
       },
       (error: any) => {
@@ -198,6 +218,13 @@ export async function syncNoteToFirestore(note: NoteItem, customUid?: string): P
 }
 
 export async function deleteNoteFromFirestore(noteId: string, customUid?: string): Promise<void> {
+  knownDeletedNoteIds.add(noteId);
+  try {
+    const local = await loadNotes();
+    const updated = local.filter((n) => n.id !== noteId);
+    await saveNotes(updated);
+  } catch (_e) {}
+
   const ref = noteDoc(noteId, customUid);
   if (!ref) return;
 
@@ -220,7 +247,7 @@ export async function fetchNotesFromServer(customUid?: string): Promise<NoteItem
       serverNotes.push(normalizeNoteItem(d.data(), d.id));
     });
 
-    return await mergeWithLocalNotes(serverNotes, customUid);
+    return await mergeWithLocalNotes(serverNotes, [], customUid);
   } catch (err) {
     console.warn("[NotesSyncService] fetchNotesFromServer failed, returning local cache:", err);
     return await loadNotes();

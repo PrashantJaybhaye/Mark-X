@@ -139,20 +139,28 @@ export async function fetchGalleryPinsPage(
 }
 
 export function subscribeLatestGalleryPins(
-  onUpdate: (pins: GalleryPin[]) => void,
+  onUpdate: (pins: GalleryPin[], removedIds: string[]) => void,
   pageSize = GALLERY_PAGE_LIMIT,
   onError?: (error: Error) => void
 ): () => void {
   const uid = auth.currentUser?.uid;
   if (!uid) {
-    onUpdate([]);
+    onUpdate([], []);
     return () => {};
   }
 
   try {
     const colRef = collection(db, "users", uid, "gallery");
     const handleSnapshot = (snapshot: FirebaseFirestoreTypes.QuerySnapshot) => {
-      onUpdate(snapshot.docs.map(parseDocPin));
+      const removedIds: string[] = [];
+      if (typeof snapshot.docChanges === "function") {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "removed") {
+            removedIds.push(change.doc.id);
+          }
+        });
+      }
+      onUpdate(snapshot.docs.map(parseDocPin), removedIds);
     };
 
     let fallbackUnsub: (() => void) | null = null;
