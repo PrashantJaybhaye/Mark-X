@@ -32,10 +32,6 @@ const KEYPAD_ROWS = [
   ["7", "8", "9"],
 ];
 
-/**
- * Memoized Keypad button responding instantaneously on finger touch-down (onPressIn)
- * to eliminate mobile tap latency.
- */
 const KeypadButton = React.memo(function KeypadButton({
   digit,
   onPressIn,
@@ -78,11 +74,9 @@ export default function MyEyesOnlyPasscodeScreen() {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Synchronous ref to prevent stale closure delays or dropped rapid taps
   const pinRef = useRef("");
   const hasErrorRef = useRef(false);
 
-  // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const dashScaleAnims = useRef([
     new Animated.Value(1),
@@ -123,7 +117,6 @@ export default function MyEyesOnlyPasscodeScreen() {
     };
   }, [mode]);
 
-  // Clean, context-aware back navigation
   const handleBackAction = useCallback(() => {
     if (isNavigatingRef.current) return;
     if (isSetupMode && setupStep === "confirm") {
@@ -150,7 +143,6 @@ export default function MyEyesOnlyPasscodeScreen() {
     }
   }, [isSetupMode, setupStep, router]);
 
-  // Android hardware back handler
   useEffect(() => {
     const onBackPress = () => {
       handleBackAction();
@@ -161,7 +153,6 @@ export default function MyEyesOnlyPasscodeScreen() {
     return () => backSub.remove();
   }, [handleBackAction]);
 
-  // Security: clear entered PIN if app is backgrounded
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") {

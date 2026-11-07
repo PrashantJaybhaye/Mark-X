@@ -88,14 +88,8 @@ export function sortNotesChronologically(notes: NoteItem[]): NoteItem[] {
   });
 }
 
-// Track deleted note IDs in this session to prevent resurrecting remotely deleted notes
 const knownDeletedNoteIds = new Set<string>();
 
-/**
- * Safely merges incoming server notes with local offline storage to guarantee
- * that offline notes created or updated while disconnected are never lost,
- * while ensuring that remotely deleted notes are never resurrected.
- */
 async function mergeWithLocalNotes(
   serverNotes: NoteItem[],
   removedIds: string[] = [],
@@ -106,12 +100,11 @@ async function mergeWithLocalNotes(
   const serverIdSet = new Set(serverNotes.map((n) => n.id));
   const merged: NoteItem[] = [];
 
-  // 1. Process server notes and pick newer local revisions if edited offline
   for (const sNote of serverNotes) {
     if (knownDeletedNoteIds.has(sNote.id)) continue;
     const localMatch = localNotes.find((ln) => ln.id === sNote.id);
     if (localMatch && (localMatch.updatedAtMs || 0) > (sNote.updatedAtMs || 0)) {
-      // Local version has newer edits; keep local and push to server
+
       merged.push(localMatch);
       syncNoteToFirestore(localMatch, customUid).catch(() => {});
     } else {
@@ -119,7 +112,6 @@ async function mergeWithLocalNotes(
     }
   }
 
-  // 2. Preserve notes created locally that do not exist on the server yet (and were NOT deleted)
   for (const lNote of localNotes) {
     if (knownDeletedNoteIds.has(lNote.id)) continue;
     if (!serverIdSet.has(lNote.id)) {

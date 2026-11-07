@@ -1,17 +1,4 @@
-/**
- * Mark-X Storage Worker (Hardened Production Version)
- * Handles authenticated R2 uploads and serves media as an ultra-fast Edge CDN.
- * 
- * Security Controls:
- * - Constant-time secret comparison to prevent timing attacks
- * - User-scoped R2 paths (`users/{uid}/pins/...`) with BOLA/IDOR protection
- * - Owner verification on DELETE operations
- * - Streaming direct-to-R2 to prevent isolate OOM crashes on large files (up to 150 MB)
- * - Strict MIME-type & extension validation (blocking SVG/HTML Stored XSS)
- * - Self-pruning IP rate limiting with post-auth evaluation
- * - Full Content-Security-Policy & nosniff headers
- * - HTTP Range Requests (206) & Edge Caching (caches.default)
- */
+
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
@@ -32,9 +19,8 @@ const CORS_HEADERS = {
 const jsonResponse = (data, status = 200) =>
   Response.json(data, { status, headers: CORS_HEADERS });
 
-// Allowed MIME types to prevent Stored XSS and malicious binary execution
 const MIME_TO_EXTENSION = {
-  // Images
+
   "image/jpeg": "jpg",
   "image/jpg": "jpg",
   "image/png": "png",
@@ -42,19 +28,19 @@ const MIME_TO_EXTENSION = {
   "image/gif": "gif",
   "image/heic": "heic",
   "image/heif": "heif",
-  // Videos
+
   "video/mp4": "mp4",
   "video/quicktime": "mov",
   "video/webm": "webm",
   "video/3gpp": "3gp",
-  // Audio
+
   "audio/mpeg": "mp3",
   "audio/mp4": "m4a",
   "audio/x-m4a": "m4a",
   "audio/wav": "wav",
   "audio/aac": "aac",
   "audio/ogg": "ogg",
-  // Documents
+
   "application/pdf": "pdf",
   "text/plain": "txt",
   "application/zip": "zip",
@@ -80,16 +66,14 @@ const FORBIDDEN_MIME_PATTERNS = [
   "application/x-csh",
 ];
 
-// In-memory sliding-window rate limiter with automatic pruning
 const uploadRateLimiter = new Map();
-const UPLOAD_RATE_LIMIT = 60; // max 60 uploads per minute per IP
+const UPLOAD_RATE_LIMIT = 60;
 const UPLOAD_RATE_WINDOW_MS = 60 * 1000;
 
 function checkUploadRateLimit(request) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown-ip";
   const now = Date.now();
 
-  // Prune expired entries to prevent isolate memory leaks
   if (uploadRateLimiter.size > 200) {
     for (const [clientIp, record] of uploadRateLimiter.entries()) {
       if (now > record.resetTime) {
@@ -110,9 +94,6 @@ function checkUploadRateLimit(request) {
   return true;
 }
 
-/**
- * Constant-time string comparison to prevent side-channel timing attacks
- */
 function constantTimeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string") return false;
   const enc = new TextEncoder();
@@ -161,7 +142,7 @@ function sanitizeKey(key) {
     ) {
       return null;
     }
-    // Only allow alphanumeric characters, hyphens, underscores, dots, and path slashes
+
     if (!/^[a-zA-Z0-9_\-\.\/]+$/.test(decoded)) {
       return null;
     }
@@ -175,7 +156,6 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Handle CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -183,7 +163,6 @@ export default {
       });
     }
 
-    // Health check root
     if (url.pathname === "/" || url.pathname === "") {
       return jsonResponse({
         service: "Mark-X Storage Worker",
@@ -193,11 +172,8 @@ export default {
       });
     }
 
-    // ==========================================
-    // 1. Upload Handler (POST /upload)
-    // ==========================================
     if (request.method === "POST" && url.pathname === "/upload") {
-      // 1. Authenticate first so unauthenticated callers cannot consume rate limits
+
       if (!isAuthorized(request, env)) {
         return jsonResponse(
           { success: false, error: "Unauthorized: Invalid or missing authorization credentials" },
@@ -205,7 +181,6 @@ export default {
         );
       }
 
-      // 2. Enforce post-auth rate limiting
       if (!checkUploadRateLimit(request)) {
         return jsonResponse(
           { success: false, error: "Rate limit exceeded: Too many uploads. Please wait a moment." },
@@ -223,7 +198,6 @@ export default {
       try {
         const contentTypeHeader = (request.headers.get("content-type") || "").toLowerCase();
 
-        // Guard against dangerous executable or script formats
         for (const forbidden of FORBIDDEN_MIME_PATTERNS) {
           if (contentTypeHeader.includes(forbidden)) {
             return jsonResponse(
@@ -254,7 +228,6 @@ export default {
           originalName = file.name || originalName;
           fileSize = file.size || 0;
 
-          // Stream directly into R2 to prevent isolate memory exhaustion
           fileStream = typeof file.stream === "function" ? file.stream() : await file.arrayBuffer();
         } else {
           mimeType = contentTypeHeader.split(";")[0].trim() || mimeType;
@@ -262,7 +235,6 @@ export default {
           fileStream = request.body;
         }
 
-        // Secondary validation on resolved mimeType
         for (const forbidden of FORBIDDEN_MIME_PATTERNS) {
           if (mimeType.toLowerCase().includes(forbidden)) {
             return jsonResponse(
@@ -272,7 +244,7 @@ export default {
           }
         }
 
-        const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150 MB ceiling
+        const MAX_FILE_SIZE = 150 * 1024 * 1024;
         if (fileSize > MAX_FILE_SIZE) {
           return jsonResponse(
             { success: false, error: "File exceeds maximum upload size (150 MB)" },
@@ -280,7 +252,6 @@ export default {
           );
         }
 
-        // Resolve safe extension
         let ext = MIME_TO_EXTENSION[mimeType.toLowerCase()];
         if (!ext) {
           const candidateExt = originalName.includes(".") ? originalName.split(".").pop().toLowerCase() : "";
@@ -296,7 +267,6 @@ export default {
         const uniqueId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
         const callerUid = extractUserId(request);
 
-        // Scope path by user ID for strict object isolation and BOLA prevention
         const key = callerUid
           ? `users/${callerUid}/pins/${Date.now()}-${uniqueId}.${ext}`
           : `pins/${Date.now()}-${uniqueId}.${ext}`;

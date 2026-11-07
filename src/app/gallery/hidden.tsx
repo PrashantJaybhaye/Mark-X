@@ -50,16 +50,13 @@ export default function MyEyesOnlyVaultScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Multi-select state
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Dialogs
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false);
   const pendingOperationIdsRef = useRef<Set<string>>(new Set());
 
-  // Options Modal
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const insets = useSafeAreaInsets();
   const optionsSheetAnim = useRef(new Animated.Value(0)).current;
@@ -188,7 +185,6 @@ export default function MyEyesOnlyVaultScreen() {
     }
   };
 
-  // Auto-lock vault on app minimize / background
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
@@ -202,7 +198,6 @@ export default function MyEyesOnlyVaultScreen() {
     return () => sub.remove();
   }, [router]);
 
-  // Handle Android hardware back button
   useEffect(() => {
     const onBackPress = () => {
       if (showOptionsModal) {
@@ -240,7 +235,6 @@ export default function MyEyesOnlyVaultScreen() {
     }
   }, []);
 
-  // Initial load & real-time sync
   useEffect(() => {
     let isMounted = true;
 
@@ -287,7 +281,6 @@ export default function MyEyesOnlyVaultScreen() {
     };
   }, []);
 
-  // Toggle selection
   const toggleSelectPin = (id: string) => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
     setSelectedIds((prev) => {
@@ -301,7 +294,6 @@ export default function MyEyesOnlyVaultScreen() {
     });
   };
 
-  // Unhide selected
   const handleConfirmUnhide = async () => {
     setShowUnhideConfirm(false);
     const targets = Array.from(selectedIds);
@@ -325,7 +317,6 @@ export default function MyEyesOnlyVaultScreen() {
     }
   };
 
-  // Delete selected
   const handleConfirmDelete = async () => {
     setShowDeleteConfirm(false);
     const targets = Array.from(selectedIds);
@@ -353,9 +344,7 @@ export default function MyEyesOnlyVaultScreen() {
     <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <StatusBar style="dark" />
 
-      {/* Top Header Bar */}
       <View className="flex-row items-center justify-between px-5 pt-6 pb-3 bg-white border-b border-[#F2F2F2]">
-        {/* Left: Apple Photos Chevron + Label */}
         <TouchableOpacity
           onPress={() => {
             if (isSelectMode) {
@@ -372,7 +361,6 @@ export default function MyEyesOnlyVaultScreen() {
           <Ionicons name="chevron-back" size={23} color="#111111" />
         </TouchableOpacity>
 
-        {/* Center: Title with Lock Badge */}
         <View className="items-center justify-center flex-1 px-2">
           <View className="flex-row items-center gap-1.5">
               <Ionicons name="lock-closed" size={14} color="#111111" />
@@ -693,7 +681,6 @@ export default function MyEyesOnlyVaultScreen() {
           },
         ]}
       />
-
 
       {/* Individual Pin Options Sheet & Info Sheet (from Gallery tab) */}
       <GalleryPinOptionsSheet

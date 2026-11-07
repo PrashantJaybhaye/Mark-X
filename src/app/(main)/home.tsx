@@ -47,8 +47,6 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
 
-  // Responsive padding for curved displays & safe areas:
-  // Math.max(insets.left, insets.right, 20) keeps elements inside the flat viewable plane on curved screens
   const horizontalPadding = Math.max(insets.left, insets.right, 20);
   const bottomScrollPadding = Math.max(insets.bottom, 16) + 76;
 
@@ -249,7 +247,6 @@ export default function HomeScreen() {
             />
           </View>
 
-          {/* Blue Branding Strip Line */}
           <View style={{ width: "100%", flexDirection: "row", alignItems: "center", marginBottom: 10, paddingHorizontal: 2 }}>
             <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: "#3E140A" }} />
             <Text

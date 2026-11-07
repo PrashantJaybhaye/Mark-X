@@ -7,7 +7,6 @@ import { triggerHaptic } from "../utils/haptics";
 export function getMimeTypeForFile(fileName?: string, defaultMime?: string): string {
   const name = (fileName || "").toLowerCase();
 
-  // Explicit extension matching first for highest reliability
   if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   if (name.endsWith(".doc")) return "application/msword";
   if (name.endsWith(".odt")) return "application/vnd.oasis.opendocument.text";
@@ -67,7 +66,6 @@ export async function openInNativeApp(item: DriveItem): Promise<boolean> {
   try {
     let localUri = targetUri;
 
-    // If localUri is a file:// path, check if it actually exists on device
     if (localUri.startsWith("file://")) {
       const info = await FileSystem.getInfoAsync(localUri).catch(() => null);
       if (!info?.exists) {
@@ -80,11 +78,9 @@ export async function openInNativeApp(item: DriveItem): Promise<boolean> {
       }
     }
 
-    // If file is remote, download it to cache directory
     if (localUri.startsWith("http://") || localUri.startsWith("https://")) {
       let safeName = (item.name || "document").replace(/[^a-zA-Z0-9._-]/g, "_");
 
-      // Ensure extension is retained so native applications recognize the file type
       const hasExtension = safeName.includes(".") && safeName.lastIndexOf(".") > 0;
       if (!hasExtension) {
         const mime = (item.mimeType || "").toLowerCase();

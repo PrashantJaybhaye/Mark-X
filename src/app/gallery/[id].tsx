@@ -67,7 +67,7 @@ const VideoProgressBar = React.memo(function VideoProgressBar({
           }
         }
       } catch {
-        // ignore
+
       }
     };
 

@@ -9,15 +9,11 @@ const LEGACY_PASSCODE_STORAGE_PREFIX = "markx_my_eyes_only_passcode_";
 const VAULT_SALT_SECRET = "markx_vault_salt_v1_";
 
 const MAX_ATTEMPTS_BEFORE_LOCK = 5;
-const LOCKOUT_DURATION_MS = 30 * 1000; // 30 seconds
+const LOCKOUT_DURATION_MS = 30 * 1000;
 
-// In-memory lockout and rate-limiting tracking to stop automated brute-force attacks
 let failedAttemptsCount = 0;
 let lockedUntilTimestamp = 0;
 
-/**
- * Returns remaining seconds if vault passcode entry is locked due to repeated failures.
- */
 export function getPasscodeLockoutRemainingSeconds(): number {
   const now = Date.now();
   if (lockedUntilTimestamp > now) {
@@ -26,15 +22,11 @@ export function getPasscodeLockoutRemainingSeconds(): number {
   return 0;
 }
 
-/**
- * Reset lockout state.
- */
 export function clearPasscodeLockout(): void {
   failedAttemptsCount = 0;
   lockedUntilTimestamp = 0;
 }
 
-// Fast in-memory cache to guarantee zero-latency rendering and instant verification
 let cachedVaultState: {
   uid: string;
   hasPasscode: boolean;

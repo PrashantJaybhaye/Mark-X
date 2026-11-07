@@ -42,7 +42,6 @@ export const NoteFormatSheet: React.FC<NoteFormatSheetProps> = ({
         paddingBottom: Math.max(bottomInset + 12, 24),
       }}
     >
-      {/* Header */}
       <View
         style={{
           flexDirection: "row",
@@ -73,7 +72,6 @@ export const NoteFormatSheet: React.FC<NoteFormatSheetProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Segmented text style selector */}
       <View
         style={{
           flexDirection: "row",
@@ -117,7 +115,6 @@ export const NoteFormatSheet: React.FC<NoteFormatSheetProps> = ({
         })}
       </View>
 
-      {/* Inline styles: B / I / U / S, marker, color */}
       <View
         style={{
           flexDirection: "row",
@@ -217,7 +214,6 @@ export const NoteFormatSheet: React.FC<NoteFormatSheetProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Block formatting: bullets, numbering, indent/outdent */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <View
           style={{

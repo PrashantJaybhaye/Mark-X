@@ -49,7 +49,6 @@ function sanitizeForServer(pin: Partial<GalleryPin>): Record<string, any> {
   return clean;
 }
 
-// Auto-migrate any legacy pins from users/{uid}/hidden subcollection into users/{uid}/gallery with hidden: true
 let hasMigratedLegacy = false;
 async function autoMigrateLegacyHiddenSubcollection(uid: string) {
   if (hasMigratedLegacy) return;
@@ -73,7 +72,7 @@ async function autoMigrateLegacyHiddenSubcollection(uid: string) {
       }
     }
   } catch (e) {
-    // non-blocking
+
   }
 }
 
@@ -89,7 +88,6 @@ export async function fetchHiddenGalleryPinsPage(
 
     const colRef = getGalleryColRef();
 
-    // Query gallery where hidden == true ordered by createdAt desc
     let snapshot: FirebaseFirestoreTypes.QuerySnapshot;
     try {
       const q = lastDoc
@@ -97,7 +95,7 @@ export async function fetchHiddenGalleryPinsPage(
         : query(colRef, where("hidden", "==", true), orderBy("createdAt", "desc"), limit(pageSize));
       snapshot = await getDocs(q);
     } catch (indexErr: any) {
-      // If composite index on (hidden + createdAt) is not yet built, fetch and filter client-side with zero error
+
       const fallbackQuery = lastDoc
         ? query(colRef, orderBy("createdAt", "desc"), startAfter(lastDoc), limit(pageSize))
         : query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
@@ -140,7 +138,6 @@ export function subscribeHiddenGalleryPins(
     const colRef = getGalleryColRef();
     let fallbackUnsub: (() => void) | null = null;
 
-    // 1. Try querying where hidden == true
     const primaryQuery = query(colRef, where("hidden", "==", true), orderBy("createdAt", "desc"), limit(pageSize));
 
     const primaryUnsub = onSnapshot(
@@ -151,7 +148,7 @@ export function subscribeHiddenGalleryPins(
         onUpdate(pins);
       },
       (error: any) => {
-        // If index is building or missing, subscribe to gallery and filter in memory
+
         if (error?.message?.includes("index")) {
           const fallbackQuery = query(colRef, orderBy("createdAt", "desc"), limit(pageSize));
           fallbackUnsub = onSnapshot(
@@ -180,11 +177,6 @@ export function subscribeHiddenGalleryPins(
   }
 }
 
-/**
- * Move pin to hidden:
- * Sets hidden: true on the pin in the 'gallery' collection.
- * CRITICAL: createdAt is NEVER changed, preserving the original photo timestamp!
- */
 export async function movePinToHiddenGallery(pinId: string): Promise<boolean> {
   try {
     const uid = auth.currentUser?.uid;
@@ -193,10 +185,8 @@ export async function movePinToHiddenGallery(pinId: string): Promise<boolean> {
     const colRef = getGalleryColRef();
     const docRef = doc(colRef, pinId);
 
-    // Merge hidden: true into the existing document (preserving createdAt!)
     await setDoc(docRef, { hidden: true, updatedAt: serverTimestamp() }, { merge: true });
 
-    // Update local caches
     const cachedGallery = await loadCachedGalleryPins();
     const updatedGallery = cachedGallery.map((p) => (p.id === pinId ? { ...p, hidden: true } : p));
     await saveCachedGalleryPins(updatedGallery);
@@ -215,11 +205,6 @@ export async function movePinToHiddenGallery(pinId: string): Promise<boolean> {
   }
 }
 
-/**
- * Move pin back to main gallery:
- * Sets hidden: false on the pin in the 'gallery' collection.
- * CRITICAL: createdAt is NEVER changed!
- */
 export async function movePinToMainGallery(pinId: string): Promise<boolean> {
   try {
     const uid = auth.currentUser?.uid;
@@ -228,10 +213,8 @@ export async function movePinToMainGallery(pinId: string): Promise<boolean> {
     const colRef = getGalleryColRef();
     const docRef = doc(colRef, pinId);
 
-    // Merge hidden: false into the existing document (preserving createdAt!)
     await setDoc(docRef, { hidden: false, updatedAt: serverTimestamp() }, { merge: true });
 
-    // Update local caches
     const cachedGallery = await loadCachedGalleryPins();
     const updatedGallery = cachedGallery.map((p) => (p.id === pinId ? { ...p, hidden: false } : p));
     await saveCachedGalleryPins(updatedGallery);
@@ -246,10 +229,6 @@ export async function movePinToMainGallery(pinId: string): Promise<boolean> {
   }
 }
 
-/**
- * Bulk move multiple pins back to main gallery atomically in a single batch.
- * Original createdAt timestamps are preserved, and Firestore fires only one clean event.
- */
 export async function moveMultiplePinsToMainGallery(pinIds: string[]): Promise<boolean> {
   try {
     const uid = auth.currentUser?.uid;
@@ -307,9 +286,6 @@ export async function deleteHiddenGalleryPinFromServer(pinId: string): Promise<v
   }
 }
 
-/**
- * Bulk delete multiple hidden pins atomically in a single batch.
- */
 export async function deleteMultipleHiddenGalleryPins(pinIds: string[]): Promise<void> {
   try {
     const uid = auth.currentUser?.uid;

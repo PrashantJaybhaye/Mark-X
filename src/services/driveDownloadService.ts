@@ -8,7 +8,6 @@ import { DriveItem } from "../utils/driveFileTypes";
 import { getMimeTypeForFile } from "./nativeFileOpenerService";
 import { emitDriveToast } from "./driveToastService";
 
-// Safely resolve optional react-native-blob-util without crashing clean CI/EAS builds
 let ReactNativeBlobUtil: any = null;
 try {
   const mod = require("react-native-blob-util");
@@ -23,12 +22,8 @@ export interface DownloadFileResult {
   error?: string;
 }
 
-// Track active download tasks
 const activeDownloads = new Map<string, FileSystem.DownloadResumable>();
 
-/**
- * Ensures Notifee notification channel exists on Android.
- */
 async function ensureDownloadChannel() {
   if (Platform.OS !== "android") return;
   try {
@@ -43,9 +38,6 @@ async function ensureDownloadChannel() {
   }
 }
 
-/**
- * Normalizes local file path: decodes %20 to spaces, removes file:// prefix.
- */
 function normalizeLocalPath(uri: string): string {
   let decoded = uri;
   try {
@@ -54,9 +46,6 @@ function normalizeLocalPath(uri: string): string {
   return decoded.replace(/^file:\/\//, "");
 }
 
-/**
- * Renders or updates a notification for downloading progress.
- */
 async function showProgressNotification(
   notificationId: string,
   fileName: string,
